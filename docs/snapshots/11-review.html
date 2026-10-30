@@ -1,0 +1,83 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>反脆弱的第二条证据 · secondBrain</title><style>
+:root{--bg:#0f1115;--card:#171a21;--line:#262b36;--fg:#e6e8ee;--dim:#9aa3b2;
+--red:#ef5f6b;--yellow:#e3b341;--green:#3fb950;--blue:#58a6ff;--mono:ui-monospace,Menlo,monospace}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);
+font:15px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+.wrap{max-width:1000px;margin:0 auto;padding:28px 20px 80px}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:14px;color:var(--dim);margin:26px 0 10px;letter-spacing:.04em}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.stat{flex:1 1 120px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.stat b{display:block;font-size:24px}.stat span{color:var(--dim);font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--dim);font-weight:500;font-size:12px}
+.mono{font-family:var(--mono);font-size:12px;color:var(--dim);word-break:break-all}
+.badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;border:1px solid var(--line)}
+.b-block{color:var(--red);border-color:#5a2b31;background:#2a1618}
+.b-warn{color:var(--yellow);border-color:#5a4a1e;background:#2a2414}
+.b-ok{color:var(--green);border-color:#24512c;background:#152215}
+.b-blue{color:var(--blue);border-color:#243b5a;background:#141c2a}
+.btn{display:inline-block;padding:6px 14px;border-radius:8px;border:1px solid var(--line);
+background:#1d222b;color:var(--fg);cursor:pointer;font-size:13.5px}
+.btn.primary{background:#1f6feb;border-color:#1f6feb;color:#fff}
+.btn.danger{background:#3a1d22;border-color:#5a2b31;color:#ff9aa2}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+input[type=text]{width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--line);
+background:#0c0e12;color:var(--fg);font-size:14px}
+li{margin:6px 0}.muted{color:var(--dim)}
+pre{background:#0c0e12;border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto;font-size:12.5px}
+</style></head>
+<body><div class="wrap">
+  <div class="row" style="justify-content:space-between">
+    <div><h1>反脆弱的第二条证据</h1><div class="mono">raw/knowledge/cubox/mock-2026-10-01 反脆弱的第二条证据.md</div></div>
+    <a class="btn" href="/">← 返回</a>
+  </div>
+
+  <div class="row" style="margin-top:12px">
+    <div class="stat"><b>189</b><span>原文字数</span></div>
+    <div class="stat"><b>patch</b><span>判档</span></div>
+    <div class="stat"><b>3</b><span>claims</span></div>
+    <div class="stat"><b><span class="badge b-ok">通过</span></b><span>预警</span></div>
+  </div>
+
+  <h2>① 预警</h2><div class="muted">无预警</div>
+
+  <h2>② 搜索现有知识库</h2>
+  <form class="card" method="get" action="/search">
+    <input type="hidden" name="draft" value="draft-0d8a005a8e2d">
+    <input type="text" name="q" value="" placeholder="换几个关键词复核">
+    <div class="row" style="margin-top:10px"><button class="btn" type="submit">搜索</button></div>
+    <ul style="margin:10px 0 0"></ul>
+  </form>
+
+  <h2>③ 草稿</h2>
+  <div class="card"><ul><li>冗余不是效率的敌人，而是极端事件下的续命装置。
+    
+    <div class="mono">来源：raw/knowledge/cubox/mock-2026-10-01 反脆弱的第二条证据.md</div></li><li>关键是冗余必须分层：第一层保命，第二层保机会，第三层才是效率优化的对象。
+    
+    <div class="mono">来源：raw/knowledge/cubox/mock-2026-10-01 反脆弱的第二条证据.md</div></li><li>边界在于：不轮换的备份等于没有备份。
+    
+    <div class="mono">来源：raw/knowledge/cubox/mock-2026-10-01 反脆弱的第二条证据.md</div></li></ul>
+    <h2 style="margin-top:16px">目标节点</h2><ul><li>
+    <span class="badge b-blue">并入</span>
+    反脆弱 <span class="muted">(concept)</span>
+    </li></ul></div>
+
+  <h2>④ 决策</h2>
+  <div class="card row">
+    <form method="post" action="/review/draft-0d8a005a8e2d/accept" style="margin:0">
+      <button class="btn primary" type="submit" >通过并入库</button>
+    </form>
+    <form method="post" action="/review/draft-0d8a005a8e2d/reject" class="row" style="margin:0">
+      <input type="text" name="note" placeholder="驳回理由" style="max-width:300px">
+      <button class="btn danger" type="submit">驳回</button>
+    </form>
+    
+  </div>
+  <div class="muted" style="margin-top:10px">
+    来源：mock / heuristic-v1 · prompt v1
+  </div></div></body></html>

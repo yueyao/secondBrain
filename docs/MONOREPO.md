@@ -19,7 +19,10 @@ secondbrain-server/                     # monorepo 根（Git 仓库根）
 │  ├─ domain/           @sb/domain          # 纯领域：状态机 / 策略 / 10 条规则（零依赖）
 │  ├─ contracts/        @sb/contracts       # 端口接口 + 跨端 DTO（只依赖 domain）
 │  ├─ adapters-sqlite/  @sb/adapters-sqlite # StateStore 的 SQLite 实现（允许 node:）
-│  └─ adapters-vault/   @sb/adapters-vault  # fs + git + 单写者锁（允许 node:）
+│  ├─ adapters-vault/   @sb/adapters-vault  # fs + git + 单写者锁（允许 node:）
+│  ├─ adapters-search-memory/ @sb/adapters-search-memory  # 内存检索
+│  ├─ app/              @sb/app             # 应用层用例（只依赖端口）
+│  └─ testing/          @sb/testing         # 测试夹具 + MockAgent + harness
 ├─ apps/                                # 入口（cli / server），尚未创建
 └─ docs/                                # PROGRESS / DOMAIN / MONOREPO / adr
 ```
@@ -46,6 +49,7 @@ secondbrain-server/                     # monorepo 根（Git 仓库根）
 | `@sb/domain` | **无**（零依赖，连 `node:` 都不允许） |
 | `@sb/contracts` | `@sb/domain` |
 | `@sb/adapters-*` | `@sb/domain`、`@sb/contracts` |
+| `@sb/testing` | domain、contracts、各适配器（仅供测试与 demo） |
 | `@sb/app` | `@sb/domain`、`@sb/contracts` |
 | `apps/*` | 以上全部 |
 

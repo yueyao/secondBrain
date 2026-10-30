@@ -1,6 +1,6 @@
 # secondbrain-server
 
-secondBrain 知识生产流程的服务端实现，**pnpm workspaces monorepo**。当前完成 P0（工程底座）+ P1（领域层）+ P2（SQLite 适配器）+ P3（Vault 适配器）+ 多包结构。
+secondBrain 知识生产流程的服务端实现，**pnpm workspaces monorepo**。当前完成 P0-P3（工程底座 / 领域层 / SQLite 适配器 / Vault 适配器）+ 应用层 + 可启动的 mock 审核台 + 测试方案。
 
 - 流程契约：[../secondBrain-生产逻辑.md](../secondBrain-生产逻辑.md)
 - 总体设计：[../secondBrain-服务端详细设计-v2.md](../secondBrain-服务端详细设计-v2.md)
@@ -16,14 +16,27 @@ secondBrain 知识生产流程的服务端实现，**pnpm workspaces monorepo**�
 | `@sb/contracts` | 端口接口 + 跨端 DTO（ReviewView / QueueItem） | `@sb/domain` | ✅ |
 | `@sb/adapters-sqlite` | StateStore 实现、迁移、事务、乐观锁、事件流 | domain + contracts | ✅ |
 | `@sb/adapters-vault` | 文件系统 + git 提交 + 单写者文件锁 | domain + contracts | ✅ |
-| `@sb/adapters-agent` | 模型 provider、schema 校验、预算 | domain + contracts | ⬜ P4 |
+| `@sb/adapters-search-memory` | 内存检索（mock 用） | domain + contracts | ✅ |
+| `@sb/app` | 用例：triage / digest / review / commit | domain + contracts | ✅ |
+| `@sb/testing` | 测试夹具、MockAgent、harness | 域 + 适配器 | ✅ |
+| `@sb/adapters-agent` | 真实模型 provider、schema 校验、预算 | domain + contracts | ⬜ P4 |
 | `@sb/app` | 用例：triage / digest / commit / recover | domain + contracts | ⬜ P5 |
 | `apps/cli` | 人审与运维命令 | 全部 | ⬜ P5 |
-| `apps/server` | JSON API | 全部 | ⬜ P6 |
+| `@sb/server` | mock 审核台：HTTP + 服务端渲染 UI | 全部 | ✅ |
 
 依赖方向由工具强制：`tools/check-boundaries.mjs`（源码级）+ `.dependency-cruiser.cjs`（图级）+ 各包 `package.json` 声明三者交叉校验。
 
-## 快速开始
+## 快速开始（含可交互 mock 审核台）
+
+```bash
+pnpm install
+pnpm demo          # → http://127.0.0.1:8787（自动播种 mock 数据）
+```
+
+首页「扫描 raw/ 并分档」→ 队列「生成草稿」→ 审阅页「通过并入库」，每一步都会在 demo vault 里产生真实 git commit。
+测试方案见 [docs/TESTING.md](docs/TESTING.md)，页面快照见 `docs/snapshots/`。
+
+## 工程校验
 
 ```bash
 pnpm install
@@ -36,10 +49,10 @@ pnpm run check     # boundaries → typecheck → depcruise → test
 pnpm run boundaries   # 包边界、深引、纯度（无 node: / 无第三方 / 无 throw / 无时钟）
 pnpm run typecheck    # tsc --noEmit（strict + exactOptionalPropertyTypes）
 pnpm run depcruise    # 依赖方向、环形依赖
-pnpm test             # vitest：13 个文件 / 112 例
+pnpm test             # vitest：17 个文件 / 129 例
 ```
 
-## 这一层能证明什么
+## 能证明什么
 
 - **状态机不可绕过**：18 状态 × 24 事件 = 432 个组合穷举；迁移表在测试里被独立重抄一遍做双重记账。
 - **阻断级预警真的挡得住**：`ACCEPT` 遇 `block` finding 返回 `BLOCK_FINDINGS_PRESENT`。

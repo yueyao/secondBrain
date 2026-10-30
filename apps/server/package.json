@@ -1,0 +1,20 @@
+{
+  "name": "@sb/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "本地 mock 审核台：HTTP + 服务端渲染 UI（无需外部模型）",
+  "scripts": {
+    "start": "tsx src/main.ts",
+    "start:node": "node src/main.ts"
+  },
+  "dependencies": {
+    "@sb/adapters-search-memory": "workspace:*",
+    "@sb/adapters-sqlite": "workspace:*",
+    "@sb/adapters-vault": "workspace:*",
+    "@sb/app": "workspace:*",
+    "@sb/contracts": "workspace:*",
+    "@sb/domain": "workspace:*",
+    "@sb/testing": "workspace:*"
+  }
+}

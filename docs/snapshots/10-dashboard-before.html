@@ -1,0 +1,92 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>审核台 · secondBrain</title><style>
+:root{--bg:#0f1115;--card:#171a21;--line:#262b36;--fg:#e6e8ee;--dim:#9aa3b2;
+--red:#ef5f6b;--yellow:#e3b341;--green:#3fb950;--blue:#58a6ff;--mono:ui-monospace,Menlo,monospace}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);
+font:15px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}
+a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
+.wrap{max-width:1000px;margin:0 auto;padding:28px 20px 80px}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:14px;color:var(--dim);margin:26px 0 10px;letter-spacing:.04em}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.stat{flex:1 1 120px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.stat b{display:block;font-size:24px}.stat span{color:var(--dim);font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--dim);font-weight:500;font-size:12px}
+.mono{font-family:var(--mono);font-size:12px;color:var(--dim);word-break:break-all}
+.badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;border:1px solid var(--line)}
+.b-block{color:var(--red);border-color:#5a2b31;background:#2a1618}
+.b-warn{color:var(--yellow);border-color:#5a4a1e;background:#2a2414}
+.b-ok{color:var(--green);border-color:#24512c;background:#152215}
+.b-blue{color:var(--blue);border-color:#243b5a;background:#141c2a}
+.btn{display:inline-block;padding:6px 14px;border-radius:8px;border:1px solid var(--line);
+background:#1d222b;color:var(--fg);cursor:pointer;font-size:13.5px}
+.btn.primary{background:#1f6feb;border-color:#1f6feb;color:#fff}
+.btn.danger{background:#3a1d22;border-color:#5a2b31;color:#ff9aa2}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+input[type=text]{width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--line);
+background:#0c0e12;color:var(--fg);font-size:14px}
+li{margin:6px 0}.muted{color:var(--dim)}
+pre{background:#0c0e12;border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto;font-size:12.5px}
+</style></head>
+<body><div class="wrap">
+  <h1>secondBrain 审核台</h1>
+  <div class="muted">mock 原文 · 真实状态机 · 每次入库一次 git commit</div>
+
+  <div class="row" style="margin-top:16px">
+    <div class="stat"><b>7</b><span>原文</span></div>
+    <div class="stat"><b>4</b><span>待加工</span></div>
+    <div class="stat"><b>0</b><span>待审</span></div>
+    <div class="stat"><b>0</b><span>已入库</span></div>
+    <div class="stat"><b>3</b><span>已延后</span></div>
+  </div>
+
+  <h2>操作</h2>
+  <div class="card row">
+    <form method="post" action="/actions/ingest" style="margin:0">
+      <button class="btn primary" type="submit">扫描 raw/ 并分档</button>
+    </form>
+    <span class="muted">超 60,000 字的原文自动延后，不读全文。</span>
+  </div>
+
+  <h2>搜索知识库</h2>
+  <form class="card" method="get" action="/search">
+    <input type="text" name="q" placeholder="例如：反脆弱、幂律、长期主义">
+    <div class="row" style="margin-top:10px"><button class="btn" type="submit">搜索</button></div>
+  </form>
+
+  <h2>待审草稿（人只在这里动手）</h2>
+  <div class="card" style="padding:4px 0"><table>
+    <tr><th>预警</th><th>草稿</th><th>claims</th><th>档位</th></tr><tr><td colspan="4" class="muted">没有待审草稿。先点「扫描并分档」，再对队列里的条目生成草稿。</td></tr>
+  </table></div>
+
+  <h2>队列</h2>
+  <div class="card" style="padding:4px 0"><table>
+    <tr><th>原文</th><th>字数</th><th>状态</th><th></th></tr><tr>
+      <td>反脆弱的第二条证据<div class="mono">raw/knowledge/cubox/mock-2026-10-01 反脆弱的第二条证据.md</div></td>
+      <td>189 字</td>
+      <td><span class="badge b-blue">queued</span></td>
+      <td><form method="post" action="/actions/digest" style="margin:0">
+             <input type="hidden" name="rawPath" value="raw/knowledge/cubox/mock-2026-10-01 反脆弱的第二条证据.md">
+             <button class="btn" type="submit">生成草稿</button></form></td></tr><tr>
+      <td>幂律分布与头部效应<div class="mono">raw/knowledge/notions/mock-2026-10-02 幂律分布.md</div></td>
+      <td>195 字</td>
+      <td><span class="badge b-blue">queued</span></td>
+      <td><form method="post" action="/actions/digest" style="margin:0">
+             <input type="hidden" name="rawPath" value="raw/knowledge/notions/mock-2026-10-02 幂律分布.md">
+             <button class="btn" type="submit">生成草稿</button></form></td></tr><tr>
+      <td>长期主义与时间套利<div class="mono">raw/knowledge/podcast/mock-E999 长期主义与时间套利.md</div></td>
+      <td>220 字</td>
+      <td><span class="badge b-blue">queued</span></td>
+      <td><form method="post" action="/actions/digest" style="margin:0">
+             <input type="hidden" name="rawPath" value="raw/knowledge/podcast/mock-E999 长期主义与时间套利.md">
+             <button class="btn" type="submit">生成草稿</button></form></td></tr><tr>
+      <td>长期主义（另一份转录）<div class="mono">raw/knowledge/podcast/mock-E999b 长期主义（另一份转录）.md</div></td>
+      <td>229 字</td>
+      <td><span class="badge b-blue">queued</span></td>
+      <td><form method="post" action="/actions/digest" style="margin:0">
+             <input type="hidden" name="rawPath" value="raw/knowledge/podcast/mock-E999b 长期主义（另一份转录）.md">
+             <button class="btn" type="submit">生成草稿</button></form></td></tr>
+  </table></div></div></body></html>

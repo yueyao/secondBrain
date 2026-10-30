@@ -336,3 +336,55 @@ P2 新增测试分布：`migrations` 4 例、`store` 13 例、`replay` 4 例。
 
 - **提交两阶段的"意图表"与启动对账 `Recover()` 没做**：它需要 `application/commit-draft` 用例配合（写 intent → 提交 → 记账），放到 P5 应用层与 commit 用例一起落地，避免现在做一个没人调用的对账器。
 - `commitFiles` 目前是"add 全部指定文件 → commit"，还没有"提交前比对目标节点 content_hash"的守卫（那属于应用层编排）。
+
+---
+
+## 十三、测试方案 + 应用层 + 可启动的 mock 审核台（2026-10-30 23:1x）
+
+### 13.1 新增内容
+
+| 包/应用 | 职责 | 测试 |
+|---|---|---|
+| `@sb/adapters-search-memory` | SearchIndex 内存实现（从 vault 建索引；供 mock 与规则评估） | 6 例 |
+| `@sb/testing` | 测试夹具（7 篇原文 + 3 个节点）、`MockAgent`、`createHarness()` | 3 例 |
+| `@sb/app` | 用例：`ingestAndTriage` / `draftDigest` / `decideReview` + 读模型 `listQueue` / `reviewView` | 5 例 |
+| `@sb/server` | HTTP + 服务端渲染审核台（无前端框架，手机可用） | 3 例（e2e） |
+
+### 13.2 实际跑通的闭环
+
+在临时数据目录启动真实服务后，用 curl 走完：
+
+```
+POST /actions/ingest   → 303，队列出现 4 篇（另 2 篇低价值、1 篇超长已自动延后）
+POST /actions/digest   → 303 → /review/draft-xxxx
+GET  /review/draft-xxxx → HTML 含「通过并入库」、3 条 claims、目标节点「反脆弱」
+POST /review/:id/accept → 303
+校验：wiki/concepts/反脆弱.md 新增 3 条 claim；git log 出现
+      `digest: raw/knowledge/cubox/mock-2026-10-01 反脆弱的第二条证据.md`
+```
+
+页面快照：`docs/snapshots/10-dashboard-before.html`、`11-review.html`、`12-dashboard-after.html`。
+
+### 13.3 工程化调整
+
+1. **`@types/node` + `types: ["node"]`**：适配器需要 Node 类型；纯包改用边界脚本补禁 `process/Buffer/__dirname/__filename/require`。
+2. **边界检查支持分层开关**：`forbidThrow/forbidClock/forbidRandom/forbidNodeGlobals` 取代单一 `pure`——应用层允许 `AppError`、但仍禁止读时钟。
+3. **契约扩展**：`SearchIndex.allDocs()`（规则评估需要现有节点快照）、`DraftRepo.listByStatus()`（待审列表）、`IdGenerator` 端口。
+4. **运行方式**：`tsx` 运行 TS（Node 原生 strip-types 对跨包相对导入要求 `.ts` 扩展名，暂不改造；P4 切构建产物后移除）。
+
+### 13.4 验证
+
+```
+✓ 边界检查通过：7 个包 / 58 个文件，0 违规
+✔ no dependency violations found (78 modules, 214 dependencies cruised)
+
+ Test Files  17 passed (17)
+      Tests  129 passed (129)
+```
+
+### 13.5 已知缺口
+
+1. **真实模型 provider 未接**（P4）：`MockAgent` 是确定性替身，不代表真实提炼质量。
+2. **`commit_intent` 两阶段与启动对账 `Recover()` 未实现**：`decideReview` 目前是「写文件 → git commit → 记状态」，失败用 `resetHard` 兜底；断电恢复类测试缺失（P5）。
+3. **写 wiki 与写状态不同事务**：极端情况下 git 成功、库失败会留下不一致；对账器补上后可收敛。
+4. **UI 无鉴权**，只绑 `127.0.0.1`。

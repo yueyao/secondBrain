@@ -1,0 +1,19 @@
+{
+  "name": "@sb/app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "应用层用例：triage / digest / review / commit（只依赖端口，不做 I/O）",
+  "exports": { ".": "./src/index.ts" },
+  "sideEffects": false,
+  "dependencies": {
+    "@sb/contracts": "workspace:*",
+    "@sb/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "@sb/testing": "workspace:*",
+    "@sb/adapters-vault": "workspace:*",
+    "@sb/adapters-sqlite": "workspace:*",
+    "@sb/adapters-search-memory": "workspace:*"
+  }
+}
