@@ -1,0 +1,16 @@
+{
+  "name": "@sb/testing",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "测试夹具：mock 原文/节点、MockAgent、以及组装好的内存测试环境",
+  "exports": { ".": "./src/index.ts" },
+  "sideEffects": false,
+  "dependencies": {
+    "@sb/adapters-search-memory": "workspace:*",
+    "@sb/adapters-sqlite": "workspace:*",
+    "@sb/adapters-vault": "workspace:*",
+    "@sb/contracts": "workspace:*",
+    "@sb/domain": "workspace:*"
+  }
+}
