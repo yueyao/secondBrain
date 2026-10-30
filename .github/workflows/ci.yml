@@ -1,0 +1,37 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: 包边界与纯度
+        run: pnpm run boundaries
+
+      - name: 类型检查
+        run: pnpm run typecheck
+
+      - name: 依赖图规则
+        run: pnpm run depcruise
+
+      - name: 单元测试
+        run: pnpm run test

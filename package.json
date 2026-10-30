@@ -1,0 +1,25 @@
+{
+  "name": "secondbrain-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "secondBrain 服务端 monorepo：领域 / 契约 / 适配器 / 应用 / 入口",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "boundaries": "node tools/check-boundaries.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "depcruise": "depcruise packages --config .dependency-cruiser.cjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "node tools/check-boundaries.mjs && tsc --noEmit -p tsconfig.json && depcruise packages --config .dependency-cruiser.cjs && vitest run"
+  },
+  "devDependencies": {
+    "dependency-cruiser": "^18.7.0",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.5"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "@sb/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "跨层契约：端口接口与跨端 DTO。不依赖任何适配器实现。",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "@sb/domain": "workspace:*"
+  }
+}

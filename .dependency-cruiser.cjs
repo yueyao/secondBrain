@@ -1,0 +1,60 @@
+/**
+ * Monorepo 依赖规则（设计文档 §2，改造为多包版）。
+ * 图级检查交给 dependency-cruiser；源码细节（throw / 时钟 / 深引）交给 tools/check-boundaries.mjs。
+ */
+module.exports = {
+  forbidden: [
+    {
+      name: 'domain-must-be-pure',
+      comment: 'domain 不允许任何 I/O 与外部依赖',
+      severity: 'error',
+      from: { path: '^packages/domain/src' },
+      to: { path: '^node:' },
+    },
+    {
+      name: 'domain-must-not-depend-on-contracts',
+      comment: '依赖只能向内：domain 是最内层，不能引用契约包',
+      severity: 'error',
+      from: { path: '^packages/domain/src' },
+      to: { path: '^packages/contracts' },
+    },
+    {
+      name: 'contracts-must-be-pure',
+      comment: '契约包只声明接口与 DTO，不实现 I/O',
+      severity: 'error',
+      from: { path: '^packages/contracts/src' },
+      to: { path: '^node:' },
+    },
+    {
+      name: 'contracts-must-not-depend-on-implementations',
+      comment: '契约不得反向依赖应用/适配器/入口',
+      severity: 'error',
+      from: { path: '^packages/contracts/src' },
+      to: { path: '^(packages/(app|adapters)|apps)/' },
+    },
+    {
+      name: 'no-circular',
+      severity: 'error',
+      from: {},
+      to: { circular: true },
+    },
+    {
+      name: 'no-orphans',
+      severity: 'warn',
+      from: {
+        orphan: true,
+        pathNot: ['\\.d\\.ts$', '(^|/)index\\.ts$', '(^|/)main\\.ts$'],
+      },
+      to: {},
+    },
+  ],
+  options: {
+    doNotFollow: { path: 'node_modules' },
+    tsConfig: { fileName: 'tsconfig.json' },
+    tsPreCompilationDeps: true,
+    enhancedResolveOptions: {
+      exportsFields: ['exports'],
+      conditionNames: ['import', 'require', 'node', 'default'],
+    },
+  },
+};

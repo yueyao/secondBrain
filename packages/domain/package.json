@@ -1,0 +1,11 @@
+{
+  "name": "@sb/domain",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "纯领域层：状态机、策略、预警规则。零 I/O、零依赖。",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "sideEffects": false
+}
