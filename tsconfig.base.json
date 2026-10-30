@@ -46,6 +46,24 @@
       ],
       "@sb/adapters-vault/*": [
         "packages/adapters-vault/src/*"
+      ],
+      "@sb/adapters-search-memory": [
+        "packages/adapters-search-memory/src/index.ts"
+      ],
+      "@sb/adapters-search-memory/*": [
+        "packages/adapters-search-memory/src/*"
+      ],
+      "@sb/testing": [
+        "packages/testing/src/index.ts"
+      ],
+      "@sb/testing/*": [
+        "packages/testing/src/*"
+      ],
+      "@sb/app": [
+        "packages/app/src/index.ts"
+      ],
+      "@sb/app/*": [
+        "packages/app/src/*"
       ]
     }
   }

@@ -1,6 +1,7 @@
 /** @sb/contracts 公开面：端口 + 跨端 DTO。包外只能从这里导入。 */
 export * from './ports/clock';
 export * from './ports/lock';
+export * from './ports/ids';
 export * from './ports/state-store';
 export * from './ports/vault';
 export * from './ports/search-index';

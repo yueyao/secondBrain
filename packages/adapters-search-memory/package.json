@@ -1,0 +1,13 @@
+{
+  "name": "@sb/adapters-search-memory",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "SearchIndex 的内存实现：从 vault 节点建索引，用于 mock 与中小规模检索",
+  "exports": { ".": "./src/index.ts" },
+  "sideEffects": false,
+  "dependencies": {
+    "@sb/contracts": "workspace:*",
+    "@sb/domain": "workspace:*"
+  }
+}

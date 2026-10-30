@@ -58,7 +58,7 @@ function fakeTransaction(): Transaction {
       listByState: nope('listByState'),
       listAll: nope('listAll'),
     },
-    drafts: { insert: nope('insert'), get: nope('get'), setStatus: nope('setStatus') },
+    drafts: { insert: nope('insert'), get: nope('get'), listByStatus: nope('listByStatus'), setStatus: nope('setStatus') },
     decisions: { append: nope('append') },
     commits: { append: nope('append') },
     jobs: { enqueue: nope('enqueue'), claimNext: nope('claimNext'), finish: nope('finish') },
@@ -95,6 +95,7 @@ const vault: VaultPort = {
 const index: SearchIndex = {
   upsert: async () => undefined,
   remove: async () => undefined,
+  allDocs: () => [],
   query: async (q, limit = 10) => {
     const hits: ScoredHit[] = [
       {

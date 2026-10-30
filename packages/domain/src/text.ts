@@ -46,6 +46,15 @@ export function splitSentences(input: string): readonly string[] {
     .filter((sentence) => sentence.length > 0);
 }
 
+/** 抽出"像判断"的句子（长度 12-160 且含判断标记），供 triage 策略与 mock agent 使用。 */
+export function judgmentSentences(input: string): readonly string[] {
+  const text = stripMarkdown(input);
+  return splitSentences(text).filter((sentence) => {
+    if (sentence.length < 12 || sentence.length > 160) return false;
+    return JUDGMENT_MARKERS.some((marker) => sentence.includes(marker));
+  });
+}
+
 export function countJudgmentSentences(input: string): number {
   const text = stripMarkdown(input);
   return splitSentences(text).filter((sentence) => {

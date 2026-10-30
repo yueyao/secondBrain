@@ -11,10 +11,13 @@ export default defineConfig({
       '@sb/contracts': fromRoot('./packages/contracts/src/index.ts'),
       '@sb/adapters-sqlite': fromRoot('./packages/adapters-sqlite/src/index.ts'),
       '@sb/adapters-vault': fromRoot('./packages/adapters-vault/src/index.ts'),
+      '@sb/adapters-search-memory': fromRoot('./packages/adapters-search-memory/src/index.ts'),
+      '@sb/testing': fromRoot('./packages/testing/src/index.ts'),
+      '@sb/app': fromRoot('./packages/app/src/index.ts'),
     },
   },
   test: {
-    include: ['packages/*/test/**/*.test.ts'],
+    include: ['packages/*/test/**/*.test.ts', 'apps/*/test/**/*.test.ts'],
     environment: 'node',
   },
 });

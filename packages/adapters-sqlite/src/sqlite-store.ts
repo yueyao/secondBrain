@@ -208,6 +208,13 @@ class Drafts {
     return row ? rowToDraft(row) : null;
   }
 
+  async listByStatus(status: DraftStatus): Promise<readonly DraftRecord[]> {
+    const rows = this.store
+      .stmt('SELECT * FROM draft WHERE status = ? ORDER BY created_at DESC')
+      .all(status) as Row[];
+    return rows.map(rowToDraft);
+  }
+
   async setStatus(id: DraftId, status: DraftStatus): Promise<void> {
     this.store.stmt('UPDATE draft SET status = ? WHERE id = ?').run(status, id);
   }

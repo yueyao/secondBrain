@@ -47,6 +47,13 @@ module.exports = {
       to: { path: '^(packages/app|apps)/' },
     },
     {
+      name: 'app-must-not-depend-on-adapters',
+      comment: '应用层只依赖端口，不依赖任何适配器实现',
+      severity: 'error',
+      from: { path: '^packages/app/src' },
+      to: { path: '^packages/adapters' },
+    },
+    {
       name: 'no-circular',
       severity: 'error',
       from: {},

@@ -98,6 +98,7 @@ export interface RawItemRepo {
 export interface DraftRepo {
   insert(record: DraftRecord): Promise<void>;
   get(id: DraftId): Promise<DraftRecord | null>;
+  listByStatus(status: DraftStatus): Promise<readonly DraftRecord[]>;
   setStatus(id: DraftId, status: DraftStatus): Promise<void>;
 }
 

@@ -21,8 +21,45 @@ const PACKAGES_DIR = path.join(ROOT, 'packages');
 
 /** 每个包声明：允许的 workspace 裸导入、是否允许 node: 模块、是否纯函数包 */
 const PACKAGES = [
-  { dir: 'domain', name: '@sb/domain', allowedBare: [], allowNode: false, pure: true },
-  { dir: 'contracts', name: '@sb/contracts', allowedBare: ['@sb/domain'], allowNode: false, pure: true },
+  {
+    // 应用层允许 throw（AppError），但仍禁止读时钟/随机数与 Node I/O
+    dir: 'app',
+    name: '@sb/app',
+    allowedBare: ['@sb/domain', '@sb/contracts'],
+    allowNode: false,
+    forbidThrow: false,
+    forbidClock: true,
+    forbidRandom: true,
+    forbidNodeGlobals: true,
+  },
+  {
+    dir: 'testing',
+    name: '@sb/testing',
+    allowedBare: [
+      '@sb/domain',
+      '@sb/contracts',
+      '@sb/adapters-vault',
+      '@sb/adapters-sqlite',
+      '@sb/adapters-search-memory',
+    ],
+    allowNode: true,
+    pure: false,
+  },
+  {
+    dir: 'domain', name: '@sb/domain', allowedBare: [], allowNode: false,
+    forbidThrow: true, forbidClock: true, forbidRandom: true, forbidNodeGlobals: true,
+  },
+  {
+    dir: 'contracts', name: '@sb/contracts', allowedBare: ['@sb/domain'], allowNode: false,
+    forbidThrow: true, forbidClock: true, forbidRandom: true, forbidNodeGlobals: true,
+  },
+  {
+    dir: 'adapters-search-memory',
+    name: '@sb/adapters-search-memory',
+    allowedBare: ['@sb/domain', '@sb/contracts'],
+    allowNode: false,
+    pure: false,
+  },
   {
     dir: 'adapters-vault',
     name: '@sb/adapters-vault',
@@ -100,6 +137,13 @@ for (const pkg of PACKAGES) {
     }
   }
 
+  const flags = {
+    forbidThrow: pkg.forbidThrow ?? false,
+    forbidClock: pkg.forbidClock ?? false,
+    forbidRandom: pkg.forbidRandom ?? false,
+    forbidNodeGlobals: pkg.forbidNodeGlobals ?? false,
+  };
+
   for (const file of walk(srcDir)) {
     scannedFiles++;
     const rel = path.relative(ROOT, file);
@@ -136,20 +180,22 @@ for (const pkg of PACKAGES) {
       }
     }
 
-    if (pkg.pure) {
+    if (flags.forbidNodeGlobals) {
       for (const globalName of ['process', 'Buffer', '__dirname', '__filename', 'require']) {
         const pattern = new RegExp(`\\b${globalName.replace(/[$]/g, '\\$')}\\b`);
         if (pattern.test(code)) {
           violations.push(`${rel}: 纯包禁止使用 Node 全局 ${globalName}`);
         }
       }
-      if (/\bthrow\b/.test(code)) violations.push(`${rel}: 纯包禁止 throw —— 失败必须通过 Result 返回`);
-      if (/\bDate\.now\s*\(/.test(code) || /\bnew\s+Date\s*\(/.test(code)) {
-        violations.push(`${rel}: 纯包禁止读时钟 —— 时间由应用层注入`);
-      }
-      if (/\bMath\.random\s*\(/.test(code)) {
-        violations.push(`${rel}: 纯包禁止随机数 —— id 由应用层生成`);
-      }
+    }
+    if (flags.forbidThrow && /\bthrow\b/.test(code)) {
+      violations.push(`${rel}: 该包禁止 throw —— 失败必须通过 Result 返回`);
+    }
+    if (flags.forbidClock && (/\bDate\.now\s*\(/.test(code) || /\bnew\s+Date\s*\(/.test(code))) {
+      violations.push(`${rel}: 该包禁止读时钟 —— 时间由应用层注入`);
+    }
+    if (flags.forbidRandom && /\bMath\.random\s*\(/.test(code)) {
+      violations.push(`${rel}: 该包禁止随机数 —— id 由应用层生成`);
     }
   }
 }
@@ -174,7 +220,7 @@ if (violations.length > 0) {
 
 console.log(`✓ 边界检查通过：${PACKAGES.length} 个包 / ${scannedFiles} 个文件，0 违规`);
 for (const pkg of PACKAGES) {
-  console.log(`  - ${pkg.name}: 允许依赖 [${pkg.allowedBare.join(', ') || '无'}]，纯函数包=${pkg.pure}`);
+  console.log(`  - ${pkg.name}: 允许依赖 [${pkg.allowedBare.join(', ') || '无'}]`);
 }
 console.log('  - 深引、未登记的包、依赖声明与白名单不一致都会被拦下');
 console.log('  - 纯包：无 node: / 无第三方 / 无 throw / 无时钟；适配器包允许 node: 与 throw');

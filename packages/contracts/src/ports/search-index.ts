@@ -25,4 +25,6 @@ export interface SearchIndex {
   upsert(doc: NodeDoc): Promise<void>;
   remove(nodeId: NodeId): Promise<void>;
   query(query: string, limit?: number): Promise<readonly ScoredHit[]>;
+  /** 现有节点快照：应用层评估"同名/近义/并入目标"规则时需要。 */
+  allDocs(): readonly NodeDoc[];
 }
