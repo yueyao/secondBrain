@@ -10,6 +10,7 @@ export default defineConfig({
       '@sb/domain': fromRoot('./packages/domain/src/index.ts'),
       '@sb/contracts': fromRoot('./packages/contracts/src/index.ts'),
       '@sb/adapters-sqlite': fromRoot('./packages/adapters-sqlite/src/index.ts'),
+      '@sb/adapters-vault': fromRoot('./packages/adapters-vault/src/index.ts'),
     },
   },
   test: {

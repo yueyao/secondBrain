@@ -13,6 +13,8 @@ export interface RawFileRef {
 export interface VaultReader {
   listRaw(): Promise<readonly RawFileRef[]>;
   readRaw(path: RawPath): Promise<string>;
+  /** wiki 下全部节点文件（vault 相对路径），供检索索引与 doctor 使用。 */
+  listNodes(): Promise<readonly string[]>;
   readNode(file: string): Promise<string>;
   head(): Promise<CommitSha | null>;
   /** 工作区是否干净；脏工作区必须拒绝提交。 */

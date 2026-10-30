@@ -1,6 +1,6 @@
 # secondbrain-server
 
-secondBrain 知识生产流程的服务端实现，**pnpm workspaces monorepo**。当前完成 P0（工程底座）+ P1（领域层）+ P2（SQLite 适配器）+ 多包结构。
+secondBrain 知识生产流程的服务端实现，**pnpm workspaces monorepo**。当前完成 P0（工程底座）+ P1（领域层）+ P2（SQLite 适配器）+ P3（Vault 适配器）+ 多包结构。
 
 - 流程契约：[../secondBrain-生产逻辑.md](../secondBrain-生产逻辑.md)
 - 总体设计：[../secondBrain-服务端详细设计-v2.md](../secondBrain-服务端详细设计-v2.md)
@@ -15,7 +15,7 @@ secondBrain 知识生产流程的服务端实现，**pnpm workspaces monorepo**�
 | `@sb/domain` | 纯领域：状态机 / 策略 / 10 条预警规则 | 无（零依赖、零 I/O） | ✅ |
 | `@sb/contracts` | 端口接口 + 跨端 DTO（ReviewView / QueueItem） | `@sb/domain` | ✅ |
 | `@sb/adapters-sqlite` | StateStore 实现、迁移、事务、乐观锁、事件流 | domain + contracts | ✅ |
-| `@sb/adapters-vault` | fs + git + 单写者锁 | domain + contracts | ⬜ P3 |
+| `@sb/adapters-vault` | 文件系统 + git 提交 + 单写者文件锁 | domain + contracts | ✅ |
 | `@sb/adapters-agent` | 模型 provider、schema 校验、预算 | domain + contracts | ⬜ P4 |
 | `@sb/app` | 用例：triage / digest / commit / recover | domain + contracts | ⬜ P5 |
 | `apps/cli` | 人审与运维命令 | 全部 | ⬜ P5 |
@@ -36,7 +36,7 @@ pnpm run check     # boundaries → typecheck → depcruise → test
 pnpm run boundaries   # 包边界、深引、纯度（无 node: / 无第三方 / 无 throw / 无时钟）
 pnpm run typecheck    # tsc --noEmit（strict + exactOptionalPropertyTypes）
 pnpm run depcruise    # 依赖方向、环形依赖
-pnpm test             # vitest：11 个文件 / 95 例
+pnpm test             # vitest：13 个文件 / 112 例
 ```
 
 ## 这一层能证明什么
@@ -47,6 +47,7 @@ pnpm test             # vitest：11 个文件 / 95 例
 - **契约可实现**：`packages/contracts/test/ports.test.ts` 用假实现证明端口不是纸上接口。
 - **事件可回放**：状态与事件同事务写入；`applyEvents` 重建的状态与库里逐字段一致（篡改事件顺序会失败）。
 - **事务与锁可验证**：回滚不留痕、乐观锁只允许一个写者成功、任务领取原子且围栏令牌自增。
+- **vault 不可被越狱**：路径逃逸（`..`/绝对路径）与非 wiki 写入会被拒绝；提交失败可 `resetHard` 回滚。
 - **包边界可执行**：深引 `@sb/domain/src/*`、domain→contracts 反向依赖、未登记的新包，都会让 CI 失败。
 
 ## 目录
@@ -55,6 +56,7 @@ pnpm test             # vitest：11 个文件 / 95 例
 packages/domain/       纯领域：状态 / 迁移表 / 策略 / 规则 + 测试
 packages/contracts/    端口（StateStore/Vault/SearchIndex/Agent/Lock/Clock）+ DTO + 契约测试
 packages/adapters-sqlite/  StateStore 实现：迁移、事务、乐观锁、事件流 + 21 例测试
+packages/adapters-vault/   fs + git 提交 + 单写者锁（含路径逃逸防护）+ 17 例测试
 tools/                 零依赖检查脚本（包边界）
 docs/                  PROGRESS / DOMAIN / MONOREPO / ADR
 apps/                  入口（待创建）

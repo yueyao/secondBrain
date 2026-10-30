@@ -24,6 +24,13 @@ const PACKAGES = [
   { dir: 'domain', name: '@sb/domain', allowedBare: [], allowNode: false, pure: true },
   { dir: 'contracts', name: '@sb/contracts', allowedBare: ['@sb/domain'], allowNode: false, pure: true },
   {
+    dir: 'adapters-vault',
+    name: '@sb/adapters-vault',
+    allowedBare: ['@sb/domain', '@sb/contracts'],
+    allowNode: true,
+    pure: false,
+  },
+  {
     dir: 'adapters-sqlite',
     name: '@sb/adapters-sqlite',
     allowedBare: ['@sb/domain', '@sb/contracts'],
@@ -130,6 +137,12 @@ for (const pkg of PACKAGES) {
     }
 
     if (pkg.pure) {
+      for (const globalName of ['process', 'Buffer', '__dirname', '__filename', 'require']) {
+        const pattern = new RegExp(`\\b${globalName.replace(/[$]/g, '\\$')}\\b`);
+        if (pattern.test(code)) {
+          violations.push(`${rel}: 纯包禁止使用 Node 全局 ${globalName}`);
+        }
+      }
       if (/\bthrow\b/.test(code)) violations.push(`${rel}: 纯包禁止 throw —— 失败必须通过 Result 返回`);
       if (/\bDate\.now\s*\(/.test(code) || /\bnew\s+Date\s*\(/.test(code)) {
         violations.push(`${rel}: 纯包禁止读时钟 —— 时间由应用层注入`);

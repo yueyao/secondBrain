@@ -18,7 +18,9 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,
-    "types": [],
+    "types": [
+      "node"
+    ],
     "baseUrl": ".",
     "paths": {
       "@sb/domain": [
@@ -38,6 +40,12 @@
       ],
       "@sb/adapters-sqlite/*": [
         "packages/adapters-sqlite/src/*"
+      ],
+      "@sb/adapters-vault": [
+        "packages/adapters-vault/src/index.ts"
+      ],
+      "@sb/adapters-vault/*": [
+        "packages/adapters-vault/src/*"
       ]
     }
   }

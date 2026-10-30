@@ -292,3 +292,47 @@ P2 新增测试分布：`migrations` 4 例、`store` 13 例、`replay` 4 例。
 3. **wiki_node / FTS 表未建**：检索索引属于 P6，端口 `SearchIndex` 已定，实现待做。
 4. **job 死信（`state='dead'`）未实现自动转移**：当前只有状态枚举，转移策略在 worker 里加。
 5. 迁移的"半迁移恢复"只测了重复执行，没有测断电中断；P3 与对账一起补。
+
+---
+
+## 十二、P3：`@sb/adapters-vault`（2026-10-30 23:0x）
+
+### 12.1 交付
+
+| 文件 | 内容 |
+|---|---|
+| `src/vault.ts` | `VaultPort` 实现：listRaw（含 sha256）/ listNodes / readRaw / readNode / writeNode（原子写）/ head / isClean / commitFiles / resetHard |
+| `src/lock.ts` | `FileLock`：O_EXCL 原子创建、pid+时间戳、陈旧锁回收、幂等释放 |
+| `src/index.ts` | 公开面 |
+
+### 12.2 安全约束（测试锁定）
+
+1. **路径逃逸**：`wiki/../../evil.md`、`/tmp/evil.md`、`../outside.md` 全部被拒（`PATH_ESCAPE`）。
+2. **写边界**：只允许写 `wiki/`；写 `raw/` 返回 `NOT_WIKI_PATH`。
+3. **原子写**：临时文件 + rename，测试断言目录里没有 `.tmp-` 残留。
+4. **空提交**：无变更时抛 `NO_CHANGES`，不产生空 commit。
+5. **可回滚**：`resetHard` 后文件内容与 HEAD 都回到指定提交。
+6. **单写者**：第二个持有者 `LOCK_HELD`；陈旧锁超过 `staleMs` 自动回收。
+
+### 12.3 验证
+
+```
+✓ 边界检查通过：4 个包 / 45 个文件，0 违规
+✔ no dependency violations found (62 modules, 174 dependencies cruised)
+
+ Test Files  13 passed (13)
+      Tests  112 passed (112)     # P2 的 95 + P3 新增 17
+```
+
+### 12.4 决策（续）
+
+| # | 决策 | 理由 | 代价 |
+|---|---|---|---|
+| D17 | 引入 `@types/node`，tsconfig 全局 `types: ["node"]` | 适配器需要 fs/path/crypto/child_process 的类型 | 纯包编译期也能看到 Node 全局 → 由边界脚本补禁 `process/Buffer/__dirname/__filename/require` |
+| D18 | 锁用 `O_EXCL` 文件而非 `flock` | 跨平台、零依赖、可观测（锁文件里有 pid/时间） | 需要陈旧锁回收策略（已实现 staleMs） |
+| D19 | `FsVault` 不注入 `Clock` | git 提交时间由 git 自己管，vault 没有需要注入时间的写入 | 无 |
+
+### 12.5 尚未完成（与设计 §9 的差异）
+
+- **提交两阶段的"意图表"与启动对账 `Recover()` 没做**：它需要 `application/commit-draft` 用例配合（写 intent → 提交 → 记账），放到 P5 应用层与 commit 用例一起落地，避免现在做一个没人调用的对账器。
+- `commitFiles` 目前是"add 全部指定文件 → commit"，还没有"提交前比对目标节点 content_hash"的守卫（那属于应用层编排）。

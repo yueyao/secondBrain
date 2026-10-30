@@ -18,7 +18,8 @@ secondbrain-server/                     # monorepo 根（Git 仓库根）
 ├─ packages/
 │  ├─ domain/           @sb/domain          # 纯领域：状态机 / 策略 / 10 条规则（零依赖）
 │  ├─ contracts/        @sb/contracts       # 端口接口 + 跨端 DTO（只依赖 domain）
-│  └─ adapters-sqlite/  @sb/adapters-sqlite # StateStore 的 SQLite 实现（允许 node:）
+│  ├─ adapters-sqlite/  @sb/adapters-sqlite # StateStore 的 SQLite 实现（允许 node:）
+│  └─ adapters-vault/   @sb/adapters-vault  # fs + git + 单写者锁（允许 node:）
 ├─ apps/                                # 入口（cli / server），尚未创建
 └─ docs/                                # PROGRESS / DOMAIN / MONOREPO / adr
 ```
@@ -28,7 +29,7 @@ secondbrain-server/                     # monorepo 根（Git 仓库根）
 | 包名 | 层 | 职责 | 允许依赖 |
 |---|---|---|---|
 | `@sb/adapters-sqlite` | 适配器 | StateStore 实现、迁移、事件表 | domain, contracts（**已实现**） |
-| `@sb/adapters-vault` | 适配器 | 文件系统 + git + flock | domain, contracts |
+| `@sb/adapters-vault` | 适配器 | 文件系统 + git + flock | domain, contracts（**已实现**） |
 | `@sb/adapters-agent` | 适配器 | 模型 provider、schema 校验、预算 | domain, contracts |
 | `@sb/app` | 应用 | 用例（triage/digest/commit/recover） | domain, contracts |
 | `@sb/obs` | 基础设施 | 日志、指标 | domain, contracts |

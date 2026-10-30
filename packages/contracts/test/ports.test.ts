@@ -75,6 +75,7 @@ const files = new Map<string, string>();
 const vault: VaultPort = {
   listRaw: async () => [{ path: RAW_A, sizeBytes: 10, contentHash: CONTENT_HASH }],
   readRaw: async (path) => files.get(path) ?? '',
+  listNodes: async () => [...files.keys()].filter((file) => file.startsWith('wiki/')),
   readNode: async (file) => files.get(file) ?? '',
   writeNode: async (file, content) => {
     files.set(file, content);

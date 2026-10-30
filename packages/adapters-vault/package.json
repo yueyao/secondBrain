@@ -1,0 +1,13 @@
+{
+  "name": "@sb/adapters-vault",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Vault 适配器：文件系统 + git 提交 + 单写者文件锁",
+  "exports": { ".": "./src/index.ts" },
+  "sideEffects": false,
+  "dependencies": {
+    "@sb/contracts": "workspace:*",
+    "@sb/domain": "workspace:*"
+  }
+}
