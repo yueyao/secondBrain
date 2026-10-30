@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
     "target": "ES2023",
-    "lib": ["ES2023"],
+    "lib": [
+      "ES2023"
+    ],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "strict": true,
@@ -19,10 +21,24 @@
     "types": [],
     "baseUrl": ".",
     "paths": {
-      "@sb/domain": ["packages/domain/src/index.ts"],
-      "@sb/domain/*": ["packages/domain/src/*"],
-      "@sb/contracts": ["packages/contracts/src/index.ts"],
-      "@sb/contracts/*": ["packages/contracts/src/*"]
+      "@sb/domain": [
+        "packages/domain/src/index.ts"
+      ],
+      "@sb/domain/*": [
+        "packages/domain/src/*"
+      ],
+      "@sb/contracts": [
+        "packages/contracts/src/index.ts"
+      ],
+      "@sb/contracts/*": [
+        "packages/contracts/src/*"
+      ],
+      "@sb/adapters-sqlite": [
+        "packages/adapters-sqlite/src/index.ts"
+      ],
+      "@sb/adapters-sqlite/*": [
+        "packages/adapters-sqlite/src/*"
+      ]
     }
   }
 }

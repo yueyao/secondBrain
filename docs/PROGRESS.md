@@ -238,3 +238,57 @@ $ pnpm run check
 1. `packages/*/package.json` 的 `exports` 仍指向 `./src/index.ts`，只适用于开发/测试；P4 前改 `dist/` 并加 build 脚本。
 2. 根 `tsconfig.json` 一次检查全部包，包多起来后改为 `tsc -b` 增量构建。
 3. `apps/` 目前只有 README 占位；P5 创建 `apps/cli` 时按 `docs/MONOREPO.md` §3 登记边界规则。
+
+---
+
+## 十一、P2：`@sb/adapters-sqlite`（2026-10-30 22:3x）
+
+### 11.1 交付内容
+
+| 文件 | 内容 |
+|---|---|
+| `src/migrations.ts` | v1 schema：raw_item / draft / review_decision / commit_record / job / event |
+| `src/migrate.ts` | 幂等迁移运行器（每版本一个事务）+ `schemaStatus()`（版本 + integrity_check） |
+| `src/state-codec.ts` | 状态 ↔ (kind 列 + JSON 列)；读时校验枚举，坏数据在适配器边界暴露 |
+| `src/mapping.ts` | 行 ↔ 契约记录映射（乐观锁/JSON 字段） |
+| `src/sqlite-store.ts` | `StateStore` 实现：事务（可嵌套）、5 个仓储、乐观锁、原子领取任务、事件流 |
+| `src/node-sqlite.d.ts` | 最小 `node:sqlite` 类型声明（避免引入 @types/node，保持领域层干净） |
+
+### 11.2 验收对照（设计文档 P2 条目）
+
+| 验收项 | 结果 |
+|---|---|
+| `migrate` 可对空库重跑 | ✅ 第二次 applied=[] / skipped=[1]；schema_migrations 单行 |
+| 状态与事件同事务 | ✅ 抛错时 raw_item 与 event 一起回滚（count 都为 0） |
+| 乐观锁 | ✅ 版本陈旧返回 false，状态不变；同一事务内两次 CAS 只有第一次成功 |
+| 事件回放一致 | ✅ 8 个事件回放后与库中状态逐字段相等；**篡改事件顺序会返回 `INVALID_TRANSITION`** |
+| 任务领取 | ✅ `UPDATE ... RETURNING *` 原子领取，`attempts` / `fencing_token` 自增，lease 计算正确 |
+| 中文与 JSON 字段 | ✅ claim/节点/findings/proposal 均 JSON 往返 |
+
+### 11.3 验证记录
+
+```
+✓ 边界检查通过：3 个包 / 42 个文件，0 违规
+✔ no dependency violations found (56 modules, 160 dependencies cruised)
+
+ Test Files  11 passed (11)
+      Tests  95 passed (95)        # P1 74 + P2 新增 21
+```
+
+P2 新增测试分布：`migrations` 4 例、`store` 13 例、`replay` 4 例。
+
+### 11.4 决策（续）
+
+| # | 决策 | 理由 | 代价 |
+|---|---|---|---|
+| D14 | 用 `node:sqlite` 而非 better-sqlite3 | 零原生编译、`DatabaseSync` 与单写者契合；实测支持 `RETURNING` | 实验性 API；用最小类型声明隔离 |
+| D15 | 状态存 `kind` 列 + `state_data` JSON 列 | kind 可索引可查询；JSON 保留完整可辨识联合 | 跨版本字段演进需要迁移脚本 |
+| D16 | `upsert` 只用于导入/初始化，状态流转必须走 `compareAndSwapVersion` | 避免并发下静默覆盖 | 调用方要区分两种写入语义（已写注释） |
+
+### 11.5 已知缺口（留给后续阶段）
+
+1. **围栏令牌尚未在写入侧校验**：`fencing_token` 已在领取时自增，但状态写入还没带 `WHERE fencing_token = ?`——要到 P5 有 worker 循环时才落地（否则没有"陈旧 worker"可防）。
+2. **租约续期未实现**：长模型调用需要心跳续租；P4/P5 补。
+3. **wiki_node / FTS 表未建**：检索索引属于 P6，端口 `SearchIndex` 已定，实现待做。
+4. **job 死信（`state='dead'`）未实现自动转移**：当前只有状态枚举，转移策略在 worker 里加。
+5. 迁移的"半迁移恢复"只测了重复执行，没有测断电中断；P3 与对账一起补。

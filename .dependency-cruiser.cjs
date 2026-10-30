@@ -30,7 +30,21 @@ module.exports = {
       comment: '契约不得反向依赖应用/适配器/入口',
       severity: 'error',
       from: { path: '^packages/contracts/src' },
-      to: { path: '^(packages/(app|adapters)|apps)/' },
+      to: { path: '^(packages/(app|adapters[^/]*)|apps)/' },
+    },
+    {
+      name: 'domain-must-not-depend-on-adapters',
+      comment: '适配器是外层，domain 不得引用',
+      severity: 'error',
+      from: { path: '^packages/domain/src' },
+      to: { path: '^packages/adapters' },
+    },
+    {
+      name: 'adapters-must-not-depend-on-app-or-entry',
+      comment: '适配器不得引用应用层与入口',
+      severity: 'error',
+      from: { path: '^packages/adapters' },
+      to: { path: '^(packages/app|apps)/' },
     },
     {
       name: 'no-circular',

@@ -23,6 +23,13 @@ const PACKAGES_DIR = path.join(ROOT, 'packages');
 const PACKAGES = [
   { dir: 'domain', name: '@sb/domain', allowedBare: [], allowNode: false, pure: true },
   { dir: 'contracts', name: '@sb/contracts', allowedBare: ['@sb/domain'], allowNode: false, pure: true },
+  {
+    dir: 'adapters-sqlite',
+    name: '@sb/adapters-sqlite',
+    allowedBare: ['@sb/domain', '@sb/contracts'],
+    allowNode: true,
+    pure: false,
+  },
 ];
 
 const violations = [];
@@ -156,5 +163,5 @@ console.log(`✓ 边界检查通过：${PACKAGES.length} 个包 / ${scannedFiles
 for (const pkg of PACKAGES) {
   console.log(`  - ${pkg.name}: 允许依赖 [${pkg.allowedBare.join(', ') || '无'}]，纯函数包=${pkg.pure}`);
 }
-console.log('  - 无 node: 模块、无第三方包、无深引、无 domain→contracts 反向依赖');
-console.log('  - 无 throw / Date.now / new Date / Math.random');
+console.log('  - 深引、未登记的包、依赖声明与白名单不一致都会被拦下');
+console.log('  - 纯包：无 node: / 无第三方 / 无 throw / 无时钟；适配器包允许 node: 与 throw');

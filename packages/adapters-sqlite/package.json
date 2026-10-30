@@ -1,0 +1,15 @@
+{
+  "name": "@sb/adapters-sqlite",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "StateStore 的 SQLite 实现：迁移、仓储、乐观锁、事务、事件流",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "sideEffects": false,
+  "dependencies": {
+    "@sb/contracts": "workspace:*",
+    "@sb/domain": "workspace:*"
+  }
+}
