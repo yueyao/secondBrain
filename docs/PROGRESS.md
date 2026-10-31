@@ -581,3 +581,24 @@ $ pnpm run check:model config/model-profiles.deepseek.example.json
 1. 用真实 key 跑一篇，核对 token 与官方账单口径（尤其 cache hit）；
 2. 账本支持 cache-hit 单价与 off-peak 时段（目前单一定价，偏保守）；
 3. golden set 建立后，对比 flash 与 v4-pro 的质量/成本曲线。
+
+### 18.4 调整（2026-10-31）：默认全部使用 deepseek-flash
+
+用户决定先用 flash 跑。配置调整：
+
+- 所有任务的 `profileOrder` 改为 `["deepseek-flash"]`；
+- `deepseek-flash.health.fallbackTo` 置空，避免失败时意外调用 v4-pro 产生更高费用；
+- `deepseek-v4-pro` 保留在配置中，作为手动升级选项（改 `profileOrder` 即可）；
+- root 脚本新增 `pnpm demo:deepseek`（默认 base URL 为 api.deepseek.com，读取 `config/model-profiles.json`）；
+- 新增**云端链路端到端测试**（本地假 OpenAI 服务）：验证 provider → runner → 存储 → git 入库 → usage 记账全链路，断言 tokens 1234/234 与成本 0.001702。
+
+### 18.5 最新验证
+
+```
+$ pnpm check:model config/model-profiles.json
+✓ 配置合法
+  triage / digest / review-rewrite / decide → deepseek-flash
+
+ Test Files  23 passed (23)
+      Tests  172 passed (172)
+```

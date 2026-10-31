@@ -99,7 +99,7 @@ describe('DeepSeek 示例配置', () => {
     if (!result.ok) return;
     expect(result.value.profiles.map((profile) => profile.id)).toEqual(['deepseek-flash', 'deepseek-v4-pro']);
     expect(result.value.profiles[0]?.providerOptions).toMatchObject({ thinking: { type: 'disabled' } });
-    expect(result.value.policies.digest.profileOrder).toEqual(['deepseek-v4-pro', 'deepseek-flash']);
+    expect(result.value.policies.digest.profileOrder).toEqual(['deepseek-flash']);
     expect(result.value.policies.triage.profileOrder).toEqual(['deepseek-flash']);
   });
 });

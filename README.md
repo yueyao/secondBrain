@@ -61,18 +61,17 @@ pnpm check:model config/model-profiles.deepseek.example.json
 
 ```bash
 cp config/model-profiles.deepseek.example.json config/model-profiles.json
-MODEL_BASE_URL=https://api.deepseek.com \
-MODEL_API_KEY=<从环境变量给，不要写进文件> \
-MODEL_CONFIG=config/model-profiles.json \
-pnpm demo
+MODEL_API_KEY=<从环境变量给，不要写进文件> pnpm demo:deepseek
 ```
 
 配置里的分工：
 
 | profile | 模型 | 用途 | 关键参数 |
 |---|---|---|---|
-| `deepseek-flash` | `deepseek-flash` | triage / 降级兜底 | `thinking: disabled`（快、省） |
-| `deepseek-v4-pro` | `deepseek-v4-pro` | digest / decide | `thinking: enabled` + `reasoning_effort: high` |
+| `deepseek-flash` | `deepseek-flash` | **全部任务（当前默认）** | `thinking: disabled`（快、省） |
+| `deepseek-v4-pro` | `deepseek-v4-pro` | 需要更强模型时手动切换 | `thinking: enabled` + `reasoning_effort: high` |
+
+> 当前默认：所有任务都用 `deepseek-flash`，且不自动降级到 v4-pro（避免意外产生更高费用）。想升级：把策略里的 `profileOrder` 改成 `deepseek-v4-pro`。
 
 > 价格按峰值期 cache-miss 单价填（flash $0.3 / $1.2，pro $1.32 / $3.96 每百万 tokens），off-peak 减半；缓存命中更便宜。当前账本按单一定价估算，属保守值。
 
@@ -104,7 +103,7 @@ pnpm run check     # boundaries → typecheck → depcruise → test
 pnpm run boundaries   # 包边界、深引、纯度（无 node: / 无第三方 / 无 throw / 无时钟）
 pnpm run typecheck    # tsc --noEmit（strict + exactOptionalPropertyTypes）
 pnpm run depcruise    # 依赖方向、环形依赖
-pnpm test             # vitest：22 个文件 / 170 例
+pnpm test             # vitest：23 个文件 / 172 例
 ```
 
 ## 能证明什么

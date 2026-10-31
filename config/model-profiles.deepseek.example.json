@@ -1,5 +1,5 @@
 {
-  "_note": "DeepSeek 官方 OpenAI 兼容端点。价格按峰值期 cache-miss 单价填写（保守估算），off-peak 为一半；缓存命中价格更低，当前账本按单一定价估算。",
+  "_note": "DeepSeek 官方 OpenAI 兼容端点。默认全部任务使用 deepseek-flash（便宜、快）；如需更强模型，把策略里的 profileOrder/fallbackTo 改成 deepseek-v4-pro。价格按峰值期 cache-miss 单价填写（保守估算），off-peak 为一半。",
   "profiles": [
     {
       "id": "deepseek-flash",
@@ -9,13 +9,32 @@
         "contextTokens": 1000000,
         "structuredOutput": true,
         "toolCalls": true,
-        "languages": ["zh", "en"],
-        "sensitivity": ["public", "restricted"]
+        "languages": [
+          "zh",
+          "en"
+        ],
+        "sensitivity": [
+          "public",
+          "restricted"
+        ]
       },
-      "pricing": { "inPerMTokens": 0.3, "outPerMTokens": 1.2 },
-      "limits": { "maxConcurrency": 8, "requestsPerMinute": 120 },
-      "health": { "enabled": true, "fallbackTo": ["deepseek-v4-pro"] },
-      "providerOptions": { "thinking": { "type": "disabled" } }
+      "pricing": {
+        "inPerMTokens": 0.3,
+        "outPerMTokens": 1.2
+      },
+      "limits": {
+        "maxConcurrency": 8,
+        "requestsPerMinute": 120
+      },
+      "health": {
+        "enabled": true,
+        "fallbackTo": []
+      },
+      "providerOptions": {
+        "thinking": {
+          "type": "disabled"
+        }
+      }
     },
     {
       "id": "deepseek-v4-pro",
@@ -25,40 +44,86 @@
         "contextTokens": 1000000,
         "structuredOutput": true,
         "toolCalls": true,
-        "languages": ["zh", "en"],
-        "sensitivity": ["public", "restricted"]
+        "languages": [
+          "zh",
+          "en"
+        ],
+        "sensitivity": [
+          "public",
+          "restricted"
+        ]
       },
-      "pricing": { "inPerMTokens": 1.32, "outPerMTokens": 3.96 },
-      "limits": { "maxConcurrency": 4, "requestsPerMinute": 60 },
-      "health": { "enabled": true, "fallbackTo": ["deepseek-flash"] },
-      "providerOptions": { "thinking": { "type": "enabled" }, "reasoning_effort": "high" }
+      "pricing": {
+        "inPerMTokens": 1.32,
+        "outPerMTokens": 3.96
+      },
+      "limits": {
+        "maxConcurrency": 4,
+        "requestsPerMinute": 60
+      },
+      "health": {
+        "enabled": true,
+        "fallbackTo": [
+          "deepseek-flash"
+        ]
+      },
+      "providerOptions": {
+        "thinking": {
+          "type": "enabled"
+        },
+        "reasoning_effort": "high"
+      }
     }
   ],
   "policies": {
     "triage": {
-      "requires": { "contextTokens": 8000, "structuredOutput": true, "toolCalls": false },
-      "profileOrder": ["deepseek-flash"],
+      "requires": {
+        "contextTokens": 8000,
+        "structuredOutput": true,
+        "toolCalls": false
+      },
+      "profileOrder": [
+        "deepseek-flash"
+      ],
       "maxInputTokens": 2000,
       "maxOutputTokens": 500,
       "expectedClaims": 3
     },
     "digest": {
-      "requires": { "contextTokens": 60000, "structuredOutput": true, "toolCalls": true },
-      "profileOrder": ["deepseek-v4-pro", "deepseek-flash"],
+      "requires": {
+        "contextTokens": 60000,
+        "structuredOutput": true,
+        "toolCalls": true
+      },
+      "profileOrder": [
+        "deepseek-flash"
+      ],
       "maxInputTokens": 60000,
       "maxOutputTokens": 4000,
       "expectedClaims": 8
     },
     "review-rewrite": {
-      "requires": { "contextTokens": 60000, "structuredOutput": true, "toolCalls": true },
-      "profileOrder": ["deepseek-v4-pro", "deepseek-flash"],
+      "requires": {
+        "contextTokens": 60000,
+        "structuredOutput": true,
+        "toolCalls": true
+      },
+      "profileOrder": [
+        "deepseek-flash"
+      ],
       "maxInputTokens": 60000,
       "maxOutputTokens": 4000,
       "expectedClaims": 8
     },
     "decide": {
-      "requires": { "contextTokens": 60000, "structuredOutput": true, "toolCalls": true },
-      "profileOrder": ["deepseek-v4-pro", "deepseek-flash"],
+      "requires": {
+        "contextTokens": 60000,
+        "structuredOutput": true,
+        "toolCalls": true
+      },
+      "profileOrder": [
+        "deepseek-flash"
+      ],
       "maxInputTokens": 60000,
       "maxOutputTokens": 3000,
       "expectedClaims": 5
