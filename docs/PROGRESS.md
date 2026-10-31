@@ -415,3 +415,43 @@ POST /review/:id/accept → 303
 2. 日/月预算上限。
 3. 判断密度可接受下限。
 4. golden set 由谁维护标注。
+
+---
+
+## 十五、P4.1：模型运行时骨架（2026-10-31）
+
+### 15.1 交付
+
+`@sb/agent-runtime`（24 例测试，不接真实模型）：
+
+- **路由**：`ModelProfile` + `TaskPolicy`，按能力（上下文/结构化输出/工具调用/敏感度）筛选，支持 `fallbackTo` 追加与去重、禁用跳过并记录拒绝原因。
+- **预算**：调用前估算 `estInput = 字数×0.7 + prompt + 检索`；单次与每日双闸门；跨天自动归零。
+- **缓存**：`contentHash + promptSha256 + profileId + 检索节点` 为 key；命中不调用模型、不计费。
+- **执行**：超时/限流/5xx 重试（≤2）后降级；契约违反只重试一次（回喂错误），再失败抛 `CONTRACT_VIOLATION`；拒答不重试。
+- **契约**：`AgentPort` 升级为返回 `AgentOutcome { proposal, provenance, cost }`；`DigestRequest` 增加 `sensitivity`；`validateDraftProposal` 做结构校验。
+- **配置样例**：`config/model-profiles.example.json`（P4.2 接入加载与校验）。
+
+### 15.2 验证
+
+```
+✓ 边界检查通过：8 个包 / 65 个文件，0 违规
+✔ no dependency violations found (95 modules, 260 dependencies cruised)
+
+ Test Files  20 passed (20)
+      Tests  153 passed (153)     # P3 后 129 + P4.1 新增 24
+```
+
+### 15.3 决策（续）
+
+| # | 决策 | 理由 | 代价 |
+|---|---|---|---|
+| D23 | `AgentPort` 返回 `AgentOutcome` 而非裸 `DraftProposal` | 换模型/降级必须可归因（profileId、fallbackChain、tokens） | 所有调用点改一次 |
+| D24 | 契约校验放在 domain（`validateDraftProposal`） | 纯函数、可单测；provider 适配器无法绕过 | 领域包新增一个文件 |
+| D25 | 缓存按 `profileId` 分桶 | 不同模型输出不可互用，避免"降级后拿到强模型缓存" | 换模型后首次调用不命中 |
+
+### 15.4 下一步（P4.2，需要用户确认）
+
+1. 敏感度边界（付费内容能否发云模型）；
+2. 日/月预算上限；
+3. 判断密度门槛；
+4. golden set 标注由谁维护。

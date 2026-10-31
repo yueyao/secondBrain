@@ -1,5 +1,5 @@
 /** MockAgent：用可解释启发式模拟"提炼"步骤，供测试与本地 mock 演示使用。 */
-import type { AgentPort, DigestRequest } from '@sb/contracts';
+import type { AgentOutcome, AgentPort, DigestRequest } from '@sb/contracts';
 import type { Claim, DraftProposal, NodeChange } from '@sb/domain';
 import { firstHeading, judgmentSentences, parseFrontmatter, truncate } from '@sb/domain';
 
@@ -17,7 +17,7 @@ export class MockAgent implements AgentPort {
     this.model = options.model ?? 'heuristic-v1';
   }
 
-  async draft(request: DigestRequest): Promise<DraftProposal> {
+  async draft(request: DigestRequest): Promise<AgentOutcome> {
     const { data, body } = parseFrontmatter(request.content);
     const hint = typeof data.node_hint === 'string' ? data.node_hint : null;
     const title =
@@ -44,13 +44,31 @@ export class MockAgent implements AgentPort {
           },
         ];
 
-    return {
+    const proposal: DraftProposal = {
       tier: target ? 'patch' : 'standard',
       rationale: target
         ? `命中已有节点「${target.name}」，按 patch 处理，新增 ${claims.length} 条 claims`
         : `未命中同名/别名节点，新建「${hint ?? title}」并沉淀 ${claims.length} 条 claims`,
       claims,
       nodes,
+    };
+
+    return {
+      proposal,
+      cost: 0,
+      provenance: {
+        profileId: 'mock-profile',
+        provider: this.provider,
+        model: this.model,
+        promptId: 'digest',
+        promptVersion: 1,
+        promptSha256: 'mock',
+        inputTokens: null,
+        outputTokens: null,
+        latencyMs: null,
+        fallbackChain: [],
+        cacheHit: false,
+      },
     };
   }
 }

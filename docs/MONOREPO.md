@@ -48,6 +48,7 @@ secondbrain-server/                     # monorepo 根（Git 仓库根）
 |---|---|
 | `@sb/domain` | **无**（零依赖，连 `node:` 都不允许） |
 | `@sb/contracts` | `@sb/domain` |
+| `@sb/agent-runtime` | `@sb/domain`、`@sb/contracts` |
 | `@sb/adapters-*` | `@sb/domain`、`@sb/contracts` |
 | `@sb/testing` | domain、contracts、各适配器（仅供测试与 demo） |
 | `@sb/app` | `@sb/domain`、`@sb/contracts` |

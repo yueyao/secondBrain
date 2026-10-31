@@ -111,15 +111,32 @@ const index: SearchIndex = {
 };
 
 const agent: AgentPort = {
-  draft: async (request): Promise<DraftProposal> => {
+  draft: async (request) => {
     expect(request.tools).toEqual(['search_wiki', 'read_node', 'read_raw']);
     expect(request.tools).not.toContain('write_node');
     expect(request.budget.maxInputTokens).toBeGreaterThan(0);
-    return {
+    const proposal: DraftProposal = {
       tier: 'patch',
       rationale: '命中已有节点',
       claims: [{ text: '一条判断', inference: false, source: request.rawPath }],
       nodes: [{ name: '反脆弱', nodeType: 'concept', action: 'patch', definition: null }],
+    };
+    return {
+      proposal,
+      provenance: {
+        profileId: 'stub',
+        provider: 'stub',
+        model: 'stub',
+        promptId: 'digest',
+        promptVersion: 1,
+        promptSha256: 'x',
+        inputTokens: null,
+        outputTokens: null,
+        latencyMs: null,
+        fallbackChain: [],
+        cacheHit: false,
+      },
+      cost: 0,
     };
   },
 };
@@ -146,16 +163,18 @@ describe('契约：端口可实现', () => {
     expect(await index.query('不存在')).toEqual([]);
   });
 
-  it('AgentPort 收到只读工具白名单，返回 DraftProposal', async () => {
-    const proposal = await agent.draft({
+  it('AgentPort 收到只读工具白名单，返回带 provenance 的结果', async () => {
+    const outcome = await agent.draft({
       rawPath: RAW_A,
       content: '正文',
+      sensitivity: 'public',
       retrieved: [],
       tools: ['search_wiki', 'read_node', 'read_raw'],
       budget: { maxInputTokens: 40_000, maxOutputTokens: 4_000, maxToolCalls: 6 },
     });
-    expect(proposal.tier).toBe('patch');
-    expect(proposal.claims[0]?.source).toBe(RAW_A);
+    expect(outcome.proposal.tier).toBe('patch');
+    expect(outcome.proposal.claims[0]?.source).toBe(RAW_A);
+    expect(outcome.provenance.cacheHit).toBe(false);
   });
 
   it('Clock / LockPort 是可注入的（不读系统时钟）', async () => {

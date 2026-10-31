@@ -1,0 +1,13 @@
+{
+  "name": "@sb/agent-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "模型运行时：能力路由 + 预算 + 缓存 + 重试 + 降级 + 契约校验（provider 可插拔）",
+  "exports": { ".": "./src/index.ts" },
+  "sideEffects": false,
+  "dependencies": {
+    "@sb/contracts": "workspace:*",
+    "@sb/domain": "workspace:*"
+  }
+}

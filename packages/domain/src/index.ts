@@ -13,5 +13,6 @@ export * from './model/rule-input';
 export * from './state-machine';
 export * from './text';
 export * from './frontmatter';
+export * from './draft-validation';
 export * from './policies';
 export * from './rules/registry';

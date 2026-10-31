@@ -1,6 +1,6 @@
 # ADR 0005 · 真实模型接入方案（路由 / 执行 / 评估）
 
-- 状态：已采纳（方案层，未实现；P4 落地）
+- 状态：已采纳；P4.1（运行时骨架）已实现，P4.2（真实 provider）待启动
 - 日期：2026-10-30
 - 关联：`docs/PROGRESS.md` D14/D15、设计文档 §10、`docs/TESTING.md`
 
@@ -225,3 +225,29 @@ draftIdem  = sha256(rawPath + contentHash + promptVersion + profileId)
 4. **golden set 归属**：谁维护标注？这决定"换模型"能否被验证。
 
 > 这四项不确认，P4.1 可以做（配置与 runner 不依赖真实模型），但 P4.2 无法开始。
+
+
+---
+
+## 9. 实施进展（P4.1，2026-10-31）
+
+已实现 `@sb/agent-runtime`（**不接真实模型**，用 fake provider 验证行为）：
+
+| 文件 | 内容 |
+|---|---|
+| `src/route.ts` | `ModelProfile` / `TaskPolicy` / `routeProfiles`：能力筛选、敏感度分流、fallbackTo 追加与去重、禁用跳过 |
+| `src/budget.ts` | `estimateCost`（调用前估算）、`costOf`、`BudgetLedger`（单次/每日闸门 + 跨天归零） |
+| `src/cache.ts` | `proposalCacheKey`（contentHash + promptSha + profileId + 检索节点）、内存缓存 |
+| `src/runner.ts` | `CompletionProvider` 接口 + `AgentRunner`：路由 → 预算 → 缓存 → 调用 → 契约校验 → 重试 → 降级 → 记账 → provenance |
+| `src/errors.ts` | `AgentProviderError`（timeout/rate_limit/upstream/refusal）与 `AgentRuntimeError` 分类 |
+
+契约同步升级：`AgentPort.draft` 现在返回 `AgentOutcome { proposal, provenance, cost }`；`DigestRequest` 增加 `sensitivity`。应用层据此把真实 `provider/model/promptVersion/tokens/latencyMs` 写进 `DraftRecord`。
+
+**测试 24 例**覆盖：路由（能力/敏感度/禁用/降级链）、预算（估算/单次/每日/跨天）、缓存命中与不命中、超时重试、重试耗尽降级、契约违反重试一次、拒答不重试、预算超限在调用前拦截、无可用 profile。
+
+**尚未做**（P4.2/P4.3）：
+
+1. 真实 provider 适配器（OpenAI 兼容 / 本地模型）与密钥管理。
+2. 把 `config/model-profiles.example.json` 接入配置加载与校验（目前是文档样例）。
+3. `sb stats --cost` 成本看板与按 profile 的用量统计。
+4. golden set 结构与评测脚本（需要用户先提供标注与预算）。

@@ -64,6 +64,12 @@
       ],
       "@sb/app/*": [
         "packages/app/src/*"
+      ],
+      "@sb/agent-runtime": [
+        "packages/agent-runtime/src/index.ts"
+      ],
+      "@sb/agent-runtime/*": [
+        "packages/agent-runtime/src/*"
       ]
     }
   }

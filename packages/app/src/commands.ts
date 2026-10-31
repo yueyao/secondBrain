@@ -129,13 +129,16 @@ export async function draftDigest(ctx: AppContext, rawPath: RawPath): Promise<Dr
     for (const hit of await ctx.search.query(query)) hitMap.set(hit.file, hit);
   }
   const hits = [...hitMap.values()];
-  const proposal = await ctx.agent.draft({
+  const sensitivity = item.sourceKey === 'dedao' || item.sourceKey === 'podcast' ? 'restricted' : 'public';
+  const outcome = await ctx.agent.draft({
     rawPath,
     content,
+    sensitivity,
     retrieved: hits,
     tools: ['search_wiki', 'read_node', 'read_raw'],
     budget: { maxInputTokens: 40_000, maxOutputTokens: 4_000, maxToolCalls: 6 },
   });
+  const proposal = outcome.proposal;
 
   const allItems = await ctx.store.transaction(async (tx) => tx.rawItems.listAll());
   const knownRawPaths = new Set((await ctx.vault.listRaw()).map((ref) => String(ref.path)));
@@ -170,14 +173,14 @@ export async function draftDigest(ctx: AppContext, rawPath: RawPath): Promise<Dr
     rawItemId: item.id,
     proposal,
     findings,
-    provider: ctx.agentMeta?.provider ?? 'unknown',
-    model: ctx.agentMeta?.model ?? 'unknown',
-    promptId: ctx.agentMeta?.promptId ?? 'digest',
-    promptVersion: ctx.agentMeta?.promptVersion ?? 1,
-    promptSha256: 'n/a',
-    inputTokens: null,
-    outputTokens: null,
-    latencyMs: null,
+    provider: outcome.provenance.provider,
+    model: outcome.provenance.model,
+    promptId: outcome.provenance.promptId,
+    promptVersion: outcome.provenance.promptVersion,
+    promptSha256: outcome.provenance.promptSha256,
+    inputTokens: outcome.provenance.inputTokens,
+    outputTokens: outcome.provenance.outputTokens,
+    latencyMs: outcome.provenance.latencyMs,
     status: 'pending',
     createdAt: now,
   };

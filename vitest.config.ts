@@ -14,6 +14,7 @@ export default defineConfig({
       '@sb/adapters-search-memory': fromRoot('./packages/adapters-search-memory/src/index.ts'),
       '@sb/testing': fromRoot('./packages/testing/src/index.ts'),
       '@sb/app': fromRoot('./packages/app/src/index.ts'),
+      '@sb/agent-runtime': fromRoot('./packages/agent-runtime/src/index.ts'),
     },
   },
   test: {

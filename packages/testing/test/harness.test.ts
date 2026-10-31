@@ -39,17 +39,19 @@ describe('测试环境 createHarness', () => {
       const content = await harness.vault.readRaw(rawPath(target.path));
       const { body } = parseFrontmatter(content);
       const hits = await harness.search.query('反脆弱');
-      const proposal = await harness.agent.draft({
+      const outcome = await harness.agent.draft({
         rawPath: rawPath(target.path),
         content,
+        sensitivity: 'public',
         retrieved: hits,
         tools: ['search_wiki', 'read_node', 'read_raw'],
         budget: { maxInputTokens: 40_000, maxOutputTokens: 4_000, maxToolCalls: 6 },
       });
-      expect(proposal.tier).toBe('patch');
-      expect(proposal.nodes[0]?.name).toBe('反脆弱');
-      expect(proposal.claims.length).toBeGreaterThan(0);
-      expect(proposal.claims.length).toBeLessThanOrEqual(5);
+      expect(outcome.proposal.tier).toBe('patch');
+      expect(outcome.proposal.nodes[0]?.name).toBe('反脆弱');
+      expect(outcome.proposal.claims.length).toBeGreaterThan(0);
+      expect(outcome.proposal.claims.length).toBeLessThanOrEqual(5);
+      expect(outcome.provenance.profileId).toBe('mock-profile');
       expect(body.length).toBeGreaterThan(0);
     } finally {
       await harness.cleanup();

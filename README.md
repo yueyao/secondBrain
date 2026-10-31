@@ -19,7 +19,8 @@ secondBrain 知识生产流程的服务端实现，**pnpm workspaces monorepo**�
 | `@sb/adapters-search-memory` | 内存检索（mock 用） | domain + contracts | ✅ |
 | `@sb/app` | 用例：triage / digest / review / commit | domain + contracts | ✅ |
 | `@sb/testing` | 测试夹具、MockAgent、harness | 域 + 适配器 | ✅ |
-| `@sb/adapters-agent` | 真实模型 provider、schema 校验、预算 | domain + contracts | ⬜ P4 |
+| `@sb/agent-runtime` | 能力路由 / 预算 / 缓存 / 重试 / 降级 / 契约校验（P4.1 ✅） | domain + contracts | ✅ |
+| `@sb/adapters-agent-*` | 真实 provider 适配器（OpenAI 兼容 / 本地） | domain + contracts | ⬜ P4.2 |
 | `@sb/app` | 用例：triage / digest / commit / recover | domain + contracts | ⬜ P5 |
 | `apps/cli` | 人审与运维命令 | 全部 | ⬜ P5 |
 | `@sb/server` | mock 审核台：HTTP + 服务端渲染 UI | 全部 | ✅ |
@@ -49,7 +50,7 @@ pnpm run check     # boundaries → typecheck → depcruise → test
 pnpm run boundaries   # 包边界、深引、纯度（无 node: / 无第三方 / 无 throw / 无时钟）
 pnpm run typecheck    # tsc --noEmit（strict + exactOptionalPropertyTypes）
 pnpm run depcruise    # 依赖方向、环形依赖
-pnpm test             # vitest：17 个文件 / 129 例
+pnpm test             # vitest：20 个文件 / 153 例
 ```
 
 ## 能证明什么
