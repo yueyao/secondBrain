@@ -689,3 +689,50 @@ $ pnpm run docs:check
 3. 按 `docs/MAINTENANCE.md` 第 2 节更新文档；
 4. `pnpm run check` 五项全绿；
 5. 一个阶段/大改动 = 一个提交。
+
+
+---
+
+## 二十一、真实模型基线（DeepSeek Flash，2026-10-31）
+
+### 21.1 运行
+
+`scripts/baseline.ts`（新增 `pnpm baseline`）：从真实 vault 复制 30 篇 5–15KB 文章到隔离 vault `.sb-real`，先看 triage 分布，再挑一篇 queued 走 digest → accept。
+
+### 21.2 结果
+
+| 指标 | 值 |
+|---|---|
+| triage 分布（30 篇） | queued 18（60%）、deferred 12（40%） |
+| 选中样本 | 2025 年终总结（约 7KB，22 条判断句） |
+| digest 耗时 | 15.6s |
+| claims | 11 条（密度 0.5），inference 1 条（9%） |
+| 节点 | 5 个 new concept |
+| findings | 仅 INFERRED_CLAIMS（warn） |
+| tokens | 2721 in / 1411 out |
+| 估算成本 | $0.00251（峰值 cache-miss） |
+| 重试/契约失败 | 0 |
+| git | 一次提交 `77f00d5`，5 文件 190 行 |
+
+### 21.3 发现的问题
+
+1. **所有新节点共享全部 claims**（5 节点 × 11 claims 重复）：schema 缺少"节点 ↔ claims"映射，这是 P6 第一优先级；
+2. 节点命名偏抽象，跨文章近义重复风险（精确匹配无法识别）；
+3. 本次为空库，全部 `new`；patch 分支未验证（需带既有节点再跑）。
+
+### 21.4 结论
+
+flash 产出可用、来源 100% 可追溯、成本可忽略（2,000 篇 backlog ≈ $10）；瓶颈在 schema 与人工审核，不在模型。
+
+### 21.5 验证
+
+```
+$ pnpm baseline
+{'deferred': 12, 'queued': 18}
+claims=11 inference=1 nodes=5 cost=$0.00251
+
+ Test Files  24 passed (24)
+      Tests  176 passed (176)
+```
+
+（基线脚本不改动领域/应用逻辑，测试数不变。）

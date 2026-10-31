@@ -10,6 +10,7 @@
 | [docs/DOMAIN.md](docs/DOMAIN.md) | 领域层手册：状态、迁移表、守卫、规则、不变式 | 状态机 / 规则 / 策略变化时 |
 | [docs/MONOREPO.md](docs/MONOREPO.md) | 包布局、依赖矩阵、新增子模块步骤 | 包增删、依赖方向变化时 |
 | [docs/TESTING.md](docs/TESTING.md) | 测试金字塔、夹具用法、启动 mock 审核台 | 测试结构或数量变化时 |
+| [docs/BASELINE-2026-10-31.md](docs/BASELINE-2026-10-31.md) | 真实模型基线：triage 分布、单篇质量/成本/稳定性、发现的问题 | 每次真实模型基线跑完后新建一份（按日期） |
 | [docs/MAINTENANCE.md](docs/MAINTENANCE.md) | 文档维护规则、检查机制、评审清单 | 维护流程本身变化时 |
 | [docs/INDEX.md](docs/INDEX.md) | 本文件：文档地图 | 任何文档增删时 |
 | [docs/adr/0001-stack.md](docs/adr/0001-stack.md) | 技术栈选型 | 换语言/测试框架/包管理器时 |
