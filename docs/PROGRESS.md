@@ -650,3 +650,42 @@ $ pnpm check:model config/model-profiles.json
 2. golden set 与真实模型质量基线；
 3. prune / decide 用例；
 4. cache-hit 与 off-peak 计价。
+
+---
+
+## 二十、文档维护机制（2026-10-31）
+
+用户要求"整个方案要持续维护好"。把这件事从"口头约定"做成**机制**：
+
+### 20.1 交付
+
+| 文件 | 作用 |
+|---|---|
+| `AGENTS.md` | 代理/维护者工作约定：必读顺序、架构边界、文档维护硬约束、提交规范 |
+| `docs/INDEX.md` | 文档地图：每份文档的用途与"何时更新"，以及阅读路径 |
+| `docs/MAINTENANCE.md` | 维护规则：三类文档寿命、改动→文档对照表、检查机制、评审清单、反模式 |
+| `scripts/check-docs.mjs` | 机械检查：文档未登记、ADR 编号断号、文档链接失效 → CI 失败 |
+| `.github/pull_request_template.md` | PR 检查清单（文档 + 验证） |
+| `package.json` | `check` 链路加入 `docs:check`：boundaries → **docs** → typecheck → depcruise → test |
+
+### 20.2 检查规则
+
+1. `docs/` 下每份 `.md` 必须出现在 `docs/INDEX.md`；
+2. ADR 编号必须从 `0001` 连续；
+3. `README.md` / `AGENTS.md` / `docs/INDEX.md` / `docs/MAINTENANCE.md` 中引用的 `docs/...md` 必须存在；
+4. `docs/PROGRESS.md` 必须存在且有章节。
+
+### 20.3 验证
+
+```
+$ pnpm run docs:check
+✓ 文档检查通过：8 份文档，6 个 ADR，引用完整、编号连续
+```
+
+### 20.4 约定（今后每次改动）
+
+1. 读 `docs/INDEX.md` 决定要读哪些文档；
+2. 改代码；
+3. 按 `docs/MAINTENANCE.md` 第 2 节更新文档；
+4. `pnpm run check` 五项全绿；
+5. 一个阶段/大改动 = 一个提交。
