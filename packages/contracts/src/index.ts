@@ -2,6 +2,7 @@
 export * from './ports/clock';
 export * from './ports/lock';
 export * from './ports/ids';
+export * from './ports/usage';
 export * from './ports/state-store';
 export * from './ports/vault';
 export * from './ports/search-index';

@@ -63,6 +63,7 @@ function fakeTransaction(): Transaction {
     commits: { append: nope('append') },
     jobs: { enqueue: nope('enqueue'), claimNext: nope('claimNext'), finish: nope('finish') },
     events: { append: nope('append'), listSince: nope('listSince') },
+    usage: { append: nope('append'), listAll: nope('listAll'), listByDay: nope('listByDay') },
   };
 }
 

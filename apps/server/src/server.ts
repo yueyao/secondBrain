@@ -9,10 +9,11 @@ import {
   listQueue,
   reviewView,
   searchWiki,
+  usageSummary,
 } from '@sb/app';
 import { parseDraftId, parseRawPath, type DraftId, type RawPath } from '@sb/domain';
 import type { Runtime } from './runtime';
-import { dashboard, errorPage, reviewPage, searchPage } from './views';
+import { dashboard, errorPage, reviewPage, searchPage, usagePage } from './views';
 
 function redirect(res: http.ServerResponse, location: string): void {
   res.writeHead(303, { location });
@@ -65,12 +66,28 @@ export function createServer(runtime: Runtime): http.Server {
 
     try {
       if (req.method === 'GET' && path === '/') {
-        const [queue, pending, stats] = await Promise.all([
+        const today = runtime.ctx.clock.now().slice(0, 10);
+        const [queue, pending, stats, usage] = await Promise.all([
           listQueue(runtime.ctx),
           listPendingDrafts(runtime.ctx),
           counts(runtime),
+          usageSummary(runtime.ctx, { day: today }),
         ]);
-        return sendHtml(res, dashboard({ queue, pending, counts: stats }));
+        return sendHtml(res, dashboard({
+          queue,
+          pending,
+          counts: stats,
+          usage: {
+            calls: usage.totals.calls,
+            inputTokens: usage.totals.inputTokens,
+            outputTokens: usage.totals.outputTokens,
+            estimatedCost: usage.totals.estimatedCost,
+          },
+        }));
+      }
+
+      if (req.method === 'GET' && path === '/usage') {
+        return sendHtml(res, usagePage(await usageSummary(runtime.ctx)));
       }
 
       if (req.method === 'GET' && path.startsWith('/review/')) {
@@ -121,6 +138,10 @@ export function createServer(runtime: Runtime): http.Server {
       }
       if (req.method === 'GET' && path.startsWith('/api/reviews/')) {
         return sendJson(res, await reviewView(runtime.ctx, draftIdOf(path.slice('/api/reviews/'.length))));
+      }
+      if (req.method === 'GET' && path === '/api/usage') {
+        const day = url.searchParams.get('day') ?? undefined;
+        return sendJson(res, await usageSummary(runtime.ctx, day ? { day } : {}));
       }
       if (req.method === 'GET' && path === '/api/search') {
         const query = url.searchParams.get('q') ?? '';

@@ -20,6 +20,7 @@ import type {
   ReviewDecisionRecord,
   StateStore,
   Transaction,
+  UsageRecord,
 } from '@sb/contracts';
 import type { DraftId, RawPath, RawState } from '@sb/domain';
 import {
@@ -29,6 +30,7 @@ import {
   rowToEvent,
   rowToJob,
   rowToRawItem,
+  rowToUsage,
   serializeState,
   type Row,
 } from './mapping';
@@ -56,6 +58,7 @@ export class SqliteStore implements StateStore {
       commits: new Commits(this),
       jobs: new Jobs(this),
       events: new Events(this),
+      usage: new Usage(this),
     };
   }
 
@@ -293,6 +296,43 @@ class Events {
   async listSince(seq: number): Promise<readonly EventRecord[]> {
     const rows = this.store.stmt('SELECT * FROM event WHERE seq > ? ORDER BY seq').all(seq) as Row[];
     return rows.map(rowToEvent);
+  }
+}
+
+class Usage {
+  constructor(private readonly store: SqliteStore) {}
+
+  async append(record: UsageRecord): Promise<void> {
+    this.store
+      .stmt(
+        `INSERT INTO usage_record
+           (at, raw_path, draft_id, profile_id, provider, model, input_tokens, output_tokens, latency_ms, cache_hit)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        record.at,
+        record.rawPath,
+        record.draftId,
+        record.profileId,
+        record.provider,
+        record.model,
+        record.inputTokens,
+        record.outputTokens,
+        record.latencyMs,
+        record.cacheHit ? 1 : 0,
+      );
+  }
+
+  async listAll(): Promise<readonly UsageRecord[]> {
+    const rows = this.store.stmt('SELECT * FROM usage_record ORDER BY id').all() as Row[];
+    return rows.map(rowToUsage);
+  }
+
+  async listByDay(day: string): Promise<readonly UsageRecord[]> {
+    const rows = this.store
+      .stmt('SELECT * FROM usage_record WHERE at LIKE ? ORDER BY id')
+      .all(`${day}%`) as Row[];
+    return rows.map(rowToUsage);
   }
 }
 

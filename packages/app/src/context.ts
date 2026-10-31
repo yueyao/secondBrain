@@ -15,6 +15,11 @@ export interface AppConfig {
   readonly enabledSources: readonly string[];
 }
 
+export interface ProfilePricing {
+  readonly inPerMTokens: number;
+  readonly outPerMTokens: number;
+}
+
 export interface AgentMeta {
   readonly provider: string;
   readonly model: string;
@@ -32,6 +37,8 @@ export interface AppContext {
   readonly config: AppConfig;
   /** 可选：mock/provider 自报身份（写进 provenance） */
   readonly agentMeta?: AgentMeta;
+  /** 价格表：profileId → 单价（用于用量汇总的估算成本；空表则只统计 tokens） */
+  readonly pricing?: Readonly<Record<string, ProfilePricing>>;
 }
 
 export type AppErrorCode =

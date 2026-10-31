@@ -4,10 +4,10 @@ import { AgentRuntimeError } from './errors';
 import type { ModelProfile } from './route';
 
 export interface BudgetLimits {
-  /** 单次任务上限（含重试累计） */
-  readonly taskCostLimit: number;
-  /** 每日上限 */
-  readonly dailyCostLimit: number;
+  /** 单次任务上限；不填 = 纯计量模式，不拦截 */
+  readonly taskCostLimit?: number;
+  /** 每日上限；不填 = 纯计量模式，不拦截 */
+  readonly dailyCostLimit?: number;
 }
 
 export interface CostEstimate {
@@ -76,17 +76,19 @@ export class BudgetLedger {
   /** 调用前检查：单次超限直接拒；每日超限只拦新任务。 */
   preflight(estimatedCost: number): void {
     this.rollover();
-    if (estimatedCost > this.limits.taskCostLimit) {
+    const taskLimit = this.limits.taskCostLimit;
+    if (taskLimit !== undefined && estimatedCost > taskLimit) {
       throw new AgentRuntimeError('BUDGET_EXCEEDED', '单次任务成本预估超限', {
         estimatedCost,
-        taskCostLimit: this.limits.taskCostLimit,
+        taskCostLimit: taskLimit,
       });
     }
-    if (this.dailyCost + estimatedCost > this.limits.dailyCostLimit) {
+    const dailyLimit = this.limits.dailyCostLimit;
+    if (dailyLimit !== undefined && this.dailyCost + estimatedCost > dailyLimit) {
       throw new AgentRuntimeError('BUDGET_EXCEEDED', '每日预算不足，暂停新任务', {
         estimatedCost,
         dailyCost: this.dailyCost,
-        dailyCostLimit: this.limits.dailyCostLimit,
+        dailyCostLimit: dailyLimit,
       });
     }
   }

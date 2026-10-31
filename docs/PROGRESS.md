@@ -455,3 +455,47 @@ POST /review/:id/accept → 303
 2. 日/月预算上限；
 3. 判断密度门槛；
 4. golden set 标注由谁维护。
+
+---
+
+## 十六、用量计量（2026-10-31，替代硬预算）
+
+用户决定：**不设预算上下限，但必须知道消耗了多少。**
+
+### 16.1 交付
+
+| 位置 | 内容 |
+|---|---|
+| `@sb/contracts` | `UsageRecord` / `UsageRepo` 端口；`Transaction` 增加 `usage` |
+| `@sb/adapters-sqlite` | 迁移 v2 建 `usage_record` 表；`append / listAll / listByDay` |
+| `@sb/app` | 起草时**同事务**写 usage；新增 `usageSummary`（按天 / 按 profile / 总计，含估算成本） |
+| `@sb/agent-runtime` | `BudgetLimits` 两个上限改为可选：不填 = 纯计量，不拦截 |
+| `@sb/server` | 首页用量卡片；`GET /usage` 页面；`GET /api/usage` |
+
+价格表为空时成本显示 0，但 tokens、调用数、缓存命中始终准确；填上价格即可得到估算成本。
+
+### 16.2 验证
+
+```
+✓ 边界检查通过：8 个包 / 65 个文件，0 违规
+✔ no dependency violations found (97 modules, 282 dependencies cruised)
+
+ Test Files  20 passed (20)
+      Tests  157 passed (157)
+```
+
+实际启动后走一遍（mock）：`/api/usage` 返回 `1 call / 1200 in / 300 out / cost 0`，`/usage` 页面按天与 profile 展示一致。
+
+### 16.3 决策（续）
+
+| # | 决策 | 理由 | 代价 |
+|---|---|---|---|
+| D26 | 预算不做硬拦截，改为 usage 账本 + 汇总 | 硬上限容易卡死任务；用户要的是"看得见" | 需要人工判断何时停 |
+| D27 | usage 与草稿同事务写入 | 草稿存在但账本缺失会导致成本漏记 | 每次起草多一次 insert |
+| D28 | 成本按"当前价格表 × 历史 tokens"估算 | 价格会变，精确账单需要供应商对账单 | 估算值，非最终账单 |
+
+### 16.4 下一步
+
+- P4.2 真实 provider（仍需确认付费内容是否上云）；
+- `sb stats --cost` CLI（目前只有 HTTP 页面与 API）；
+- 把 `config/model-profiles.example.json` 接成真正的配置加载与校验。

@@ -24,6 +24,18 @@ describe('预算：调用前估算', () => {
   });
 });
 
+describe('预算：纯计量模式（不设上限）', () => {
+  it('没有上限时不拦截，只累计用量', () => {
+    const ledger = new BudgetLedger({}, clock);
+    expect(() => ledger.preflight(999)).not.toThrow();
+    ledger.record({ cost: 0.25, inputTokens: 12_000, outputTokens: 800 });
+    const snapshot = ledger.snapshot();
+    expect(snapshot.dailyCost).toBeCloseTo(0.25, 10);
+    expect(snapshot.dailyInputTokens).toBe(12_000);
+    expect(snapshot.dailyOutputTokens).toBe(800);
+  });
+});
+
 describe('预算：三级闸门', () => {
   it('单次超限：preflight 直接拒绝', () => {
     const ledger = new BudgetLedger({ taskCostLimit: 0.01, dailyCostLimit: 100 }, clock);

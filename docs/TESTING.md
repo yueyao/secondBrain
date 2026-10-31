@@ -12,10 +12,11 @@
 | 领域单测 | `packages/domain/test` | 无 | 58 | 纯函数：状态矩阵、规则、策略、文本工具 |
 | 契约冒烟 | `packages/contracts/test` | 无 | 7 | 用假实现证明端口可实现、DTO 形状稳定 |
 | 适配器集成 | `packages/adapters-*/test` | 真实临时目录 / `:memory:` SQLite / 真实 git | 34 | 迁移、事务、乐观锁、路径逃逸、锁 |
-| 应用集成 | `packages/app/test` | 真实 git + SQLite + MockAgent | 5 | 完整流程：triage → digest → accept/reject |
+| 应用集成 | `packages/app/test` | 真实 git + SQLite + MockAgent | 7 | 完整流程 + 用量账本 |
 | 端到端 | `apps/server/test` | 真实 HTTP 服务 + 浏览器级 HTML | 3 | 起服务、走 UI 路由、断言 wiki 与 git |
+| 运行时 | `packages/agent-runtime/test` | fake provider，无真实模型 | 24 | 路由/预算/缓存/重试/降级/契约校验 |
 
-当前总数：**129 例 / 17 个文件**。
+当前总数：**157 例 / 20 个文件**。
 
 ---
 
@@ -72,7 +73,9 @@ PORT=9000 DATA_DIR=/tmp/sb-demo pnpm demo   # 换端口/数据目录
 - 每次入库都会在 `DATA_DIR/vault` 里产生一个 `digest: <raw>` commit；
 - 想重置：删掉 `DATA_DIR` 再启动。
 
-页面快照（无需启动服务即可预览）：`docs/snapshots/11-review.html`、`docs/snapshots/12-dashboard-after.html`。
+页面快照（无需启动服务即可预览）：`docs/snapshots/11-review.html`、`docs/snapshots/12-dashboard-after.html`、`docs/snapshots/13-usage.html`。
+
+用量查看：首页卡片，或 `GET /api/usage`、`GET /usage`。只计量不拦截。
 
 ---
 

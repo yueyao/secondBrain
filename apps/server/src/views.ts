@@ -52,10 +52,18 @@ function findingBadge(severity: string): string {
   return `<span class="badge ${cls}">${LEVEL[severity] ?? esc(severity)}</span>`;
 }
 
+export interface UsageTiles {
+  readonly calls: number;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly estimatedCost: number;
+}
+
 export interface DashboardData {
   readonly queue: readonly QueueItemV1[];
   readonly pending: readonly ReviewViewV1[];
   readonly counts: { readonly items: number; readonly queued: number; readonly committed: number; readonly deferred: number };
+  readonly usage: UsageTiles;
 }
 
 export function dashboard(data: DashboardData): string {
@@ -89,6 +97,14 @@ export function dashboard(data: DashboardData): string {
     <div class="stat"><b>${data.pending.length}</b><span>待审</span></div>
     <div class="stat"><b>${data.counts.committed}</b><span>已入库</span></div>
     <div class="stat"><b>${data.counts.deferred}</b><span>已延后</span></div>
+  </div>
+
+  <div class="row" style="margin-top:12px">
+    <div class="stat"><b>${data.usage.calls}</b><span>今日模型调用</span></div>
+    <div class="stat"><b>${data.usage.inputTokens.toLocaleString()}</b><span>今日输入 tokens</span></div>
+    <div class="stat"><b>${data.usage.outputTokens.toLocaleString()}</b><span>今日输出 tokens</span></div>
+    <div class="stat"><b>${data.usage.estimatedCost}</b><span>今日估算成本（价格未配置时为 0）</span></div>
+    <div class="stat"><b><a href="/usage">用量明细 →</a></b><span>按天 / 按 profile</span></div>
   </div>
 
   <h2>操作</h2>
@@ -198,4 +214,48 @@ export function searchPage(query: string, hits: readonly ScoredHit[]): string {
 
 export function errorPage(message: string): string {
   return layout('出错了', `<h1>出错了</h1><pre>${esc(message)}</pre><a class="btn" href="/">← 返回</a>`);
+}
+
+
+export interface UsagePageData {
+  readonly days: readonly { day: string; calls: number; cacheHits: number; inputTokens: number; outputTokens: number; estimatedCost: number }[];
+  readonly byProfile: readonly { profileId: string; calls: number; inputTokens: number; outputTokens: number; estimatedCost: number }[];
+  readonly totals: { calls: number; cacheHits: number; inputTokens: number; outputTokens: number; estimatedCost: number };
+}
+
+export function usagePage(data: UsagePageData): string {
+  const dayRows = data.days.map((entry) => `<tr>
+    <td>${esc(entry.day)}</td><td>${entry.calls}</td>
+    <td>${entry.cacheHits}</td>
+    <td>${entry.inputTokens.toLocaleString()}</td>
+    <td>${entry.outputTokens.toLocaleString()}</td>
+    <td>${entry.estimatedCost}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">还没有调用记录</td></tr>';
+
+  const profileRows = data.byProfile.map((entry) => `<tr>
+    <td>${esc(entry.profileId)}</td><td>${entry.calls}</td>
+    <td>${entry.inputTokens.toLocaleString()}</td>
+    <td>${entry.outputTokens.toLocaleString()}</td>
+    <td>${entry.estimatedCost}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">还没有调用记录</td></tr>';
+
+  return layout('用量', `
+  <div class="row" style="justify-content:space-between"><h1>模型用量</h1><a class="btn" href="/">← 返回</a></div>
+  <div class="muted">只计量、不拦截（ADR 0005 修订）。价格未配置时成本显示 0，tokens 仍然准确。</div>
+
+  <div class="row" style="margin-top:16px">
+    <div class="stat"><b>${data.totals.calls}</b><span>总调用</span></div>
+    <div class="stat"><b>${data.totals.cacheHits}</b><span>缓存命中</span></div>
+    <div class="stat"><b>${data.totals.inputTokens.toLocaleString()}</b><span>输入 tokens</span></div>
+    <div class="stat"><b>${data.totals.outputTokens.toLocaleString()}</b><span>输出 tokens</span></div>
+    <div class="stat"><b>${data.totals.estimatedCost}</b><span>估算成本</span></div>
+  </div>
+
+  <h2>按天</h2>
+  <div class="card" style="padding:4px 0"><table>
+    <tr><th>日期</th><th>调用</th><th>缓存命中</th><th>输入</th><th>输出</th><th>估算成本</th></tr>${dayRows}
+  </table></div>
+
+  <h2>按 profile</h2>
+  <div class="card" style="padding:4px 0"><table>
+    <tr><th>profile</th><th>调用</th><th>输入</th><th>输出</th><th>估算成本</th></tr>${profileRows}
+  </table></div>`);
 }

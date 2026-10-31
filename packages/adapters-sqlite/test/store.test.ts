@@ -262,3 +262,42 @@ describe('event 流', () => {
     expect(since[0]?.payload).toEqual({ n: 2 });
   });
 });
+
+describe('usage 账本', () => {
+  it('追加与读取：可按天过滤', async () => {
+    await store.transaction(async (tx) => {
+      tx.usage.append({
+        at: '2026-10-30T10:00:00+08:00',
+        rawPath: RAW,
+        draftId: DRAFT,
+        profileId: 'strong',
+        provider: 'fake',
+        model: 'strong-2026-01',
+        inputTokens: 1000,
+        outputTokens: 200,
+        latencyMs: 900,
+        cacheHit: false,
+      });
+      tx.usage.append({
+        at: '2026-10-31T09:00:00+08:00',
+        rawPath: RAW,
+        draftId: DRAFT,
+        profileId: 'strong',
+        provider: 'fake',
+        model: 'strong-2026-01',
+        inputTokens: 500,
+        outputTokens: 100,
+        latencyMs: 300,
+        cacheHit: true,
+      });
+    });
+
+    const all = await store.transaction(async (tx) => tx.usage.listAll());
+    expect(all).toHaveLength(2);
+    expect(all[0]).toMatchObject({ profileId: 'strong', inputTokens: 1000, cacheHit: false });
+
+    const day = await store.transaction(async (tx) => tx.usage.listByDay('2026-10-30'));
+    expect(day).toHaveLength(1);
+    expect(day[0]?.at.startsWith('2026-10-30')).toBe(true);
+  });
+});

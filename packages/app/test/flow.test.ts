@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { parseRawPath, type RawPath } from '@sb/domain';
 import type { AppContext } from '../src/context';
 import { decideReview, draftDigest, ingestAndTriage } from '../src/commands';
-import { listPendingDrafts, listQueue, reviewView } from '../src/queries';
+import { listPendingDrafts, listQueue, reviewView, usageSummary } from '../src/queries';
 import { createHarness, type TestHarness } from '@sb/testing';
 
 function rawPath(value: string): RawPath {
@@ -24,6 +24,7 @@ function ctxOf(harness: TestHarness): AppContext {
       enabledSources: ['cubox', 'notions', 'podcast', 'dedao', 'general'],
     },
     agentMeta: { provider: 'mock', model: 'heuristic-v1', promptId: 'digest', promptVersion: 1 },
+    pricing: { 'mock-profile': { inPerMTokens: 1, outPerMTokens: 3 } },
   };
 }
 
@@ -125,5 +126,35 @@ describe('应用层：完整流程', () => {
     const pending = await listPendingDrafts(ctx);
     expect(pending).toHaveLength(1);
     expect(pending[0]?.actions.accept).toBe(true);
+  });
+});
+
+
+describe('用量账本', () => {
+  it('每次起草记录 tokens / profile / 缓存命中，并能按天汇总', async () => {
+    const ctx = ctxOf(harness);
+    await ingestAndTriage(ctx);
+    await draftDigest(ctx, await findRaw(harness, '反脆弱'));
+
+    const summary = await usageSummary(ctx);
+    expect(summary.totals.calls).toBe(1);
+    expect(summary.totals.inputTokens).toBe(1200);
+    expect(summary.totals.outputTokens).toBe(300);
+    expect(summary.totals.cacheHits).toBe(0);
+    expect(summary.byProfile[0]?.profileId).toBe('mock-profile');
+
+    // 价格表：1/M in + 3/M out → 1200/1e6*1 + 300/1e6*3 = 0.0021
+    expect(summary.totals.estimatedCost).toBeCloseTo(0.0021, 6);
+    expect(summary.days[0]?.day).toBe('2026-10-30');
+  });
+
+  it('没有价格表时只统计 tokens，成本为 0', async () => {
+    const ctx = { ...ctxOf(harness), pricing: {} };
+    await ingestAndTriage(ctx);
+    await draftDigest(ctx, await findRaw(harness, '反脆弱'));
+
+    const summary = await usageSummary(ctx);
+    expect(summary.totals.inputTokens).toBe(1200);
+    expect(summary.totals.estimatedCost).toBe(0);
   });
 });

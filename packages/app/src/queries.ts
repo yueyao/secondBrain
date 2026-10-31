@@ -91,3 +91,90 @@ export async function reviewView(ctx: AppContext, draftId: DraftId): Promise<Rev
 export async function searchWiki(ctx: AppContext, query: string, limit = 10) {
   return ctx.search.query(query, limit);
 }
+
+export interface UsageDaySummary {
+  readonly day: string;
+  readonly calls: number;
+  readonly cacheHits: number;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly estimatedCost: number;
+}
+
+export interface UsageProfileSummary {
+  readonly profileId: string;
+  readonly calls: number;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly estimatedCost: number;
+}
+
+export interface UsageSummary {
+  readonly days: readonly UsageDaySummary[];
+  readonly byProfile: readonly UsageProfileSummary[];
+  readonly totals: Omit<UsageDaySummary, 'day'>;
+}
+
+function costOfUsage(
+  inputTokens: number,
+  outputTokens: number,
+  profileId: string,
+  pricing: AppContext['pricing'],
+): number {
+  const price = pricing?.[profileId];
+  if (!price) return 0;
+  const cost = (inputTokens / 1_000_000) * price.inPerMTokens + (outputTokens / 1_000_000) * price.outPerMTokens;
+  return Math.round(cost * 1_000_000) / 1_000_000;
+}
+
+/** 用量汇总：按天、按 profile；不拦截，只报告（ADR 0005 修订）。 */
+export async function usageSummary(ctx: AppContext, options: { readonly day?: string } = {}): Promise<UsageSummary> {
+  const records = options.day
+    ? await ctx.store.transaction(async (tx) => tx.usage.listByDay(options.day as string))
+    : await ctx.store.transaction(async (tx) => tx.usage.listAll());
+
+  const days = new Map<string, UsageDaySummary>();
+  const profiles = new Map<string, UsageProfileSummary>();
+
+  for (const record of records) {
+    const day = record.at.slice(0, 10);
+    const cost = costOfUsage(record.inputTokens, record.outputTokens, record.profileId, ctx.pricing);
+    const dayEntry = days.get(day) ?? { day, calls: 0, cacheHits: 0, inputTokens: 0, outputTokens: 0, estimatedCost: 0 };
+    days.set(day, {
+      day,
+      calls: dayEntry.calls + 1,
+      cacheHits: dayEntry.cacheHits + (record.cacheHit ? 1 : 0),
+      inputTokens: dayEntry.inputTokens + record.inputTokens,
+      outputTokens: dayEntry.outputTokens + record.outputTokens,
+      estimatedCost: Math.round((dayEntry.estimatedCost + cost) * 1_000_000) / 1_000_000,
+    });
+
+    const profileEntry = profiles.get(record.profileId) ?? {
+      profileId: record.profileId, calls: 0, inputTokens: 0, outputTokens: 0, estimatedCost: 0,
+    };
+    profiles.set(record.profileId, {
+      profileId: record.profileId,
+      calls: profileEntry.calls + 1,
+      inputTokens: profileEntry.inputTokens + record.inputTokens,
+      outputTokens: profileEntry.outputTokens + record.outputTokens,
+      estimatedCost: Math.round((profileEntry.estimatedCost + cost) * 1_000_000) / 1_000_000,
+    });
+  }
+
+  const totals = [...days.values()].reduce(
+    (acc, entry) => ({
+      calls: acc.calls + entry.calls,
+      cacheHits: acc.cacheHits + entry.cacheHits,
+      inputTokens: acc.inputTokens + entry.inputTokens,
+      outputTokens: acc.outputTokens + entry.outputTokens,
+      estimatedCost: Math.round((acc.estimatedCost + entry.estimatedCost) * 1_000_000) / 1_000_000,
+    }),
+    { calls: 0, cacheHits: 0, inputTokens: 0, outputTokens: 0, estimatedCost: 0 },
+  );
+
+  return {
+    days: [...days.values()].sort((a, b) => b.day.localeCompare(a.day)),
+    byProfile: [...profiles.values()].sort((a, b) => b.calls - a.calls),
+    totals,
+  };
+}

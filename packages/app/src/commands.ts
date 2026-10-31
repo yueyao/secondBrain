@@ -193,6 +193,18 @@ export async function draftDigest(ctx: AppContext, rawPath: RawPath): Promise<Dr
     const swapped = await tx.rawItems.compareAndSwapVersion(latest.id, latest.version, ready);
     if (!swapped) throw new AppError('INVALID_STATE', '并发冲突：状态已被修改，请重试');
     await tx.drafts.insert(draft);
+    await tx.usage.append({
+      at: now,
+      rawPath,
+      draftId: draft.id,
+      profileId: outcome.provenance.profileId,
+      provider: outcome.provenance.provider,
+      model: outcome.provenance.model,
+      inputTokens: outcome.provenance.inputTokens ?? 0,
+      outputTokens: outcome.provenance.outputTokens ?? 0,
+      latencyMs: outcome.provenance.latencyMs,
+      cacheHit: outcome.provenance.cacheHit,
+    });
     await tx.events.append({
       at: now,
       actor: 'agent',

@@ -8,6 +8,7 @@ import type {
   JobState,
   RawItemRecord,
   ReviewDecisionRecord,
+  UsageRecord,
 } from '@sb/contracts';
 import type { ContentHash, DraftId, DraftProposal, Finding, RawPath, TriageResult } from '@sb/domain';
 import { decodeState, encodeState } from './state-codec';
@@ -81,6 +82,21 @@ export function rowToEvent(row: Row): EventRecord {
     type: asString(row.type),
     aggregateId: asString(row.aggregate_id),
     payload: JSON.parse(asString(row.payload)) as Record<string, unknown>,
+  };
+}
+
+export function rowToUsage(row: Row): UsageRecord {
+  return {
+    at: asString(row.at),
+    rawPath: asString(row.raw_path) as RawPath,
+    draftId: asString(row.draft_id) as DraftId,
+    profileId: asString(row.profile_id),
+    provider: asString(row.provider),
+    model: asString(row.model),
+    inputTokens: asNumber(row.input_tokens),
+    outputTokens: asNumber(row.output_tokens),
+    latencyMs: asNullableNumber(row.latency_ms),
+    cacheHit: Number(row.cache_hit) === 1,
   };
 }
 

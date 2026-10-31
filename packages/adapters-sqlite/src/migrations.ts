@@ -87,4 +87,24 @@ CREATE INDEX ix_event_aggregate ON event(aggregate_id, seq);
 
 `;
 
-export const MIGRATIONS: readonly Migration[] = [{ version: 1, name: 'init', up: INIT }];
+const USAGE = `
+CREATE TABLE usage_record (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  at            TEXT NOT NULL,
+  raw_path      TEXT NOT NULL,
+  draft_id      TEXT NOT NULL,
+  profile_id    TEXT NOT NULL,
+  provider      TEXT NOT NULL,
+  model         TEXT NOT NULL,
+  input_tokens  INTEGER NOT NULL,
+  output_tokens INTEGER NOT NULL,
+  latency_ms    INTEGER,
+  cache_hit     INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX ix_usage_at ON usage_record(at);
+`;
+
+export const MIGRATIONS: readonly Migration[] = [
+  { version: 1, name: 'init', up: INIT },
+  { version: 2, name: 'usage', up: USAGE },
+];

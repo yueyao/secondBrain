@@ -251,3 +251,21 @@ draftIdem  = sha256(rawPath + contentHash + promptVersion + profileId)
 2. 把 `config/model-profiles.example.json` 接入配置加载与校验（目前是文档样例）。
 3. `sb stats --cost` 成本看板与按 profile 的用量统计。
 4. golden set 结构与评测脚本（需要用户先提供标注与预算）。
+
+
+---
+
+## 10. 修订（2026-10-31）：不做硬上限，改为"只计量"
+
+用户决定：**不设预算上下限，但必须知道消耗了多少。**
+
+据此调整：
+
+1. `BudgetLedger` 的两个上限改为**可选**；不填即"纯计量模式"，`preflight` 不拦截，只累计。
+2. 新增 **usage 账本**（`packages/contracts/src/ports/usage.ts` + SQLite `usage_record` 表）：
+   每次模型调用记录 `at / rawPath / draftId / profileId / provider / model / inputTokens / outputTokens / latencyMs / cacheHit`。
+3. 每次起草在**同一事务**内写 usage，保证草稿与账本一致。
+4. 汇总接口 `usageSummary`：按天、按 profile 的调用数、tokens、缓存命中、估算成本（价格表为空时成本为 0，tokens 仍准确）。
+5. 服务端新增 `GET /usage` 页面与 `GET /api/usage`；首页增加"今日调用 / 输入 tokens / 输出 tokens / 估算成本"。
+
+保留的能力：如果将来想加回上限，只需在配置里填 `taskCostLimit` / `dailyCostLimit`，代码不用改。
