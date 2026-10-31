@@ -21,6 +21,8 @@ export interface ModelProfile {
   readonly pricing: { readonly inPerMTokens: number; readonly outPerMTokens: number };
   readonly limits: { readonly maxConcurrency: number; readonly requestsPerMinute: number };
   readonly health: { readonly enabled: boolean; readonly fallbackTo: readonly string[] };
+  /** 厂商私有参数，原样合并进请求体（如 DeepSeek 的 thinking / reasoning_effort） */
+  readonly providerOptions?: Readonly<Record<string, unknown>>;
 }
 
 export interface TaskPolicy {

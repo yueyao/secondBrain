@@ -35,7 +35,7 @@ export class OpenAICompatibleProvider implements CompletionProvider {
 
   async complete(request: CompletionRequest): Promise<CompletionResponse> {
     const url = `${this.options.baseUrl.replace(/\/+$/, '')}/chat/completions`;
-    const body = {
+    const body: Record<string, unknown> = {
       model: request.profile.model,
       messages: [
         { role: 'system', content: request.system },
@@ -44,6 +44,8 @@ export class OpenAICompatibleProvider implements CompletionProvider {
       temperature: this.temperature,
       max_tokens: request.maxOutputTokens,
       response_format: { type: 'json_object' },
+      // 厂商私有参数（如 DeepSeek thinking / reasoning_effort）原样透传
+      ...(request.profile.providerOptions ?? {}),
     };
 
     let response: Response;

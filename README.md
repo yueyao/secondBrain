@@ -37,7 +37,46 @@ pnpm demo          # → http://127.0.0.1:8787（自动播种 mock 数据）
 首页「扫描 raw/ 并分档」→ 队列「生成草稿」→ 审阅页「通过并入库」，每一步都会在 demo vault 里产生真实 git commit。
 测试方案见 [docs/TESTING.md](docs/TESTING.md)，页面快照见 `docs/snapshots/`。
 
-## 接真实模型（P4.2，决策 A：全部来源走云）
+## 支持哪些模型
+
+适配器实现的是 **OpenAI 兼容协议**（`/chat/completions`），所以"支持"= 任何兼容端点：
+
+| 供应商 / 端点 | 状态 | 备注 |
+|---|---|---|
+| **DeepSeek** | ✅ 已提供配置 | `deepseek-flash` / `deepseek-v4-pro`，见下 |
+| **OpenAI** | ✅ | 任意官方模型名 |
+| Qwen / DashScope 兼容模式、Moonshot、智谱、MiniMax、OpenRouter | ✅ | 填 base URL + model 即可 |
+| vLLM / Ollama / LM Studio / LiteLLM 网关 | ✅ | 本地或自建网关 |
+| Google Gemini | ✅ | 官方提供 OpenAI 兼容端点 |
+| Anthropic Claude 原生协议 | ⬜ | 需另写适配器或经网关转换 |
+
+先自检配置（不调用模型、不花钱）：
+
+```bash
+pnpm check:model config/model-profiles.deepseek.example.json
+# 输出每个任务在 public/restricted 下解析出的 profile 链
+```
+
+## 接 DeepSeek（推荐先跑这个）
+
+```bash
+cp config/model-profiles.deepseek.example.json config/model-profiles.json
+MODEL_BASE_URL=https://api.deepseek.com \
+MODEL_API_KEY=<从环境变量给，不要写进文件> \
+MODEL_CONFIG=config/model-profiles.json \
+pnpm demo
+```
+
+配置里的分工：
+
+| profile | 模型 | 用途 | 关键参数 |
+|---|---|---|---|
+| `deepseek-flash` | `deepseek-flash` | triage / 降级兜底 | `thinking: disabled`（快、省） |
+| `deepseek-v4-pro` | `deepseek-v4-pro` | digest / decide | `thinking: enabled` + `reasoning_effort: high` |
+
+> 价格按峰值期 cache-miss 单价填（flash $0.3 / $1.2，pro $1.32 / $3.96 每百万 tokens），off-peak 减半；缓存命中更便宜。当前账本按单一定价估算，属保守值。
+
+## 接其他 OpenAI 兼容端点
 
 ```bash
 cp config/model-profiles.example.json config/model-profiles.json
@@ -65,7 +104,7 @@ pnpm run check     # boundaries → typecheck → depcruise → test
 pnpm run boundaries   # 包边界、深引、纯度（无 node: / 无第三方 / 无 throw / 无时钟）
 pnpm run typecheck    # tsc --noEmit（strict + exactOptionalPropertyTypes）
 pnpm run depcruise    # 依赖方向、环形依赖
-pnpm test             # vitest：22 个文件 / 168 例
+pnpm test             # vitest：22 个文件 / 170 例
 ```
 
 ## 能证明什么

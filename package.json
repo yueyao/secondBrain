@@ -16,7 +16,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "node tools/check-boundaries.mjs && tsc --noEmit -p tsconfig.json && depcruise packages --config .dependency-cruiser.cjs && vitest run",
-    "demo": "pnpm --filter @sb/server start"
+    "demo": "pnpm --filter @sb/server start",
+    "check:model": "tsx scripts/check-model-config.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",

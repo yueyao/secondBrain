@@ -119,6 +119,22 @@ describe('OpenAI 兼容 provider', () => {
     await expect(provider.complete(request())).rejects.toMatchObject({ kind: 'timeout' });
   });
 
+  it('providerOptions 原样透传（DeepSeek 的 thinking / reasoning_effort）', async () => {
+    server = await startServer((_captured, res) => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(okBody));
+    });
+    const provider = new OpenAICompatibleProvider({ baseUrl: server.baseUrl, apiKey: 'k' });
+    await provider.complete({
+      ...request(),
+      profile: { ...profile, providerOptions: { thinking: { type: 'disabled' }, reasoning_effort: 'high' } },
+    });
+    expect(server.captured[0]?.body).toMatchObject({
+      thinking: { type: 'disabled' },
+      reasoning_effort: 'high',
+    });
+  });
+
   it('模型返回非 JSON 时原样交给 runner 做契约校验', async () => {
     server = await startServer((_captured, res) => {
       res.writeHead(200, { 'content-type': 'application/json' });

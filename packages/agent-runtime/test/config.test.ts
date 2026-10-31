@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parseModelPolicy } from '../src/config';
 
@@ -84,5 +86,20 @@ describe('模型策略配置解析', () => {
     const result = parseModelPolicy(raw);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.errors.join(';')).toContain('ghost');
+  });
+});
+
+
+describe('DeepSeek 示例配置', () => {
+  it('可直接解析，且 providerOptions 被保留', () => {
+    const file = path.resolve(import.meta.dirname, '../../../config/model-profiles.deepseek.example.json');
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8')) as unknown;
+    const result = parseModelPolicy(raw);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.profiles.map((profile) => profile.id)).toEqual(['deepseek-flash', 'deepseek-v4-pro']);
+    expect(result.value.profiles[0]?.providerOptions).toMatchObject({ thinking: { type: 'disabled' } });
+    expect(result.value.policies.digest.profileOrder).toEqual(['deepseek-v4-pro', 'deepseek-flash']);
+    expect(result.value.policies.triage.profileOrder).toEqual(['deepseek-flash']);
   });
 });

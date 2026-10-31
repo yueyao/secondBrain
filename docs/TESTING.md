@@ -15,9 +15,9 @@
 | 应用集成 | `packages/app/test` | 真实 git + SQLite + MockAgent | 7 | 完整流程 + 用量账本 |
 | 端到端 | `apps/server/test` | 真实 HTTP 服务 + 浏览器级 HTML | 3 | 起服务、走 UI 路由、断言 wiki 与 git |
 | 运行时 | `packages/agent-runtime/test` | fake provider，无真实模型 | 30 | 路由/预算/缓存/重试/降级/契约校验/配置解析 |
-| provider | `packages/adapters-agent-openai/test` | 本地假 HTTP 服务，无真实网络 | 5 | 请求体、鉴权、429/5xx/content_filter/超时 |
+| provider | `packages/adapters-agent-openai/test` | 本地假 HTTP 服务，无真实网络 | 6 | 请求体、鉴权、providerOptions 透传、429/5xx/content_filter/超时 |
 
-当前总数：**168 例 / 22 个文件**。
+当前总数：**170 例 / 22 个文件**。
 
 ---
 

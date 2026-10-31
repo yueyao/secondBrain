@@ -69,6 +69,11 @@ function parseProfile(raw: unknown, index: number, errors: string[]): ModelProfi
     if (typeof limits.requestsPerMinute !== 'number' || limits.requestsPerMinute <= 0) errors.push(`${path}.limits.requestsPerMinute 必须是正数`);
   }
 
+  const providerOptions = raw.providerOptions;
+  if (providerOptions !== undefined && !isRecord(providerOptions)) {
+    errors.push(`${path}.providerOptions 必须是对象`);
+  }
+
   const health = raw.health;
   if (!isRecord(health)) {
     errors.push(`${path}.health 必须是对象`);
@@ -99,6 +104,7 @@ function parseProfile(raw: unknown, index: number, errors: string[]): ModelProfi
       requestsPerMinute: limitsSafe.requestsPerMinute ?? 60,
     },
     health: { enabled: healthSafe.enabled, fallbackTo: healthSafe.fallbackTo },
+    ...(providerOptions !== undefined && isRecord(providerOptions) ? { providerOptions } : {}),
   };
 }
 

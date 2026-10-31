@@ -541,3 +541,43 @@ POST /review/:id/accept → 303
 1. 填 `config/model-profiles.json` 的真实 `model` 与 `pricing`，用你的 key 跑一篇真原文；
 2. 用真实产出建立 golden set（30–50 篇）；
 3. 若要本地模型：新增 `@sb/adapters-agent-ollama` 与本地 profile，代码不改。
+
+---
+
+## 十八、DeepSeek 接入（2026-10-31）
+
+### 18.1 结论
+
+DeepSeek 兼容 OpenAI 协议，**不需要新适配器**；只加了配置与一层"厂商参数透传"。
+
+| 内容 | 说明 |
+|---|---|
+| `ModelProfile.providerOptions` | 配置里的厂商私有参数原样并入请求体（DeepSeek 的 `thinking` / `reasoning_effort`） |
+| `config/model-profiles.deepseek.example.json` | flash（triage，thinking 关闭）+ v4-pro（digest，thinking high，fallback flash） |
+| `scripts/check-model-config.ts` | `pnpm check:model [config]`：解析配置并打印每个任务的 profile 链，不调用模型 |
+| 测试 | providerOptions 透传 1 例；DeepSeek 示例配置解析 1 例（总计 170 例） |
+
+DeepSeek 关键事实（来自官方文档，2026-10）：
+
+- 模型：`deepseek-flash`、`deepseek-v4-pro`；上下文 1M，最大输出 384K；
+- JSON 输出：支持，但输出不合法时会返回空白 content → runner 按契约失败重试；
+- thinking：默认开启；`{"thinking":{"type":"disabled"}}` 关闭，`reasoning_effort` 可调；
+- 价格（峰值 cache-miss）：flash $0.3/$1.2，pro $1.32/$3.96 每百万 tokens；off-peak 减半。
+
+### 18.2 验证
+
+```
+$ pnpm run check:model config/model-profiles.deepseek.example.json
+✓ 配置合法
+  triage → deepseek-flash → deepseek-v4-pro
+  digest → deepseek-v4-pro → deepseek-flash
+
+ Test Files  22 passed (22)
+      Tests  170 passed (170)
+```
+
+### 18.3 待办
+
+1. 用真实 key 跑一篇，核对 token 与官方账单口径（尤其 cache hit）；
+2. 账本支持 cache-hit 单价与 off-peak 时段（目前单一定价，偏保守）；
+3. golden set 建立后，对比 flash 与 v4-pro 的质量/成本曲线。

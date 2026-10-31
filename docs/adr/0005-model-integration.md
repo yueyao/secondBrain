@@ -294,3 +294,26 @@ draftIdem  = sha256(rawPath + contentHash + promptVersion + profileId)
 | 安全 | key 只从 `MODEL_API_KEY` 环境变量读取；启动时缺失直接失败，不落日志 |
 
 **注**：模块名里的 "openai" 指协议（OpenAI-compatible），不是供应商锁定；任何兼容网关/本地 OpenAI 兼容服务都可接入。
+
+
+---
+
+## 12. DeepSeek 接入（2026-10-31）
+
+DeepSeek 提供 OpenAI 兼容端点，因此**不需要新适配器**，只需要配置：
+
+| 项 | 值 |
+|---|---|
+| Base URL | `https://api.deepseek.com` |
+| 模型 | `deepseek-flash`（快/省）、`deepseek-v4-pro`（强） |
+| 上下文 / 最大输出 | 1M / 384K |
+| JSON 输出 | ✅ 两个模型都支持（需 prompt 含 "json" 并给示例；输出不合法时 API 会用空格替换，需按"空白内容"重试） |
+| thinking | 默认开启、effort=high；用 `{"thinking":{"type":"disabled"}}` 关闭，`reasoning_effort` 可调 |
+| 价格（峰值，cache miss） | flash $0.3 in / $1.2 out；pro $1.32 in / $3.96 out；off-peak 减半；cache hit 更低 |
+
+实现要点：
+
+1. **`ModelProfile.providerOptions`**：厂商私有参数原样合并进请求体。DeepSeek 的 `thinking` / `reasoning_effort` 由配置声明，适配器不写死。
+2. **分工**：triage 用 `deepseek-flash` 且关闭 thinking；digest 用 `deepseek-v4-pro` 且 thinking=high，失败降级到 flash。
+3. **JSON 空白内容**：DeepSeek JSON 模式在解析失败时会返回空白 content。provider 原样返回，runner 契约校验失败后重试一次（已有逻辑），仍失败则 `CONTRACT_VIOLATION`。
+4. 价格账本暂按单一定价（峰值 cache-miss）估算，cache hit 折扣未细分——列为后续优化。
