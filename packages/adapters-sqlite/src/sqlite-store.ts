@@ -184,15 +184,16 @@ class Drafts {
     this.store
       .stmt(
         `INSERT INTO draft
-           (id, raw_item_id, proposal, findings, provider, model, prompt_id, prompt_version,
+           (id, raw_item_id, proposal, findings, target_hashes, provider, model, prompt_id, prompt_version,
             prompt_sha256, input_tokens, output_tokens, latency_ms, status, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         record.id,
         record.rawItemId,
         JSON.stringify(record.proposal),
         JSON.stringify(record.findings),
+        JSON.stringify(record.targetHashes ?? {}),
         record.provider,
         record.model,
         record.promptId,

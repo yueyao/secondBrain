@@ -41,6 +41,7 @@ const vault: VaultReader = {
   listNodes: async () => Object.keys(FILES),
   readNode: async (file) => FILES[file] ?? '',
   head: async () => null,
+  lastCommitMessage: async () => null,
   isClean: async () => true,
 };
 

@@ -35,6 +35,8 @@ export interface DraftRecord {
   readonly rawItemId: number;
   readonly proposal: DraftProposal;
   readonly findings: readonly Finding[];
+  /** 起草时目标文件的 sha256（file → hash）；accept 时用于"不覆盖"校验 */
+  readonly targetHashes: Readonly<Record<string, string>>;
   /** provenance：任何一条知识都能追溯到模型、prompt 与用量（设计文档 §10）。 */
   readonly provider: string;
   readonly model: string;

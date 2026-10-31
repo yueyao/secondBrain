@@ -48,6 +48,7 @@ export function rowToDraft(row: Row): DraftRecord {
     rawItemId: asNumber(row.raw_item_id),
     proposal: JSON.parse(asString(row.proposal)) as DraftProposal,
     findings: JSON.parse(asString(row.findings)) as readonly Finding[],
+    targetHashes: JSON.parse(asString(row.target_hashes ?? '{}')) as Record<string, string>,
     provider: asString(row.provider),
     model: asString(row.model),
     promptId: asString(row.prompt_id),

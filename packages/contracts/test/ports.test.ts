@@ -82,6 +82,7 @@ const vault: VaultPort = {
     files.set(file, content);
   },
   head: async () => COMMIT_SHA,
+  lastCommitMessage: async () => 'digest: raw/x.md [draft-abc123]',
   isClean: async () => true,
   commitFiles: async (changed, message) => {
     expect(changed.length).toBeGreaterThan(0);

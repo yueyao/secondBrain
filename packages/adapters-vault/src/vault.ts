@@ -89,6 +89,15 @@ export class FsVault implements VaultPort {
     }
   }
 
+  async lastCommitMessage(): Promise<string | null> {
+    try {
+      const subject = this.git(['log', '-1', '--pretty=%s']).trim();
+      return subject.length > 0 ? subject : null;
+    } catch {
+      return null;
+    }
+  }
+
   async isClean(): Promise<boolean> {
     return this.git(['status', '--porcelain']).trim().length === 0;
   }

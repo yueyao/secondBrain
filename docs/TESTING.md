@@ -12,13 +12,13 @@
 | 领域单测 | `packages/domain/test` | 无 | 58 | 纯函数：状态矩阵、规则、策略、文本工具 |
 | 契约冒烟 | `packages/contracts/test` | 无 | 7 | 用假实现证明端口可实现、DTO 形状稳定 |
 | 适配器集成 | `packages/adapters-*/test` | 真实临时目录 / `:memory:` SQLite / 真实 git | 34 | 迁移、事务、乐观锁、路径逃逸、锁 |
-| 应用集成 | `packages/app/test` | 真实 git + SQLite + MockAgent | 7 | 完整流程 + 用量账本 |
+| 应用集成 | `packages/app/test` | 真实 git + SQLite + MockAgent | 11 | 完整流程 + 用量账本 + 崩溃恢复 4 例 |
 | 端到端 | `apps/server/test` | 真实 HTTP 服务 + 浏览器级 HTML | 3 | 起服务、走 UI 路由、断言 wiki 与 git |
 | 云端链路 | `apps/server/test/cloud.test.ts` | 本地假 OpenAI 服务，无外网/无费用 | 2 | provider→runner→存储→入库→usage 全链路 |
 | 运行时 | `packages/agent-runtime/test` | fake provider，无真实模型 | 30 | 路由/预算/缓存/重试/降级/契约校验/配置解析 |
 | provider | `packages/adapters-agent-openai/test` | 本地假 HTTP 服务，无真实网络 | 6 | 请求体、鉴权、providerOptions 透传、429/5xx/content_filter/超时 |
 
-当前总数：**172 例 / 23 个文件**。
+当前总数：**176 例 / 24 个文件**。
 
 ---
 

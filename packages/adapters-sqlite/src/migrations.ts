@@ -104,7 +104,12 @@ CREATE TABLE usage_record (
 CREATE INDEX ix_usage_at ON usage_record(at);
 `;
 
+const DRAFT_TARGET_HASHES = `
+ALTER TABLE draft ADD COLUMN target_hashes TEXT NOT NULL DEFAULT '{}';
+`;
+
 export const MIGRATIONS: readonly Migration[] = [
   { version: 1, name: 'init', up: INIT },
   { version: 2, name: 'usage', up: USAGE },
+  { version: 3, name: 'draft-target-hashes', up: DRAFT_TARGET_HASHES },
 ];

@@ -53,6 +53,7 @@ function draftRecord(): DraftRecord {
       nodes: [{ name: '反脆弱', nodeType: 'concept', action: 'patch', definition: null }],
     },
     findings: [{ ruleId: 'r-inferred-claims', severity: 'warn', code: 'INFERRED_CLAIMS', message: 'x', detail: {} }],
+    targetHashes: {},
     provider: 'mock',
     model: 'mock',
     promptId: 'digest',

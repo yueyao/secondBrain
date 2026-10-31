@@ -8,6 +8,7 @@ import {
   parseFrontmatter,
   parseRawPath,
   transition,
+  type CommitSha,
   type DraftId,
   type DraftProposal,
   type Finding,
@@ -168,8 +169,17 @@ export async function draftDigest(ctx: AppContext, rawPath: RawPath): Promise<Dr
     knownRawPaths,
   });
 
+  const targetHashes: Record<string, string> = {};
+  for (const node of proposal.nodes) {
+    if (node.action !== 'patch') continue;
+    const doc = existingNodes.find((entry) => entry.name === node.name);
+    if (!doc) continue;
+    targetHashes[doc.file] = ctx.hash.sha256(await ctx.vault.readNode(doc.file));
+  }
+
   const draft: DraftRecord = {
     id: ctx.ids.draftId(),
+    targetHashes,
     rawItemId: item.id,
     proposal,
     findings,
@@ -223,7 +233,11 @@ export interface DecideResult {
   readonly commit?: string;
 }
 
-/** 人审决策：accept 会写 wiki 并 git commit；reject 只记录。 */
+/**
+ * 人审决策：
+ * - accept：先把状态落成 approved（durable），再执行幂等的 commitApproved；
+ * - reject：只记录，不碰文件。
+ */
 export async function decideReview(
   ctx: AppContext,
   draftId: DraftId,
@@ -233,6 +247,9 @@ export async function decideReview(
   const now = ctx.clock.now();
   const draft = await ctx.store.transaction(async (tx) => tx.drafts.get(draftId));
   if (!draft) throw new AppError('NOT_FOUND', `草稿不存在：${draftId}`);
+
+  // 之前已批准但未完成提交（崩溃/中断）：直接重放提交
+  if (draft.status === 'approved') return commitApproved(ctx, draftId);
   if (draft.status !== 'pending') throw new AppError('INVALID_STATE', `草稿状态为 ${draft.status}`);
 
   return action === 'accept'
@@ -252,6 +269,7 @@ function parseRawPathOk(value: string): RawPath {
   return parsed.value;
 }
 
+/** 阶段一：把条目落成 approved（幂等；此后即使崩溃也能重放）。 */
 async function acceptDraft(
   ctx: AppContext,
   draftId: DraftId,
@@ -265,55 +283,206 @@ async function acceptDraft(
     });
   }
 
+  const rawPath = itemPath(draft);
+  await ctx.store.transaction(async (tx) => {
+    const item = await tx.rawItems.getByPath(rawPath);
+    if (!item) throw new AppError('NOT_FOUND', '原文记录消失');
+    if (item.state.kind === 'committed') return;
+    if (item.state.kind !== 'draft_ready' && item.state.kind !== 'in_review') {
+      throw new AppError('INVALID_STATE', `条目状态 ${item.state.kind}，无法批准`);
+    }
+    let state: RawState = item.state;
+    if (state.kind === 'draft_ready') {
+      state = unwrap(transition(state, { type: 'REVIEW_OPEN', findings: draft.findings }, { now }));
+    }
+    state = unwrap(transition(state, { type: 'ACCEPT', actor: input.actor }, { now }));
+    const swapped = await tx.rawItems.compareAndSwapVersion(item.id, item.version, state);
+    if (!swapped) throw new AppError('INVALID_STATE', '并发冲突：状态已被修改');
+    await tx.drafts.setStatus(draftId, 'approved');
+    await tx.decisions.append({
+      draftId, action: 'accept', note: input.note ?? null, actor: input.actor, createdAt: now,
+    });
+    await tx.events.append({
+      at: now, actor: input.actor, type: 'approved', aggregateId: String(rawPath), payload: { draftId },
+    });
+  });
+
+  return commitApproved(ctx, draftId);
+}
+
+/**
+ * 阶段二：写入 wiki 并提交（幂等）。
+ * 可被 accept 调用，也可被启动恢复调用；重复执行不会产生重复 claim 或重复 commit。
+ */
+export async function commitApproved(ctx: AppContext, draftId: DraftId): Promise<DecideResult> {
+  const now = ctx.clock.now();
+  const draft = await ctx.store.transaction(async (tx) => tx.drafts.get(draftId));
+  if (!draft) throw new AppError('NOT_FOUND', `草稿不存在：${draftId}`);
+  if (draft.status !== 'approved') throw new AppError('INVALID_STATE', `草稿状态为 ${draft.status}，无法提交`);
+
   const sourcePath = String(itemPath(draft));
-  const files: string[] = [];
+  const rawPath = parseRawPathOk(sourcePath);
+  const item = await ctx.store.transaction(async (tx) => tx.rawItems.getByPath(rawPath));
+  if (!item) throw new AppError('NOT_FOUND', '原文记录消失');
+  if (item.state.kind === 'committed') {
+    const head = await ctx.vault.head();
+    return { ok: true, state: 'committed', ...(head ? { commit: head } : {}) };
+  }
+  if (item.state.kind !== 'approved' && item.state.kind !== 'committing') {
+    throw new AppError('INVALID_STATE', `条目状态 ${item.state.kind}，无法提交`);
+  }
+
+  const today = now.slice(0, 10);
   const previousHead = await ctx.vault.head();
+  const allFiles = [...new Set(
+    draft.proposal.nodes.map((node) => (node.action === 'new' ? nodeFile(node) : targetFile(ctx, node.name))),
+  )];
+  let commitSha: CommitSha;
+  let wroteAny = false;
 
   try {
+    const writes: Array<{ file: string; content: string }> = [];
     for (const node of draft.proposal.nodes) {
-      if (node.action === 'new') {
-        const file = nodeFile(node);
-        await ctx.vault.writeNode(file, renderNewNode(node, draft.proposal.claims, sourcePath, now.slice(0, 10)));
-        files.push(file);
-        continue;
+      const file = node.action === 'new' ? nodeFile(node) : targetFile(ctx, node.name);
+      const existing = await readNodeOrNull(ctx, file);
+      const content = node.action === 'new'
+        ? renderNewNode(node, draft.proposal.claims, sourcePath, today)
+        : renderPatchedNode(existing ?? '', draft.proposal.claims, sourcePath, today);
+
+      if (existing === content) continue; // 已写完
+      // 崩溃重放：上一次已经把这些 claim 写进去了，跳过硬性重渲染（避免重复追加）
+      if (node.action === 'patch' && claimsApplied(existing, draft.proposal.claims)) continue;
+      if (existing !== null) {
+        const baseline = draft.targetHashes[file];
+        if (!baseline) throw new AppError('TARGET_MOVED', `缺少目标文件基线，拒绝覆盖：${file}`);
+        if (ctx.hash.sha256(existing) !== baseline) {
+          throw new AppError('TARGET_MOVED', `目标文件在起草后被修改，拒绝覆盖：${file}`);
+        }
       }
-      const doc = ctx.search.allDocs().find((entry) => entry.name === node.name);
-      if (!doc) throw new AppError('UNKNOWN_NODE', `并入目标不存在：${node.name}`);
-      const existing = await ctx.vault.readNode(doc.file);
-      await ctx.vault.writeNode(
-        doc.file,
-        renderPatchedNode(existing, draft.proposal.claims, sourcePath, now.slice(0, 10)),
-      );
-      files.push(doc.file);
+      writes.push({ file, content });
     }
 
-    const commitSha = await ctx.vault.commitFiles(files, `digest: ${sourcePath}`);
-    const rawItem = await ctx.store.transaction(async (tx) => tx.rawItems.getByPath(parseRawPathOk(sourcePath)));
-    if (!rawItem) throw new AppError('NOT_FOUND', '原文记录消失');
+    for (const write of writes) await ctx.vault.writeNode(write.file, write.content);
+    wroteAny = writes.length > 0;
+    try {
+      commitSha = await ctx.vault.commitFiles(allFiles, `digest: ${sourcePath} [${draft.id}]`);
+    } catch (error) {
+      // 幂等：内容已经提交过（崩溃后重放）→ 识别 draftId 并认为已完成
+      const message = await ctx.vault.lastCommitMessage().catch(() => null);
+      if (!message || !message.includes(`[${draft.id}]`)) throw error;
+      const head = await ctx.vault.head();
+      if (!head) throw error;
+      commitSha = head;
+    }
+  } catch (error) {
+    // 只有真的写过文件才回滚；TARGET_MOVED 发生在写入前，不能误删外部改动
+    if (wroteAny && previousHead) await ctx.vault.resetHard(previousHead).catch(() => undefined);
+    await markRolledBack(ctx, draft, now, error);
+    throw error;
+  }
 
+  const latest = await ctx.store.transaction(async (tx) => tx.rawItems.getByPath(rawPath));
+  if (!latest) throw new AppError('NOT_FOUND', '原文记录消失');
+  await ctx.store.transaction(async (tx) => {
+    let state: RawState = latest.state;
+    if (state.kind === 'approved') {
+      state = unwrap(transition(
+        state,
+        { type: 'COMMIT_INTENT', intentId: ctx.ids.intentId(), preCommitSha: previousHead },
+        { now, targetHashesUnchanged: true },
+      ));
+    }
+    state = unwrap(transition(state, { type: 'COMMIT_OK', commitSha }, { now }));
+    const swapped = await tx.rawItems.compareAndSwapVersion(latest.id, latest.version, state);
+    if (!swapped) throw new AppError('INVALID_STATE', '并发冲突：状态已被修改');
+    await tx.commits.append({ draftId, gitSha: commitSha, files: allFiles, createdAt: now });
+    await tx.events.append({
+      at: now, actor: 'system', type: 'committed', aggregateId: sourcePath,
+      payload: { draftId, commitSha, recovered: !wroteAny },
+    });
+  });
+
+  return { ok: true, state: 'committed', commit: commitSha };
+}
+
+/**
+ * 启动恢复（简化版 P5）：把 approved 但未完成的草稿重放一次。
+ * 规则：幂等重放；失败则回滚并标 rolled_back；仍有脏改动 → 拒绝启动。
+ */
+export interface RecoveryReport {
+  readonly recovered: readonly DraftId[];
+  readonly failed: readonly { readonly draftId: DraftId; readonly error: string }[];
+}
+
+export async function recoverPending(ctx: AppContext): Promise<RecoveryReport> {
+  const drafts = await ctx.store.transaction(async (tx) => tx.drafts.listByStatus('approved'));
+  const recovered: DraftId[] = [];
+  const failed: Array<{ draftId: DraftId; error: string }> = [];
+
+  for (const draft of drafts) {
+    try {
+      await commitApproved(ctx, draft.id);
+      recovered.push(draft.id);
+    } catch (error) {
+      failed.push({ draftId: draft.id, error: String((error as Error).message) });
+    }
+  }
+
+  if (!(await ctx.vault.isClean())) {
+    throw new AppError('DIRTY_VAULT', 'vault 存在未提交改动（可能来自崩溃或外部修改），拒绝启动，请人工确认后执行 git checkout -- .', {
+      recovered: recovered.length,
+      failed: failed.length,
+    });
+  }
+
+  return { recovered, failed };
+}
+
+async function markRolledBack(ctx: AppContext, draft: DraftRecord, now: string, error: unknown): Promise<void> {
+  try {
+    const rawPath = itemPath(draft);
     await ctx.store.transaction(async (tx) => {
-      let state = unwrap(transition(rawItem.state, { type: 'REVIEW_OPEN', findings: draft.findings }, { now }));
-      state = unwrap(transition(state, { type: 'ACCEPT', actor: input.actor }, { now }));
-      state = unwrap(
-        transition(state, { type: 'COMMIT_INTENT', intentId: ctx.ids.intentId(), preCommitSha: previousHead }, { now, targetHashesUnchanged: true }),
-      );
-      state = unwrap(transition(state, { type: 'COMMIT_OK', commitSha }, { now }));
-      const swapped = await tx.rawItems.compareAndSwapVersion(rawItem.id, rawItem.version, state);
-      if (!swapped) throw new AppError('INVALID_STATE', '并发冲突：状态已被修改');
-      await tx.drafts.setStatus(draftId, 'approved');
-      await tx.decisions.append({
-        draftId, action: 'accept', note: input.note ?? null, actor: input.actor, createdAt: now,
-      });
-      await tx.commits.append({ draftId, gitSha: commitSha, files, createdAt: now });
+      const latest = await tx.rawItems.getByPath(rawPath);
+      if (!latest || latest.state.kind === 'committed') return;
+      let state: RawState = latest.state;
+      if (state.kind === 'approved') {
+        state = unwrap(transition(state, {
+          type: 'COMMIT_INTENT', intentId: ctx.ids.intentId(), preCommitSha: null,
+        }, { now, targetHashesUnchanged: true }));
+      }
+      if (state.kind !== 'committing') return;
+      state = unwrap(transition(state, {
+        type: 'COMMIT_FAIL', reason: String((error as Error).message ?? error), attempts: 1,
+      }, { now }));
+      const swapped = await tx.rawItems.compareAndSwapVersion(latest.id, latest.version, state);
+      if (!swapped) return;
+      await tx.drafts.setStatus(draft.id, 'pending');
       await tx.events.append({
-        at: now, actor: input.actor, type: 'committed', aggregateId: sourcePath, payload: { draftId, commitSha },
+        at: now, actor: 'system', type: 'rolled_back', aggregateId: String(rawPath),
+        payload: { draftId: draft.id, error: String((error as Error).message ?? error) },
       });
     });
+  } catch {
+    // 恢复路径本身不抛：失败留给下一次启动或人工
+  }
+}
 
-    return { ok: true, state: 'committed', commit: commitSha };
-  } catch (error) {
-    if (previousHead) await ctx.vault.resetHard(previousHead).catch(() => undefined);
-    throw error;
+function claimsApplied(existing: string | null, claims: readonly { text: string }[]): boolean {
+  if (!existing || claims.length === 0) return false;
+  return claims.every((claim) => existing.includes(claim.text));
+}
+
+function targetFile(ctx: AppContext, name: string): string {
+  const doc = ctx.search.allDocs().find((entry) => entry.name === name);
+  if (!doc) throw new AppError('UNKNOWN_NODE', `并入目标不存在：${name}`);
+  return doc.file;
+}
+
+async function readNodeOrNull(ctx: AppContext, file: string): Promise<string | null> {
+  try {
+    return await ctx.vault.readNode(file);
+  } catch {
+    return null;
   }
 }
 

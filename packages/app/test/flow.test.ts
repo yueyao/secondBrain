@@ -3,7 +3,7 @@ import { parseRawPath, type RawPath } from '@sb/domain';
 import type { AppContext } from '../src/context';
 import { decideReview, draftDigest, ingestAndTriage } from '../src/commands';
 import { listPendingDrafts, listQueue, reviewView, usageSummary } from '../src/queries';
-import { createHarness, type TestHarness } from '@sb/testing';
+import { createHarness, hashPort, type TestHarness } from '@sb/testing';
 
 function rawPath(value: string): RawPath {
   const parsed = parseRawPath(value);
@@ -19,6 +19,7 @@ function ctxOf(harness: TestHarness): AppContext {
     agent: harness.agent,
     clock: harness.clock,
     ids: harness.ids,
+    hash: hashPort,
     config: {
       longTextThreshold: 60_000,
       enabledSources: ['cubox', 'notions', 'podcast', 'dedao', 'general'],

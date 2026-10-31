@@ -17,6 +17,8 @@ export interface VaultReader {
   listNodes(): Promise<readonly string[]>;
   readNode(file: string): Promise<string>;
   head(): Promise<CommitSha | null>;
+  /** 最近一次提交的标题（用于幂等判断：是否已经提交过某个 draftId）。 */
+  lastCommitMessage(): Promise<string | null>;
   /** 工作区是否干净；脏工作区必须拒绝提交。 */
   isClean(): Promise<boolean>;
 }

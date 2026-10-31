@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
-import type { AppContext, ProfilePricing } from '@sb/app';
+import { recoverPending, type AppContext, type ProfilePricing } from '@sb/app';
 import type { AgentPort, DigestRequest } from '@sb/contracts';
 import { parseDraftId, stringifyFrontmatter } from '@sb/domain';
 import { FsVault } from '@sb/adapters-vault';
@@ -162,7 +162,17 @@ export async function createRuntime(options: RuntimeOptions): Promise<Runtime> {
       enabledSources: ['cubox', 'notions', 'podcast', 'dedao', 'general'],
     },
     pricing: built.pricing,
+    hash: { sha256: (text) => createHash('sha256').update(text).digest('hex') },
   };
+
+  // 简化版 P5：启动时把 approved 但未完成的草稿重放一次；脏工作区则拒绝启动
+  const recovery = await recoverPending(ctx);
+  if (recovery.recovered.length > 0) {
+    console.log(`[recover] 已重放 ${recovery.recovered.length} 个待提交草稿`);
+  }
+  if (recovery.failed.length > 0) {
+    console.warn(`[recover] ${recovery.failed.length} 个草稿回滚待人工：${recovery.failed.map((entry) => entry.draftId).join(', ')}`);
+  }
 
   return {
     ctx,

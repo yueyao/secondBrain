@@ -2,6 +2,7 @@
 import type {
   AgentPort,
   Clock,
+  HashPort,
   IdGenerator,
   SearchIndex,
   StateStore,
@@ -34,6 +35,7 @@ export interface AppContext {
   readonly agent: AgentPort;
   readonly clock: Clock;
   readonly ids: IdGenerator;
+  readonly hash: HashPort;
   readonly config: AppConfig;
   /** 可选：mock/provider 自报身份（写进 provenance） */
   readonly agentMeta?: AgentMeta;
@@ -43,6 +45,9 @@ export interface AppContext {
 
 export type AppErrorCode =
   | 'NOT_FOUND'
+  | 'TARGET_MOVED'
+  | 'NO_CHANGES'
+  | 'DIRTY_VAULT'
   | 'INVALID_STATE'
   | 'GATE_BLOCKED'
   | 'UNKNOWN_NODE'

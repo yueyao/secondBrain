@@ -2,10 +2,11 @@
  * 测试环境组装：临时 vault（真实 git）+ 内存 SQLite + 内存检索 + MockAgent。
  * 用法见 docs/TESTING.md。
  */
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { Clock, IdGenerator } from '@sb/contracts';
+import type { Clock, HashPort, IdGenerator } from '@sb/contracts';
 import { FsVault } from '@sb/adapters-vault';
 import { migrate, SqliteStore } from '@sb/adapters-sqlite';
 import { MemorySearch } from '@sb/adapters-search-memory';
@@ -16,6 +17,8 @@ import { MockAgent } from './mock-agent';
 export const FIXED_NOW = '2026-10-30T23:00:00+08:00';
 
 export const fixedClock: Clock = { now: () => FIXED_NOW };
+
+export const hashPort: HashPort = { sha256: (text) => createHash('sha256').update(text).digest('hex') };
 
 export class SequentialIds implements IdGenerator {
   private draftSeq = 0;

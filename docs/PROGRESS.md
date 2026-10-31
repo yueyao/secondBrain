@@ -602,3 +602,51 @@ $ pnpm check:model config/model-profiles.json
  Test Files  23 passed (23)
       Tests  172 passed (172)
 ```
+
+
+---
+
+## 十九、P5 简化版：幂等重放 + 失败即停（2026-10-31）
+
+### 19.1 决策
+
+不做完整 `commit_intent` 对账器（8 个崩溃点判定），改为五条规则：原子写、写前 hash 比对、提交带 draftId、两阶段状态、启动重放 approved 草稿。详见 ADR 0006。
+
+### 19.2 交付
+
+| 层 | 改动 |
+|---|---|
+| contracts | `HashPort`、`DraftRecord.targetHashes`、`VaultReader.lastCommitMessage()` |
+| sqlite | 迁移 v3：`draft.target_hashes` |
+| vault | `lastCommitMessage()` |
+| app | `decideReview` 拆两阶段（批准 → `commitApproved`）；新增 `recoverPending` / `markRolledBack`；patch 幂等（已写入的 claim 不重复追加） |
+| server | 启动时先 `recoverPending()`，脏工作区/失败即拒绝启动 |
+
+### 19.3 验证
+
+```
+✓ 边界检查：9 个包 / 69 个文件，0 违规
+ Test Files  24 passed (24)
+      Tests  176 passed (176)     # 新增 recovery 4 例
+```
+
+真实启动验证：
+
+- 干净工作区 → 正常启动并返回 git head；
+- 人为在 wiki 里制造未提交改动 → 启动失败：`DIRTY_VAULT ... 请人工确认后执行 git checkout -- .`
+
+### 19.4 决策（续）
+
+| # | 决策 | 理由 | 代价 |
+|---|---|---|---|
+| D30 | 不做 `commit_intent` 表 | 单写者 + 幂等重放已覆盖崩溃场景 | 无法自动判定"未知 HEAD"（拒绝启动） |
+| D31 | `approved` 作为 durable 中间态 | 崩溃后重启有明确的重放入口 | 状态机多一个稳定态 |
+| D32 | patch 幂等按"claim 文本是否已存在"判断 | 重渲染会重复追加；内容比对不足 | 极少数同文 claim 会误判为已写（可接受） |
+| D33 | 只有真的写过文件才 `resetHard` | TARGET_MOVED 发生在写入前，回滚会误删外部改动 | 需要 `wroteAny` 标记 |
+
+### 19.5 剩余缺口
+
+1. 完整对账（未知 HEAD 自动判定）仍不做，按 ADR 0006 的触发条件再升级；
+2. golden set 与真实模型质量基线；
+3. prune / decide 用例；
+4. cache-hit 与 off-peak 计价。
