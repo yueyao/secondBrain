@@ -15,6 +15,8 @@
     "@sb/app": "workspace:*",
     "@sb/contracts": "workspace:*",
     "@sb/domain": "workspace:*",
-    "@sb/testing": "workspace:*"
+    "@sb/testing": "workspace:*",
+    "@sb/agent-runtime": "workspace:*",
+    "@sb/adapters-agent-openai": "workspace:*"
   }
 }

@@ -269,3 +269,28 @@ draftIdem  = sha256(rawPath + contentHash + promptVersion + profileId)
 5. 服务端新增 `GET /usage` 页面与 `GET /api/usage`；首页增加"今日调用 / 输入 tokens / 输出 tokens / 估算成本"。
 
 保留的能力：如果将来想加回上限，只需在配置里填 `taskCostLimit` / `dailyCostLimit`，代码不用改。
+
+
+---
+
+## 11. 决策 A（2026-10-31）：全部来源走云模型
+
+用户确认：**所有来源都是自己付费购买、仅自己使用、不会公开**，因此按方案 A 处理，不做敏感度分流。
+
+落实方式：
+
+- 配置里的 profile 统一声明 `sensitivity: ["public", "restricted"]`；
+- 应用层仍计算 `sensitivity`（`dedao`/`podcast` → restricted），但路由不会因此拒绝云模型；
+- `sensitivity` 字段保留为**未来可用的开关**：若某天想切本地模型，只需在配置里删掉 `restricted` 并新增本地 profile，代码不动。
+
+同时落地 P4.2 的基础设施：
+
+| 内容 | 说明 |
+|---|---|
+| `@sb/adapters-agent-openai` | OpenAI 兼容 `/chat/completions`：鉴权、`response_format: json_object`、超时、错误分类（429/5xx/content_filter/超时） |
+| `@sb/agent-runtime/config.ts` | `parseModelPolicy`：profiles/policies/budget 校验；未显式配置的任务复用 digest 策略 |
+| 服务端接线 | 有 `MODEL_BASE_URL` → 云端模式（`OpenAICompatibleProvider` + `AgentRunner`）；否则 mock 模式 |
+| 价格表 | 从配置读取，注入 `AppContext.pricing`，用于 `/usage` 的估算成本 |
+| 安全 | key 只从 `MODEL_API_KEY` 环境变量读取；启动时缺失直接失败，不落日志 |
+
+**注**：模块名里的 "openai" 指协议（OpenAI-compatible），不是供应商锁定；任何兼容网关/本地 OpenAI 兼容服务都可接入。

@@ -60,6 +60,7 @@ export interface UsageTiles {
 }
 
 export interface DashboardData {
+  readonly mode?: 'mock' | 'cloud';
   readonly queue: readonly QueueItemV1[];
   readonly pending: readonly ReviewViewV1[];
   readonly counts: { readonly items: number; readonly queued: number; readonly committed: number; readonly deferred: number };
@@ -89,7 +90,7 @@ export function dashboard(data: DashboardData): string {
 
   return layout('审核台', `
   <h1>secondBrain 审核台</h1>
-  <div class="muted">mock 原文 · 真实状态机 · 每次入库一次 git commit</div>
+  <div class="muted">${data.mode === 'cloud' ? '云模型模式' : 'mock 模型模式'} · 真实状态机 · 每次入库一次 git commit</div>
 
   <div class="row" style="margin-top:16px">
     <div class="stat"><b>${data.counts.items}</b><span>原文</span></div>

@@ -155,3 +155,7 @@ coverage/
 .DS_Store
 .pnpm-store/
 *.tsbuildinfo
+
+# 本地运行数据与真实模型配置（可能含价格/密钥引用，不入库）
+.sb-demo/
+config/model-profiles.json

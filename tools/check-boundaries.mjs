@@ -22,6 +22,16 @@ const PACKAGES_DIR = path.join(ROOT, 'packages');
 /** 每个包声明：允许的 workspace 裸导入、是否允许 node: 模块、是否纯函数包 */
 const PACKAGES = [
   {
+    dir: 'adapters-agent-openai',
+    name: '@sb/adapters-agent-openai',
+    allowedBare: ['@sb/domain', '@sb/contracts', '@sb/agent-runtime'],
+    allowNode: true,
+    forbidThrow: false,
+    forbidClock: false,
+    forbidRandom: false,
+    forbidNodeGlobals: false,
+  },
+  {
     dir: 'agent-runtime',
     name: '@sb/agent-runtime',
     allowedBare: ['@sb/domain', '@sb/contracts'],

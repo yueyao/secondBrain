@@ -70,6 +70,12 @@
       ],
       "@sb/agent-runtime/*": [
         "packages/agent-runtime/src/*"
+      ],
+      "@sb/adapters-agent-openai": [
+        "packages/adapters-agent-openai/src/index.ts"
+      ],
+      "@sb/adapters-agent-openai/*": [
+        "packages/adapters-agent-openai/src/*"
       ]
     }
   }

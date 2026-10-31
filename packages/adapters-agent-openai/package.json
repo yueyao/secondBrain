@@ -1,0 +1,13 @@
+{
+  "name": "@sb/adapters-agent-openai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OpenAI 兼容 chat/completions 的 provider 适配器（只负责调用与错误分类）",
+  "exports": { ".": "./src/index.ts" },
+  "sideEffects": false,
+  "dependencies": {
+    "@sb/agent-runtime": "workspace:*",
+    "@sb/contracts": "workspace:*"
+  }
+}

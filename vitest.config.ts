@@ -15,6 +15,7 @@ export default defineConfig({
       '@sb/testing': fromRoot('./packages/testing/src/index.ts'),
       '@sb/app': fromRoot('./packages/app/src/index.ts'),
       '@sb/agent-runtime': fromRoot('./packages/agent-runtime/src/index.ts'),
+      '@sb/adapters-agent-openai': fromRoot('./packages/adapters-agent-openai/src/index.ts'),
     },
   },
   test: {

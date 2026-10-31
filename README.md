@@ -20,7 +20,7 @@ secondBrain 知识生产流程的服务端实现，**pnpm workspaces monorepo**�
 | `@sb/app` | 用例：triage / digest / review / commit | domain + contracts | ✅ |
 | `@sb/testing` | 测试夹具、MockAgent、harness | 域 + 适配器 | ✅ |
 | `@sb/agent-runtime` | 能力路由 / 预算 / 缓存 / 重试 / 降级 / 契约校验（P4.1 ✅） | domain + contracts | ✅ |
-| `@sb/adapters-agent-*` | 真实 provider 适配器（OpenAI 兼容 / 本地） | domain + contracts | ⬜ P4.2 |
+| `@sb/adapters-agent-openai` | OpenAI 兼容 provider（真实模型） | agent-runtime + contracts | ✅ P4.2 |
 | `@sb/app` | 用例：triage / digest / commit / recover | domain + contracts | ⬜ P5 |
 | `apps/cli` | 人审与运维命令 | 全部 | ⬜ P5 |
 | `@sb/server` | mock 审核台：HTTP + 服务端渲染 UI | 全部 | ✅ |
@@ -37,6 +37,21 @@ pnpm demo          # → http://127.0.0.1:8787（自动播种 mock 数据）
 首页「扫描 raw/ 并分档」→ 队列「生成草稿」→ 审阅页「通过并入库」，每一步都会在 demo vault 里产生真实 git commit。
 测试方案见 [docs/TESTING.md](docs/TESTING.md)，页面快照见 `docs/snapshots/`。
 
+## 接真实模型（P4.2，决策 A：全部来源走云）
+
+```bash
+cp config/model-profiles.example.json config/model-profiles.json
+# 编辑：填 model 与 pricing（每百万 token 单价），按需改 fallback
+MODEL_BASE_URL=https://<你的网关>/v1 \
+MODEL_API_KEY=<从环境变量给，不要写进文件> \
+MODEL_CONFIG=config/model-profiles.json \
+pnpm demo
+```
+
+- 有 `MODEL_BASE_URL` → 云端模式（首页显示「云模型模式」）；没有 → mock 模式；
+- key 缺失会启动即失败，不会静默降级；
+- 每次调用的 tokens / 成本（按 pricing 估算）在 `/usage` 与 `/api/usage` 可查。
+
 ## 工程校验
 
 ```bash
@@ -50,7 +65,7 @@ pnpm run check     # boundaries → typecheck → depcruise → test
 pnpm run boundaries   # 包边界、深引、纯度（无 node: / 无第三方 / 无 throw / 无时钟）
 pnpm run typecheck    # tsc --noEmit（strict + exactOptionalPropertyTypes）
 pnpm run depcruise    # 依赖方向、环形依赖
-pnpm test             # vitest：20 个文件 / 157 例
+pnpm test             # vitest：22 个文件 / 168 例
 ```
 
 ## 能证明什么

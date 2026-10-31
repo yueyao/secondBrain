@@ -499,3 +499,45 @@ POST /review/:id/accept → 303
 - P4.2 真实 provider（仍需确认付费内容是否上云）；
 - `sb stats --cost` CLI（目前只有 HTTP 页面与 API）；
 - 把 `config/model-profiles.example.json` 接成真正的配置加载与校验。
+
+
+---
+
+## 十七、P4.2：真实 provider 接线（决策 A：全部走云模型）
+
+### 17.1 决策
+
+用户确认：得到/播客内容均为自费购买、仅自用、不公开 → **按方案 A，全部来源走云模型**，不再做敏感度分流。`sensitivity` 字段保留，作为将来切本地模型的开关。
+
+### 17.2 交付
+
+| 位置 | 内容 |
+|---|---|
+| `@sb/adapters-agent-openai` | OpenAI 兼容 `/chat/completions`：Bearer 鉴权、`response_format: json_object`、超时控制、错误分类（429→rate_limit、5xx→upstream、content_filter→refusal、超时→timeout） |
+| `@sb/agent-runtime/config.ts` | `parseModelPolicy`：profiles / policies / budget 结构校验；未配置的任务复用 digest 策略；重复 id、悬空 fallback、非法敏感度都会报错 |
+| `apps/server/src/runtime.ts` | 启动时按 `MODEL_BASE_URL` 选择 mock / cloud；云端模式组装 `OpenAICompatibleProvider + AgentRunner`，价格表注入 `AppContext.pricing` |
+| `apps/server/src/prompt.ts`（合并入 runtime） | digest 系统提示 + 渲染函数；`promptSha256` 进入 provenance 与缓存 key |
+| 安全 | `MODEL_API_KEY` 只从环境变量读取；缺失时启动即失败；`config/model-profiles.json` 与 `.sb-demo/` 已加入 `.gitignore` |
+
+### 17.3 实测
+
+| 场景 | 结果 |
+|---|---|
+| 默认启动（无环境变量） | mock 模式，首页显示「mock 模型模式」，`/api/health` 正常 |
+| `MODEL_BASE_URL` 存在但缺 `MODEL_API_KEY` | 启动即失败：`缺少 MODEL_API_KEY（不要写进配置文件或日志）` |
+| provider 单测（本地假 HTTP 服务） | 鉴权头、请求体、JSON 输出、429/5xx、content_filter、超时、非 JSON 原文全部覆盖 |
+
+### 17.4 验证
+
+```
+✓ 边界检查通过：9 个包 / 73 个文件，0 违规
+✔ no dependency violations found
+ Test Files  22 passed (22)
+      Tests  168 passed (168)
+```
+
+### 17.5 下一步
+
+1. 填 `config/model-profiles.json` 的真实 `model` 与 `pricing`，用你的 key 跑一篇真原文；
+2. 用真实产出建立 golden set（30–50 篇）；
+3. 若要本地模型：新增 `@sb/adapters-agent-ollama` 与本地 profile，代码不改。

@@ -74,6 +74,7 @@ export function createServer(runtime: Runtime): http.Server {
           usageSummary(runtime.ctx, { day: today }),
         ]);
         return sendHtml(res, dashboard({
+          mode: runtime.mode,
           queue,
           pending,
           counts: stats,

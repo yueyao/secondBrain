@@ -47,6 +47,13 @@ module.exports = {
       to: { path: '^(packages/app|apps)/' },
     },
     {
+      name: 'agent-runtime-must-not-depend-on-provider-adapters',
+      comment: '运行时只依赖契约；provider 适配器实现 CompletionProvider 后注入',
+      severity: 'error',
+      from: { path: '^packages/agent-runtime/src' },
+      to: { path: '^packages/adapters' },
+    },
+    {
       name: 'agent-runtime-must-not-depend-on-outer-layers',
       comment: '模型运行时只依赖契约与领域',
       severity: 'error',
