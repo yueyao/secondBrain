@@ -829,3 +829,39 @@ conflicts: {cacheMissingOnDisk:0, invalidHashes:0, unknownReasons:0, wikiMissing
 1. 141 篇 review 的处理方式（默认 deferred 待人工）；
 2. 1,080 篇长文：先 deferred（推荐）还是绕过策略；
 3. apply 在服务器还是本地先试。
+
+
+### 23.7 修订（2026-11-01）：长文口径 + 重新 triage
+
+**Bug 修正**：初版 dry-run 用文件字节数判断长文，中文 1 字符≈3 字节，导致"1,080 篇长文"的误判。改为 `content.length`（字符）后：
+
+| 指标 | 初版（错） | 修订版 |
+|---|---|---|
+| backlog >60k 字符 | 1,080 | **350** |
+| backlog >200k 字符 | 90 | **4** |
+| 旧口径 queued | 2,209 | 2,205 |
+| 旧口径 deferred_long | — | 4 |
+
+**阈值调整**（用户决策："重新跑数据，尽量让大部分直接入队"）：
+
+- `longTextThreshold`：60,000 → **200,000** 字符（runtime 可用 `LONG_TEXT_THRESHOLD` 覆盖）；
+- digest/review/decide 的 `maxInputTokens`：60,000 → **250,000**。
+
+**按新规则重新 triage**（`pnpm import:dry-run --retriage`，3,014 篇非 committed/review）：
+
+| 结果 | 数量 |
+|---|---|
+| queued | **1,955**（可处理源的 82%） |
+| deferred(low) | 438 |
+| deferred(source_disabled) | 617 |
+| deferred(too_long) | 4 |
+
+**导入计划更新**：committed 1,253 + queued 1,955 + deferred 438 + source_disabled 617 + too_long 4 + review 141；跳过 21 个 `_index.md`。队列成本 ≈$4.89，串行 8.5h、3 并发 2.8h。
+
+**决策**：
+
+| # | 决策 | 说明 |
+|---|---|---|
+| D42 | 141 篇 review 按 `deferred` 处理 | 待人工抽查，不自动重跑 |
+| D43 | 长文阈值提升到 200k 字符 | 200k 以内直接入队；仅 4 篇例外 |
+| D44 | 导入队列以"重新 triage"为准 | 旧 cache 状态仅作交叉校验 |

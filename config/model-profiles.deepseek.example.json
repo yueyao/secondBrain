@@ -98,7 +98,7 @@
       "profileOrder": [
         "deepseek-flash"
       ],
-      "maxInputTokens": 60000,
+      "maxInputTokens": 250000,
       "maxOutputTokens": 4000,
       "expectedClaims": 8
     },
@@ -111,7 +111,7 @@
       "profileOrder": [
         "deepseek-flash"
       ],
-      "maxInputTokens": 60000,
+      "maxInputTokens": 250000,
       "maxOutputTokens": 4000,
       "expectedClaims": 8
     },
@@ -124,7 +124,7 @@
       "profileOrder": [
         "deepseek-flash"
       ],
-      "maxInputTokens": 60000,
+      "maxInputTokens": 250000,
       "maxOutputTokens": 3000,
       "expectedClaims": 5
     }

@@ -7,6 +7,9 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { parseFrontmatter } from '@sb/domain';
+import { countJudgmentSentences } from '@sb/domain';
+import { decideTriage } from '@sb/domain';
 
 const DEFAULT_VAULT = '/Users/dynamic/workspace/secondBrain';
 
@@ -26,6 +29,7 @@ type Classification =
   | 'review'           // cache 说 digested，但 wiki 无引用
   | 'queued'           // medium/high 但未 digested
   | 'deferred'         // low / skipped / defer
+  | 'deferred_long'    // 超过长文阈值
   | 'triaged_unknown'  // 只出现在 triage-log，没有 digest 结论
   | 'untriaged';       // 完全没进过流水线
 
@@ -65,7 +69,11 @@ function argValue(argv: readonly string[], flag: string): string | null {
 }
 
 function main(): void {
-  const vault = path.resolve(argValue(process.argv.slice(2), '--vault') ?? DEFAULT_VAULT);
+  const argv = process.argv.slice(2);
+  const vault = path.resolve(argValue(argv, '--vault') ?? DEFAULT_VAULT);
+  const longThreshold = Number(argValue(argv, '--long-threshold') ?? 200_000);
+  const retriage = argv.includes('--retriage');
+  const enabledSources = new Set(['cubox', 'notions', 'podcast', 'dedao', 'general']);
   if (!fs.existsSync(path.join(vault, 'raw'))) throw new Error(`vault 不存在或缺少 raw/：${vault}`);
 
   // 1) raw 文件系统
@@ -120,7 +128,10 @@ function main(): void {
     }
   }
 
-  // 5) 分类
+  // 注意：系统阈值是「字符数」（content.length），不是文件字节数
+  const sizes = new Map(rawAbs.map((file) => [toRelative(vault, file), fs.readFileSync(file, 'utf8').length]));
+
+  // 5) 分类（顺序：committed > review > 长文 > queued > deferred > untriaged）
   const classes = new Map<Classification, string[]>();
   const add = (kind: Classification, rawPath: string): void => {
     const list = classes.get(kind) ?? [];
@@ -132,6 +143,7 @@ function main(): void {
     const cached = cache.get(rawPath);
     if (wikiSet.has(rawPath)) add('committed', rawPath);
     else if (cached?.digestStatus === 'digested') add('review', rawPath);
+    else if ((sizes.get(rawPath) ?? 0) > longThreshold) add('deferred_long', rawPath);
     else if (cached && (cached.triageStatus === 'medium' || cached.triageStatus === 'high')) add('queued', rawPath);
     else if (cached) add('deferred', rawPath);
     else if (triageLogSet.has(rawPath)) add('triaged_unknown', rawPath);
@@ -164,6 +176,8 @@ function main(): void {
       ? 'committed'
       : cached?.digestStatus === 'digested'
         ? 'review'
+        : (sizes.get(rawPath) ?? 0) > longThreshold
+        ? 'deferred_long'
         : cached && (cached.triageStatus === 'medium' || cached.triageStatus === 'high')
           ? 'queued'
           : cached
@@ -176,7 +190,6 @@ function main(): void {
   }
 
   const counts = Object.fromEntries([...classes.entries()].map(([kind, list]) => [kind, list.length]));
-  const sizes = new Map(rawAbs.map((file) => [toRelative(vault, file), fs.statSync(file).size]));
   const longText = Object.fromEntries([...classes.entries()].map(([kind, list]) => [
     kind, list.filter((rawPath) => (sizes.get(rawPath) ?? 0) > 60_000).length,
   ]));
@@ -189,6 +202,40 @@ function main(): void {
   const costPerArticle = 0.0025;
   const secondsPerArticle = 15.6;
 
+  // 8) 可选：用新规则重跑 triage（不依赖旧 cache 状态）
+  let retriageReport: Record<string, unknown> | null = null;
+  if (retriage) {
+    const next: Record<string, number> = { queued: 0, deferred: 0, deferred_long: 0, source_disabled: 0 };
+    for (const rawPath of rawSet) {
+      if (wikiSet.has(rawPath) || cache.get(rawPath)?.digestStatus === 'digested') continue;
+      const content = fs.readFileSync(path.join(vault, rawPath), 'utf8');
+      const { body } = parseFrontmatter(content);
+      const size = content.length;
+      const source = rawPath.split('/')[2] ?? '';
+      if (size > longThreshold) {
+        next.deferred_long = (next.deferred_long ?? 0) + 1;
+        continue;
+      }
+      if (!enabledSources.has(source)) {
+        next.source_disabled = (next.source_disabled ?? 0) + 1;
+        continue;
+      }
+      const triage = decideTriage({ judgments: countJudgmentSentences(body), charCount: size });
+      if (triage.status === 'low') next.deferred = (next.deferred ?? 0) + 1;
+      else next.queued = (next.queued ?? 0) + 1;
+    }
+    const q = next.queued ?? 0;
+    retriageReport = {
+      threshold: longThreshold,
+      counts: next,
+      estimate: {
+        costUsd: Number((q * costPerArticle).toFixed(4)),
+        hoursSerial: Number(((q * secondsPerArticle) / 3600).toFixed(1)),
+        hoursWith3Workers: Number(((q * secondsPerArticle) / 3600 / 3).toFixed(1)),
+      },
+    };
+  }
+
   const report = {
     vault,
     rawFiles: rawSet.size,
@@ -197,6 +244,8 @@ function main(): void {
     digestLogPaths: digestLogSet.size,
     triageLogPaths: triageLogSet.size,
     counts,
+    longThreshold,
+    retriage: retriageReport,
     longText,
     metaFiles,
     expectedNewQueue,
@@ -236,6 +285,8 @@ function main(): void {
     wikiFiles: report.wikiFiles,
     cacheItems: report.cacheItems,
     counts: report.counts,
+    longThreshold: report.longThreshold,
+    retriage: report.retriage,
     longText: report.longText,
     metaFiles: report.metaFiles,
     expectedNewQueue: report.expectedNewQueue,

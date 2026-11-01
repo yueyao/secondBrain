@@ -158,7 +158,7 @@ export async function createRuntime(options: RuntimeOptions): Promise<Runtime> {
       intentId: () => `intent-${randomHex(6)}`,
     },
     config: {
-      longTextThreshold: 60_000,
+      longTextThreshold: Number(process.env.LONG_TEXT_THRESHOLD ?? 200_000),
       enabledSources: ['cubox', 'notions', 'podcast', 'dedao', 'general'],
     },
     pricing: built.pricing,
