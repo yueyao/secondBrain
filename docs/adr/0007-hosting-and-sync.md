@@ -60,7 +60,7 @@
 - 需要迁移机器时：**在目标机重建**（用 legacy import + wiki 推导），或复制快照后校验；
 - 用户保留手动手段：`pnpm state:backup` / `pnpm state:restore`（脚本化，不自动）。
 
-### D40 · accept 前同步守卫（fail closed）
+### D40 · accept 前同步守卫（fail closed）｜已实现（P7.1）
 
 服务端每次 accept 前：
 
@@ -95,7 +95,7 @@
 
 ## 未决 / 后续
 
-1. P7.1：accept 前同步守卫（`fetch` + `OUT_OF_SYNC`）；
-2. P7.2：bare 仓库初始化、systemd 单元、每日 mirror 与状态库备份脚本；
+1. ✅ P7.1：accept 前同步守卫（`fetch` + `OUT_OF_SYNC`）——已实现并测试；
+2. ✅ P7.2：systemd 单元、sync/backup 脚本与 timer——已交付（`deploy/`、`docs/DEPLOY.md`）；
 3. 服务器访问控制（HTTPS、Basic Auth 或 Tailscale）；
 4. 本地仓库"只读"的强制手段（文件权限或 pre-push hook），当前靠约定。

@@ -48,6 +48,7 @@ export type AppErrorCode =
   | 'TARGET_MOVED'
   | 'NO_CHANGES'
   | 'DIRTY_VAULT'
+  | 'OUT_OF_SYNC'
   | 'INVALID_STATE'
   | 'GATE_BLOCKED'
   | 'UNKNOWN_NODE'

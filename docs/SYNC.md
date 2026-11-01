@@ -100,9 +100,11 @@ sqlite3 /srv/secondbrain/state/state.db "PRAGMA integrity_check; SELECT COUNT(*)
 
 ## 7. 实现状态
 
+accept 守卫已生效：`commitApproved` 会先 `git fetch`，若远端领先本地则抛 `OUT_OF_SYNC` 并拒绝写入。
+
 | 能力 | 状态 |
 |---|---|
 | 单写者 + 幂等恢复（ADR 0006） | ✅ 已实现 |
-| accept 前同步守卫（`fetch` + `OUT_OF_SYNC`） | ⬜ P7.1 |
+| accept 前同步守卫（`fetch` + `OUT_OF_SYNC`） | ✅ 已实现（P7.1） |
 | bare 仓库 / systemd / mirror / 备份脚本 | ⬜ P7.2 |
 | 本地 wiki 只读强制 | ⬜ 靠约定，后续可加 pre-push hook |

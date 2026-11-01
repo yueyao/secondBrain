@@ -89,6 +89,31 @@ export class FsVault implements VaultPort {
     }
   }
 
+  async fetch(): Promise<void> {
+    try {
+      this.git(['fetch', '--prune', '--quiet']);
+    } catch {
+      // 无 remote、离线或没有 upstream：静默忽略
+    }
+  }
+
+  async remoteBehind(): Promise<number> {
+    try {
+      const upstream = this.git(['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{upstream}']).trim();
+      if (!upstream || upstream.includes('@{upstream}')) return 0;
+      try {
+        const count = Number(this.git(['rev-list', '--count', `HEAD..${upstream}`]).trim());
+        return Number.isFinite(count) ? count : 0;
+      } catch {
+        // HEAD 尚未诞生（新克隆的空仓库）：远端提交数即落后数
+        const count = Number(this.git(['rev-list', '--count', upstream]).trim());
+        return Number.isFinite(count) ? count : 0;
+      }
+    } catch {
+      return 0;
+    }
+  }
+
   async lastCommitMessage(): Promise<string | null> {
     try {
       const subject = this.git(['log', '-1', '--pretty=%s']).trim();

@@ -954,3 +954,39 @@ worker 测试断言：tick 后草稿数 = 队列数、**committed 为 0**（绝�
 1. P7.1 accept 前同步守卫；
 2. 目标机器确定后按 DEPLOY.md 部署并在服务器执行 legacy apply；
 3. 并发 >1 的任务锁、失败熔断、审核通知。
+
+
+---
+
+## 二十六、P7.1 accept 前同步守卫（2026-11-01）
+
+### 26.1 交付
+
+| 层 | 改动 |
+|---|---|
+| contracts | `VaultReader` 增加 `fetch()` / `remoteBehind()` |
+| adapters-vault | `git fetch --prune`；`remoteBehind` 用 `HEAD..@{upstream}` 计数，兼容未诞生的 HEAD（新克隆空仓库） |
+| app | `commitApproved` 写入前先 fetch，远端领先则抛 `OUT_OF_SYNC`（fail closed），不写文件也不回滚 |
+| 错误码 | 新增 `OUT_OF_SYNC` |
+
+### 26.2 行为
+
+- 无 remote / 离线：fetch 静默忽略，`remoteBehind` 返回 0（本地可用）；
+- 远端有新提交：accept 被拒，提示先 `git pull`；
+- 与 ADR 0006 互补：恢复管"自己崩了"，守卫管"别人改了"。
+
+### 26.3 验证
+
+```
+ Test Files  25 passed (25)
+      Tests  179 passed (179)     # 新增 FsVault 远端落后检测 1 例
+```
+
+新增测试：本地 clone 落后远端 1 个提交时，`fetch()` 后 `remoteBehind() >= 1`。
+
+### 26.4 待办
+
+1. 目标机器确定后按 `docs/DEPLOY.md` 部署；
+2. 服务器端执行 legacy apply（`inserted 4408`）；
+3. 服务器访问控制（HTTPS / 认证）；
+4. 本地 wiki 只读的强制手段（pre-push hook）。

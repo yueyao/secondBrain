@@ -42,6 +42,8 @@ const vault: VaultReader = {
   readNode: async (file) => FILES[file] ?? '',
   head: async () => null,
   lastCommitMessage: async () => null,
+  fetch: async () => undefined,
+  remoteBehind: async () => 0,
   isClean: async () => true,
 };
 

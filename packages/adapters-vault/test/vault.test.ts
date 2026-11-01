@@ -155,3 +155,31 @@ function parseRawPathOk(value: string) {
   if (!parsed.ok) throw new Error(parsed.error.message);
   return parsed.value;
 }
+
+describe('FsVault：远端同步检测（P7.1）', () => {
+  it('本地落后远端时 remoteBehind 返回提交数', async () => {
+    const { execFileSync } = await import('node:child_process');
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'sb-sync-'));
+    try {
+      const remote = path.join(tmp, 'remote.git');
+      execFileSync('git', ['init', '--bare', '-q', '-b', 'main', remote]);
+      const a = path.join(tmp, 'a');
+      const b = path.join(tmp, 'b');
+      execFileSync('git', ['clone', '-q', remote, a]);
+      execFileSync('git', ['clone', '-q', remote, b]);
+
+      execFileSync('git', ['-C', a, 'config', 'user.name', 'test']);
+      execFileSync('git', ['-C', a, 'config', 'user.email', 'test@example.com']);
+      fs.writeFileSync(path.join(a, 'x.md'), '# x\n');
+      execFileSync('git', ['-C', a, 'add', '-A']);
+      execFileSync('git', ['-C', a, 'commit', '-q', '-m', 'first']);
+      execFileSync('git', ['-C', a, 'push', '-q', 'origin', 'main']);
+
+      const vault = FsVault.open({ root: b });
+      await vault.fetch();
+      expect(await vault.remoteBehind()).toBeGreaterThanOrEqual(1);
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+});

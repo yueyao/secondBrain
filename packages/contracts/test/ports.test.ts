@@ -83,6 +83,8 @@ const vault: VaultPort = {
   },
   head: async () => COMMIT_SHA,
   lastCommitMessage: async () => 'digest: raw/x.md [draft-abc123]',
+  fetch: async () => undefined,
+  remoteBehind: async () => 0,
   isClean: async () => true,
   commitFiles: async (changed, message) => {
     expect(changed.length).toBeGreaterThan(0);

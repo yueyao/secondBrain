@@ -332,6 +332,13 @@ export async function commitApproved(ctx: AppContext, draftId: DraftId): Promise
     throw new AppError('INVALID_STATE', `条目状态 ${item.state.kind}，无法提交`);
   }
 
+  // P7.1 同步守卫：远端有新提交时拒绝写入（fail closed）
+  await ctx.vault.fetch();
+  const behind = await ctx.vault.remoteBehind();
+  if (behind > 0) {
+    throw new AppError('OUT_OF_SYNC', `vault 远端有 ${behind} 个新提交，请先 git pull 再入库`, { behind });
+  }
+
   const today = now.slice(0, 10);
   const previousHead = await ctx.vault.head();
   const allFiles = [...new Set(
