@@ -916,3 +916,41 @@ $ pnpm import:apply --state .sb-import-test --apply   # 第二次
 1. 服务器定下来后，用 `--state /srv/secondbrain/state` 正式导入；
 2. 小批量真实处理（重点验证 patch 分支）；
 3. 6 个元文件 / 141 review / 33 死链 / 4 超长文的后续清理。
+
+
+---
+
+## 二十五、服务端自动流水线（2026-11-01）
+
+### 25.1 决策
+
+用户决定：**不在本地做生产**，全部在服务端自动运行，避免两端逻辑不同步（ADR 0008）。
+
+### 25.2 交付
+
+| 内容 | 说明 |
+|---|---|
+| `apps/worker` | 定时 ingest + 为 queued 条目起草；**不自动入库**；JSON 日志；`pnpm worker` / `pnpm worker:once` |
+| `deploy/` | env 示例、systemd unit（server/worker）、sync/backup 脚本与 timer |
+| `docs/DEPLOY.md` | 从零部署步骤（目录、仓库、systemd、首次导入、验证、恢复） |
+| `docs/adr/0008-automation.md` | D45-D49：双进程、tick 语义、timer 分工、失败处理、可观测性 |
+
+### 25.3 worker 语义
+
+每次 tick：ingest 全部新 raw（幂等）→ 取 queued 前 N 篇 → 逐篇起草 → 失败记日志下轮重试。
+默认 5 分钟一次、每轮最多 5 篇；串行执行避免 SQLite 写竞争。
+
+### 25.4 验证
+
+```
+ Test Files  25 passed (25)
+      Tests  178 passed (178)     # 新增 worker 2 例
+```
+
+worker 测试断言：tick 后草稿数 = 队列数、**committed 为 0**（绝不自动入库）、二次 tick 不重复起草。
+
+### 25.5 待办
+
+1. P7.1 accept 前同步守卫；
+2. 目标机器确定后按 DEPLOY.md 部署并在服务器执行 legacy apply；
+3. 并发 >1 的任务锁、失败熔断、审核通知。

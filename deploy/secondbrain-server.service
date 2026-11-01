@@ -1,0 +1,18 @@
+[Unit]
+Description=secondBrain 审核台
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=secondbrain
+WorkingDirectory=/srv/secondbrain/repo
+EnvironmentFile=/etc/secondbrain/secondbrain.env
+ExecStart=/usr/bin/pnpm --filter @sb/server start
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

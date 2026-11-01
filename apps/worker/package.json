@@ -1,0 +1,14 @@
+{
+  "name": "@sb/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "服务端自动流水线：定时 ingest + 为 queued 条目起草（不自动入库）",
+  "scripts": {
+    "start": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@sb/app": "workspace:*",
+    "@sb/domain": "workspace:*"
+  }
+}

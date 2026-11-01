@@ -1,0 +1,9 @@
+[Unit]
+Description=secondBrain 定时拉取 raw/wiki
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+
+[Install]
+WantedBy=timers.target

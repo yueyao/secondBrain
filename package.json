@@ -22,7 +22,9 @@
     "docs:check": "node scripts/check-docs.mjs",
     "baseline": "tsx scripts/baseline.ts",
     "import:dry-run": "tsx scripts/import-dry-run.ts",
-    "import:apply": "tsx scripts/import-apply.ts"
+    "import:apply": "tsx scripts/import-apply.ts",
+    "worker": "tsx apps/worker/src/main.ts",
+    "worker:once": "WORKER_ONCE=1 tsx apps/worker/src/main.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
