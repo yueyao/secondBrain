@@ -160,3 +160,4 @@ coverage/
 .sb-demo/
 config/model-profiles.json
 .sb-real/
+.sb-import/

@@ -780,3 +780,52 @@ claims=11 inference=1 nodes=5 cost=$0.00251
 3. P7.2 部署脚本（bare 仓库/systemd/备份）；
 4. 服务器端执行 legacy apply；
 5. 小批量真实处理（重点验证 patch 分支）。
+
+
+---
+
+## 二十三、Legacy 导入 dry-run（2026-11-01）
+
+### 23.1 交付
+
+`scripts/import-dry-run.ts`（`pnpm import:dry-run`）：只读对账，产出分类与冲突；明细写 `.sb-import/dry-run.json`（gitignore），摘要写 `docs/IMPORT-REPORT-2026-11-01.md`。
+
+### 23.2 结果
+
+| 分类 | 数量 |
+|---|---|
+| committed（wiki 引用） | 1,253 |
+| queued（medium/high 未 digest） | 2,209 |
+| review（digested 但 wiki 无引用） | 141 |
+| deferred（low/skipped/延后） | 188（含 21 个 `_index.md`） |
+| untriaged（禁用来源） | 617 |
+
+冲突：cache 缺失 0、hash 非法 0、状态/原因词表未知 0；wiki 死链 33、digest-log 缺失 34。
+
+### 23.3 关键发现
+
+1. **queued 里 1,080 篇 >60k 字符**，新 ingest 会 `TRIAGE_LONG → deferred`。导入需拆成 1,129 queued + 1,080 deferred(too_long)，否则违反新策略；旧流水线能处理长文，新系统目前不能（能力回退，P6.2 待补）。
+2. 617 篇 untriaged 全部来自禁用来源（newsletters 609、自媒体 8），不会入队。
+3. cache 的 triage 词表与领域层完全一致，score/hash 可直接搬运。
+
+### 23.4 修正后的预期
+
+导入后队列 **1,129**；成本 **≈$2.82**；串行 4.9h、3 并发 1.6h。
+
+### 23.5 验证
+
+```
+$ pnpm import:dry-run
+counts: {committed:1253, queued:2209, review:141, deferred:188, untriaged:617}
+longText: {queued:1080, committed:320, review:21, deferred:4}
+conflicts: {cacheMissingOnDisk:0, invalidHashes:0, unknownReasons:0, wikiMissingOnDisk:33}
+
+ Test Files  24 passed (24)
+      Tests  176 passed (176)
+```
+
+### 23.6 待确认
+
+1. 141 篇 review 的处理方式（默认 deferred 待人工）；
+2. 1,080 篇长文：先 deferred（推荐）还是绕过策略；
+3. apply 在服务器还是本地先试。

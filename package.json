@@ -20,7 +20,8 @@
     "check:model": "tsx scripts/check-model-config.ts",
     "demo:deepseek": "MODEL_BASE_URL=${MODEL_BASE_URL:-https://api.deepseek.com} MODEL_CONFIG=config/model-profiles.json pnpm --filter @sb/server start",
     "docs:check": "node scripts/check-docs.mjs",
-    "baseline": "tsx scripts/baseline.ts"
+    "baseline": "tsx scripts/baseline.ts",
+    "import:dry-run": "tsx scripts/import-dry-run.ts"
   },
   "devDependencies": {
     "@types/node": "^22.20.5",
