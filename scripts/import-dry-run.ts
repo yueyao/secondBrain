@@ -206,6 +206,7 @@ function main(): void {
   let retriageReport: Record<string, unknown> | null = null;
   if (retriage) {
     const next: Record<string, number> = { queued: 0, deferred: 0, deferred_long: 0, source_disabled: 0 };
+    const retriageQueuedSet = new Set<string>();
     for (const rawPath of rawSet) {
       if (wikiSet.has(rawPath) || cache.get(rawPath)?.digestStatus === 'digested') continue;
       const content = fs.readFileSync(path.join(vault, rawPath), 'utf8');
@@ -222,11 +223,24 @@ function main(): void {
       }
       const triage = decideTriage({ judgments: countJudgmentSentences(body), charCount: size });
       if (triage.status === 'low') next.deferred = (next.deferred ?? 0) + 1;
-      else next.queued = (next.queued ?? 0) + 1;
+      else {
+        next.queued = (next.queued ?? 0) + 1;
+        retriageQueuedSet.add(rawPath);
+      }
     }
     const q = next.queued ?? 0;
+    const legacyQueuedSet = new Set(classes.get('queued') ?? []);
+    const both = [...legacyQueuedSet].filter((rawPath) => retriageQueuedSet.has(rawPath)).length;
     retriageReport = {
       threshold: longThreshold,
+      compare: {
+        legacyQueued: legacyQueuedSet.size,
+        retriageQueued: retriageQueuedSet.size,
+        both,
+        legacyOnly: legacyQueuedSet.size - both,
+        retriageOnly: retriageQueuedSet.size - both,
+        union: legacyQueuedSet.size + retriageQueuedSet.size - both,
+      },
       counts: next,
       estimate: {
         costUsd: Number((q * costPerArticle).toFixed(4)),

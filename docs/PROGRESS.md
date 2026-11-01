@@ -865,3 +865,54 @@ conflicts: {cacheMissingOnDisk:0, invalidHashes:0, unknownReasons:0, wikiMissing
 | D42 | 141 篇 review 按 `deferred` 处理 | 待人工抽查，不自动重跑 |
 | D43 | 长文阈值提升到 200k 字符 | 200k 以内直接入队；仅 4 篇例外 |
 | D44 | 导入队列以"重新 triage"为准 | 旧 cache 状态仅作交叉校验 |
+
+
+---
+
+## 二十四、Legacy 导入 apply（2026-11-01）
+
+### 24.1 决策
+
+用户选择方案 C（并集）：队列 = 旧 cache medium/high ∪ 新规则 triage 达标。
+
+### 24.2 交付
+
+| 文件 | 内容 |
+|---|---|
+| `scripts/legacy-plan.ts` | 共用的导入计划：分类、并集队列、deferred 原因、合成 draftId |
+| `scripts/import-apply.ts` | `pnpm import:apply --state <dir> [--apply]`：只写 SQLite；带预演、幂等、导入后 ingest 验证 |
+| `apps/server/src/runtime.ts` | 新增 `vaultRoot` 选项（复用真实 vault + 独立状态库） |
+
+### 24.3 结果（本地临时库 `.sb-import-test`）
+
+| 项 | 值 |
+|---|---|
+| 写入 | 4,408（skipped 0） |
+| committed | 1,253 |
+| queued（并集） | **2,302**（两者都认可 1,852 + 仅旧台账 353 + 仅新规则 97） |
+| deferred | 853（low 70 / source_disabled 617 / too_long 4 / user 162） |
+| 元文件 | 21 个 `_index.md` → deferred(user)，不入队 |
+| 验证 | 导入后 ingest：observed 4,408、**newItems 0** |
+| 幂等 | 第二次 apply：inserted 0、skipped 4,408 |
+
+**说明**：并集理论值 2,308，实际 2,302，差 6 个元文件（新规则会把它们判为可入队；apply 统一按元文件延后）。
+
+### 24.4 验证
+
+```
+$ pnpm import:apply --state .sb-import-test --apply
+{"phase":"import","inserted":4408,"skipped":0}
+{"phase":"verify","before":4408,"after":4408,"newItems":0,"ok":true}
+
+$ pnpm import:apply --state .sb-import-test --apply   # 第二次
+{"phase":"import","inserted":0,"skipped":4408}
+
+ Test Files  24 passed (24)
+      Tests  176 passed (176)
+```
+
+### 24.5 待办
+
+1. 服务器定下来后，用 `--state /srv/secondbrain/state` 正式导入；
+2. 小批量真实处理（重点验证 patch 分支）；
+3. 6 个元文件 / 141 review / 33 死链 / 4 超长文的后续清理。

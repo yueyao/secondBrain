@@ -28,6 +28,8 @@ export type AgentMode = 'mock' | 'cloud';
 
 export interface RuntimeOptions {
   readonly dataDir: string;
+  /** vault 根目录；默认 <dataDir>/vault（生产布局），可指向已有 vault */
+  readonly vaultRoot?: string;
   readonly seedDemo?: boolean;
 }
 
@@ -133,7 +135,8 @@ export async function createRuntime(options: RuntimeOptions): Promise<Runtime> {
   const dataDir = path.resolve(options.dataDir);
   fs.mkdirSync(dataDir, { recursive: true });
 
-  const vault = FsVault.open({ root: path.join(dataDir, 'vault') });
+  const vaultRoot = options.vaultRoot ? path.resolve(options.vaultRoot) : path.join(dataDir, 'vault');
+  const vault = FsVault.open({ root: vaultRoot });
   const store = SqliteStore.open({ path: path.join(dataDir, 'state.db'), clock: systemClock });
   migrate(store.database, systemClock);
 

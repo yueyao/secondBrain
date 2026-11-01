@@ -93,7 +93,25 @@ cache 的 `reasons` 词表与领域层 `TriageReason` 完全一致，score 与 h
 3. 服务器就位后执行 apply，再小批量真实处理，重点验证 patch 分支；
 4. follow-up：4 篇超长文 + 33 条死链 + 141 篇 review 清理。
 
-## 8. 复现
+## 8. apply 验证（本地临时库，2026-11-01）
+
+已用 `pnpm import:apply --state .sb-import-test --apply` 在本地临时库执行：
+
+| 阶段 | 结果 |
+|---|---|
+| 计划 | raw 4,408 → committed 1,253 / queued **2,302** / deferred 853 |
+| 写入 | inserted **4,408**、skipped 0 |
+| 验证 | 再跑 `ingestAndTriage`：observed 4,408、**newItems 0**，状态分布与计划一致 |
+| 幂等 | 第二次 apply：inserted 0、skipped 4,408 |
+| 事件 | 每次实际导入记一条 `import:legacy` 事件（0 插入时不记） |
+
+**队列 2,302 与并集 2,308 的差异**：6 个 `_index.md` 元文件在"新规则 triage"里会被判为可入队，但 apply 统一按元文件 `deferred(user)` 处理，避免把目录索引当文章处理。
+
+deferred 853 的构成：`low_value` 70、`source_disabled` 617、`too_long` 4、`user` 162（141 review + 21 元文件）。
+
+状态库位置：`.sb-import-test/state.db`（已 gitignore，可随时删除重建）。
+
+## 9. 复现
 
 ```bash
 pnpm import:dry-run --retriage [--long-threshold 200000]
