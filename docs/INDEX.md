@@ -11,6 +11,7 @@
 | [docs/MONOREPO.md](docs/MONOREPO.md) | 包布局、依赖矩阵、新增子模块步骤 | 包增删、依赖方向变化时 |
 | [docs/TESTING.md](docs/TESTING.md) | 测试金字塔、夹具用法、启动 mock 审核台 | 测试结构或数量变化时 |
 | [docs/BASELINE-2026-10-31.md](docs/BASELINE-2026-10-31.md) | 真实模型基线：triage 分布、单篇质量/成本/稳定性、发现的问题 | 每次真实模型基线跑完后新建一份（按日期） |
+| [docs/SYNC.md](docs/SYNC.md) | 多端同步操作手册：角色、日常流程、冲突处理、备份恢复 | 同步流程/命令变化时 |
 | [docs/MAINTENANCE.md](docs/MAINTENANCE.md) | 文档维护规则、检查机制、评审清单 | 维护流程本身变化时 |
 | [docs/INDEX.md](docs/INDEX.md) | 本文件：文档地图 | 任何文档增删时 |
 | [docs/adr/0001-stack.md](docs/adr/0001-stack.md) | 技术栈选型 | 换语言/测试框架/包管理器时 |
@@ -19,6 +20,7 @@
 | [docs/adr/0004-database.md](docs/adr/0004-database.md) | 数据库选型（node:sqlite） | 换库/迁移策略变化时 |
 | [docs/adr/0005-model-integration.md](docs/adr/0005-model-integration.md) | 模型接入：路由/执行/评估、DeepSeek、预算计量 | 模型接入方式、路由或预算策略变化时 |
 | [docs/adr/0006-simplified-recovery.md](docs/adr/0006-simplified-recovery.md) | 简化版崩溃恢复（幂等重放） | 恢复策略变化、升级为完整对账时 |
+| [docs/adr/0007-hosting-and-sync.md](docs/adr/0007-hosting-and-sync.md) | 部署与多端同步：服务端唯一写者、总线、状态库边界 | 部署形态或同步策略变化时 |
 
 ## 阅读路径
 

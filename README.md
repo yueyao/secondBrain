@@ -7,6 +7,7 @@ secondBrain 知识生产流程的服务端实现，**pnpm workspaces monorepo**�
 - 包布局与接入指南：[docs/MONOREPO.md](docs/MONOREPO.md)
 - 文档地图（先看这个）：[docs/INDEX.md](docs/INDEX.md)
 - 维护规则（改代码必读）：[AGENTS.md](AGENTS.md) · [docs/MAINTENANCE.md](docs/MAINTENANCE.md)
+- 多端同步手册：[docs/SYNC.md](docs/SYNC.md)
 - 实施进展与决策日志：[docs/PROGRESS.md](docs/PROGRESS.md)
 - **当前阶段快照**：[docs/STAGE-2026-10-31.md](docs/STAGE-2026-10-31.md)
 - 领域层手册：[docs/DOMAIN.md](docs/DOMAIN.md)
