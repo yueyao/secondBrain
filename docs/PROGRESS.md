@@ -1297,3 +1297,12 @@ sync: vault/raw 均 "Already up to date"
 - `/nodes` 顶部新增面积图：横轴为节点 claims 数分箱（0/1/2–3/4–9/10–19/20+），纵轴为节点数量；
 - 图表下方显示各类型节点数与 claims 总数；列表保留在下方供检索；
 - 纯内联 SVG（无图表库），真数据；测试 189 例。
+
+
+---
+
+## 四十五、Compose C1 收尾：创建文章 + 大纲（2026-11-03）
+
+- app：`createArticle` / `saveArticleOutline` / `listComposeArticles`；
+- `/compose` 页面：节点多选（前 20 个 + claims 数）、标题/主题、创建文章、文章列表；
+- 下一轮：文章详情页 + 大纲 AI 生成 + v1 正文生成（C2）。

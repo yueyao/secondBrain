@@ -55,10 +55,12 @@ import {
   listWikiNodes,
   wikiNodeDetail,
   nodeStats,
+  createArticle,
+  listComposeArticles,
 } from '@sb/app';
 import { parseDraftId, parseRawPath, type DraftId, type RawPath } from '@sb/domain';
 import type { Runtime } from './runtime';
-import { adminPage, articlePage, articlesPage, claimsPage, dashboard, errorPage, guidePage, nodePage, nodesPage, reviewListPage, reviewPage, searchPage, usagePage } from './views';
+import { adminPage, articlePage, articlesPage, claimsPage, composePage, dashboard, errorPage, guidePage, nodePage, nodesPage, reviewListPage, reviewPage, searchPage, usagePage } from './views';
 
 function redirect(res: http.ServerResponse, location: string): void {
   res.writeHead(303, { location });
@@ -142,6 +144,19 @@ export function createServer(runtime: Runtime): http.Server {
         return sendHtml(res, usagePage(await usageSummary(runtime.ctx)));
       }
 
+      if (req.method === 'GET' && path === '/compose') {
+        return sendHtml(res, composePage({
+          articles: await listComposeArticles(runtime.ctx),
+          nodes: (await listWikiNodes(runtime.ctx)).slice(0, 20).map((node) => ({ name: node.name, claimCount: node.claimCount })),
+        }));
+      }
+      if (req.method === 'POST' && path === '/actions/compose/create') {
+        const form = await readForm(req);
+        const nodes = typeof form.node === 'string' ? [form.node] : [];
+        const id = `article-${Date.now().toString(36)}`;
+        await createArticle(runtime.ctx, id, { title: form.title ?? '', theme: form.theme ?? '', nodeIds: nodes });
+        return redirect(res, '/compose');
+      }
       if (req.method === 'GET' && path === '/nodes') {
         const url3 = new URL(req.url ?? '/', 'http://localhost');
         const type = url3.searchParams.get('type') ?? 'all';

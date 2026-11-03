@@ -686,3 +686,8 @@ export async function nodeStats(ctx: AppContext): Promise<NodeStatsV1> {
     byType: [...types.entries()].map(([type, stat]) => ({ type, ...stat })),
   };
 }
+
+
+export async function listComposeArticles(ctx: AppContext): Promise<readonly import('@sb/contracts').ArticleRecord[]> {
+  return ctx.store.transaction(async (tx) => tx.articles.list());
+}

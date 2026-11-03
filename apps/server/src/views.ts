@@ -785,3 +785,20 @@ export function nodePage(node: { name: string; file: string; nodeType: string; a
   <h2>观点</h2><div class="card"><ol>${claims}</ol></div>
   <h2>相关概念</h2><div class="card">${related}</div>`);
 }
+
+
+export function composePage(data: { articles: readonly { id: string; title: string; theme: string; nodeIds: readonly string[]; status: string; outline: string | null; updatedAt: string }[]; nodes: readonly { name: string; claimCount: number }[] }): string {
+  const list = data.articles.map((article) => `<tr><td><a href="/compose/${encodeURIComponent(article.id)}">${esc(article.title)}</a></td><td>${esc(article.theme || '—')}</td><td>${article.nodeIds.length}</td><td>${esc(article.status)}</td><td class="muted">${article.outline ? '有大纲' : '未生成'}</td><td class="muted">${esc(article.updatedAt.slice(0, 10))}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">还没有文章，先创建一篇</td></tr>';
+  const nodeOptions = data.nodes.map((node) => `<label class="muted" style="display:inline-flex;gap:6px;align-items:center;margin:2px 10px 2px 0"><input type="checkbox" name="node" value="${esc(node.name)}">${esc(node.name)} <span style="opacity:.6">${node.claimCount}</span></label>`).join('');
+  return layout('创作', `${nav()}
+  <h1>创作</h1>
+  <div class="muted">选择知识节点，创建文章并生成大纲（生成正文在 C2 接入模型）</div>
+  <div class="card" style="margin-top:12px"><form method="post" action="/actions/compose/create">
+    标题：<input name="title" placeholder="文章标题" style="width:280px">
+    主题：<input name="theme" placeholder="主题（可选）" style="width:200px">
+    <div style="margin:10px 0;max-height:150px;overflow:auto">${nodeOptions || '<span class="muted">暂无节点</span>'}</div>
+    <button class="btn" type="submit">创建文章</button>
+  </form></div>
+  <h2>我的文章</h2>
+  <div class="card" style="padding:4px 0"><table><tr><th>标题</th><th>主题</th><th>节点</th><th>状态</th><th>大纲</th><th>更新</th></tr>${list}</table></div>`);
+}
