@@ -49,10 +49,12 @@ import {
   overview,
   pendingReviewList,
   wikiClaims,
+  listWikiNodes,
+  wikiNodeDetail,
 } from '@sb/app';
 import { parseDraftId, parseRawPath, type DraftId, type RawPath } from '@sb/domain';
 import type { Runtime } from './runtime';
-import { adminPage, articlePage, articlesPage, claimsPage, dashboard, errorPage, guidePage, reviewListPage, reviewPage, searchPage, usagePage } from './views';
+import { adminPage, articlePage, articlesPage, claimsPage, dashboard, errorPage, guidePage, nodePage, nodesPage, reviewListPage, reviewPage, searchPage, usagePage } from './views';
 
 function redirect(res: http.ServerResponse, location: string): void {
   res.writeHead(303, { location });
@@ -136,6 +138,21 @@ export function createServer(runtime: Runtime): http.Server {
         return sendHtml(res, usagePage(await usageSummary(runtime.ctx)));
       }
 
+      if (req.method === 'GET' && path === '/nodes') {
+        const url3 = new URL(req.url ?? '/', 'http://localhost');
+        const type = url3.searchParams.get('type') ?? 'all';
+        const q = url3.searchParams.get('q') ?? '';
+        const allDocs = runtime.ctx.search.allDocs();
+        const counts: Record<string, number> = { all: allDocs.length, concept: 0, topic: 0, person: 0 };
+        for (const doc of allDocs) counts[doc.nodeType] = (counts[doc.nodeType] ?? 0) + 1;
+        return sendHtml(res, nodesPage(await listWikiNodes(runtime.ctx, { type, q }), type, q, counts));
+      }
+      if (req.method === 'GET' && path.startsWith('/nodes/')) {
+        const file = decodeURIComponent(path.slice('/nodes/'.length));
+        const node = await wikiNodeDetail(runtime.ctx, file);
+        if (!node) return sendHtml(res, errorPage('节点不存在'), 404);
+        return sendHtml(res, nodePage(node));
+      }
       if (req.method === 'GET' && path === '/claims') {
         return sendHtml(res, claimsPage(await wikiClaims(runtime.ctx)));
       }

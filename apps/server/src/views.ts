@@ -320,7 +320,7 @@ function nav(): string {
   return `<div class="nav">
     <a href="/"><b>secondBrain</b></a>
     <a href="/">工作台</a><a href="/articles">文章库</a><a href="/review">审核</a>
-    <a href="/claims">claims</a><a href="/operations">运维</a><a href="/exceptions">异常</a><a href="/usage">用量</a><a href="/search">搜索</a>
+    <a href="/nodes">节点</a><a href="/claims">claims</a><a href="/operations">运维</a><a href="/exceptions">异常</a><a href="/usage">用量</a><a href="/search">搜索</a>
     <span style="flex:1"></span>
     <span id="worker-light" class="muted">worker: --</span>
     <span id="pending-badge" class="badge b-warn">待审 0</span>
@@ -672,4 +672,33 @@ export function guidePage(): string {
   <h2>5. 版本与回滚</h2>
   <p>每次 accept 一次 git commit；用 <code>git log</code> / <code>git revert</code> 回滚，服务器与本地通过私有仓库同步。</p>
   </div>`);
+}
+
+
+export function nodesPage(rows: readonly { name: string; file: string; nodeType: string; claimedCount?: never; claimCount: number; sourceCount: number; aliases: readonly string[] }[], type: string, query: string, counts: Record<string, number>): string {
+  const tabs = [['all', '全部'], ['concept', '概念'], ['topic', '主题'], ['person', '人物']]
+    .map(([key, label]) => `<a class="btn" style="${key === type ? 'background:#1f6feb;color:#fff' : ''}" href="/nodes?type=${key}&q=${encodeURIComponent(query)}">${label} <span class="muted">${counts[key] ?? 0}</span></a>`).join('');
+  const rowsHtml = rows.map((row) => `<tr>
+    <td><a href="/nodes/${encodeURIComponent(row.file)}">${esc(row.name)}</a>${row.aliases.length > 0 ? ` <span class="muted">（${row.aliases.map((a) => esc(a)).join('、')}）</span>` : ''}</td>
+    <td>${esc(row.nodeType)}</td><td>${row.claimCount}</td><td>${row.sourceCount}</td></tr>`).join('')
+    || '<tr><td colspan="4" class="muted">没有匹配的节点</td></tr>';
+  return layout('知识节点', `${nav()}
+  <h1>知识节点（${rows.length}）</h1>
+  <div class="row" style="gap:6px;margin:12px 0">${tabs}</div>
+  <form class="row" method="get" action="/nodes" style="gap:8px;margin-bottom:12px">
+    <input type="hidden" name="type" value="${esc(type)}"><input name="q" value="${esc(query)}" placeholder="搜索节点名">
+    <button class="btn" type="submit">筛选</button></form>
+  <div class="card" style="padding:4px 0"><table><tr><th>节点</th><th>类型</th><th>claims</th><th>来源数</th></tr>${rowsHtml}</table></div>`);
+}
+
+export function nodePage(node: { name: string; file: string; nodeType: string; aliases: readonly string[]; definition: string; claims: readonly { text: string; source: string }[]; related: readonly string[] }): string {
+  const claims = node.claims.map((claim) => `<li>${esc(claim.text)}<div class="muted">来源：<a href="/articles/${encodeURIComponent(claim.source)}">${esc(claim.source)}</a></div></li>`).join('') || '<li class="muted">暂无 claims</li>';
+  const related = node.related.map((name) => `<span class="badge">${esc(name)}</span>`).join(' ') || '<span class="muted">无</span>';
+  return layout(node.name, `${nav()}
+  <div class="row" style="justify-content:space-between"><h1>${esc(node.name)}</h1><a class="btn" href="/nodes">← 节点</a></div>
+  <div class="muted">${esc(node.file)} · ${esc(node.nodeType)}${node.aliases.length > 0 ? ` · 别名：${node.aliases.map((a) => esc(a)).join('、')}` : ''}</div>
+  <h2>定义（${node.claims.length} 条 claims）</h2>
+  <div class="card">${esc(node.definition) || '<span class="muted">无定义</span>'}</div>
+  <h2>观点</h2><div class="card"><ol>${claims}</ol></div>
+  <h2>相关概念</h2><div class="card">${related}</div>`);
 }

@@ -568,3 +568,77 @@ export async function wikiClaims(ctx: AppContext, limit = 2000): Promise<readonl
   }
   return rows;
 }
+
+
+export interface WikiNodeRowV1 {
+  readonly name: string;
+  readonly file: string;
+  readonly nodeType: string;
+  readonly aliases: readonly string[];
+  readonly updatedAt: string;
+  readonly claimCount: number;
+  readonly sourceCount: number;
+}
+
+function claimLines(body: string): { text: string; source: string }[] {
+  const rows: { text: string; source: string }[] = [];
+  for (const line of body.split('\n')) {
+    const match = line.match(/^- (.+?)（来源：\[\[(raw\/[^\]]+)\]\]/);
+    if (match) rows.push({ text: match[1] as string, source: match[2] as string });
+  }
+  return rows;
+}
+
+export async function listWikiNodes(
+  ctx: AppContext,
+  options: { readonly type?: string; readonly q?: string } = {},
+): Promise<readonly WikiNodeRowV1[]> {
+  const docs = ctx.search.allDocs();
+  const type = options.type && options.type !== 'all' ? options.type : 'all';
+  const q = (options.q ?? '').toLowerCase();
+  const rows: WikiNodeRowV1[] = [];
+  for (const doc of docs) {
+    if (type !== 'all' && doc.nodeType !== type) continue;
+    if (q !== '' && !doc.name.toLowerCase().includes(q)) continue;
+    const claims = claimLines(doc.body);
+    rows.push({
+      name: doc.name,
+      file: doc.file,
+      nodeType: doc.nodeType,
+      aliases: doc.aliases,
+      updatedAt: doc.updatedAt,
+      claimCount: claims.length,
+      sourceCount: new Set(claims.map((claim) => claim.source)).size,
+    });
+  }
+  return rows.sort((a, b) => b.claimCount - a.claimCount);
+}
+
+export interface WikiNodeDetailV1 {
+  readonly name: string;
+  readonly file: string;
+  readonly nodeType: string;
+  readonly aliases: readonly string[];
+  readonly definition: string;
+  readonly claims: readonly { text: string; source: string }[];
+  readonly related: readonly string[];
+}
+
+export async function wikiNodeDetail(ctx: AppContext, fileInput: string): Promise<WikiNodeDetailV1 | null> {
+  const doc = ctx.search.allDocs().find((entry) => entry.file === fileInput);
+  if (!doc) return null;
+  const definitionMatch = doc.body.match(/## 一句话定义\n+([\s\S]*?)(?=\n## |$)/);
+  const relatedSection = doc.body.match(/## 相关概念\n+([\s\S]*?)$/);
+  const related = relatedSection
+    ? [...(relatedSection[1] as string).matchAll(/\[\[([^\]]+)\]\]/g)].map((match) => match[1] as string)
+    : [];
+  return {
+    name: doc.name,
+    file: doc.file,
+    nodeType: doc.nodeType,
+    aliases: doc.aliases,
+    definition: (definitionMatch?.[1] ?? '').trim(),
+    claims: claimLines(doc.body),
+    related,
+  };
+}

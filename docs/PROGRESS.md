@@ -1235,3 +1235,13 @@ sync: vault/raw 均 "Already up to date"
 
 `/claims` 之前读"已审核草稿"，而服务器尚无 accept 记录（1,253 篇 legacy 导入没有草稿记录）→ 显示 0。
 改为**从 wiki Markdown 反向解析 claims**（节点内 `- 文本（来源：[[raw/…]]）`），可立即看到已入库知识。
+
+
+---
+
+## 三十九、知识节点可视化（2026-11-03）
+
+- `/nodes`：全部 wiki 节点（名称/别名/类型/claims 数/来源数），按 claims 数排序；类型 tab（概念/主题/人物）+ 搜索；
+- `/nodes/<file>`：节点详情（定义、views、来源原文链接、相关概念）；
+- 数据来自已加载的搜索索引（含 body），无需逐文件读取；
+- 说明：已入库**文章**在 `/articles?group=committed`，已入库**知识**在 `/nodes`。
