@@ -329,6 +329,7 @@ DeepSeek 提供 OpenAI 兼容端点，因此**不需要新适配器**，只需�
 |---|---|
 | 输出模式 | **text**（请求体不发送 `response_format`），Markdown 直接回传；digest 仍为 json（D51） |
 | 引用 | 正文每个判断后 `（来源：[[raw/...]]）`；由 `@sb/domain` 的 `extractCitationSources` 解析，应用层补 claim 原文；解析不到引用即拒收（D52） |
+| 材料 | 顶级节点 claims 可达数百条，生成时按节点**等距抽样上限 60 条**（去重、保持顺序），控制 prompt 与成本（D54） |
 | 执行层 | `ComposeRunner`（`@sb/agent-runtime`）复用路由/预算/重试/降级/provenance；与 digest 各自实例、共用 profile/policy 配置（D50） |
 | 端口 | `ComposePort` 在 `@sb/contracts`；mock 模式由 `@sb/testing` 的 `MockComposer` 实现，测试与本地演示不花钱（D53） |
 | 版本 | 正文写入 `article_version`：v1 `ai_initial`、v2+ `ai_refine`，记录 `basedOnVersionId` / tokens / cost；文章状态生成后转 `review` |

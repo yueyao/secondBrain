@@ -2,7 +2,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ComposePort, ComposeRequest, ComposeResult } from '@sb/contracts';
 import { createHarness, hashPort, type TestHarness } from '@sb/testing';
 import type { AppContext } from '../src/context';
-import { createArticle, generateArticleBody, generateArticleOutline } from '../src/compose';
+import {
+  createArticle,
+  generateArticleBody,
+  generateArticleOutline,
+  MAX_CLAIMS_PER_NODE,
+  sampleClaimsForPrompt,
+} from '../src/compose';
 
 const NODES = ['反脆弱', '长期主义'] as const;
 
@@ -173,5 +179,28 @@ describe('主编台用例：大纲与正文版本链', () => {
     await expect(generateArticleBody(ctx, 'article-test-1')).rejects.toMatchObject({ code: 'INVALID_STATE' });
     const versions = await harness.store.transaction(async (tx) => tx.articleVersions.listByArticle('article-test-1'));
     expect(versions).toHaveLength(0);
+  });
+});
+
+describe('生成材料抽样（控制 prompt 与成本）', () => {
+  it('不超过上限时原样返回', () => {
+    const claims = Array.from({ length: 10 }, (_, index) => ({ text: `判断 ${index}`, source: `raw/k/${index}.md` }));
+    expect(sampleClaimsForPrompt(claims)).toEqual(claims);
+  });
+
+  it('超过上限时等距抽样：保留首条与尾部代表，条数不超过上限', () => {
+    const claims = Array.from({ length: 100 }, (_, index) => ({ text: `判断 ${index}`, source: `raw/k/${index}.md` }));
+    const sampled = sampleClaimsForPrompt(claims);
+    expect(sampled).toHaveLength(MAX_CLAIMS_PER_NODE);
+    expect(sampled[0]?.text).toBe('判断 0');
+    expect(sampled[sampled.length - 1]?.text).toBe('判断 98');
+    // 抽样不改变时间顺序
+    const indexes = sampled.map((claim) => Number(claim.text.replace('判断 ', '')));
+    expect([...indexes].sort((a, b) => a - b)).toEqual(indexes);
+  });
+
+  it('重复文本只保留一条', () => {
+    const claims = Array.from({ length: 100 }, (_, index) => ({ text: '同一判断', source: `raw/k/${index}.md` }));
+    expect(sampleClaimsForPrompt(claims)).toHaveLength(1);
   });
 });

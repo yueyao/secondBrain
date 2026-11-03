@@ -12,7 +12,7 @@
 | 领域单测 | `packages/domain/test` | 无 | 74 | 纯函数：状态矩阵、规则、策略、文本工具、引用解析 |
 | 契约冒烟 | `packages/contracts/test` | 无 | 7 | 用假实现证明端口可实现、DTO 形状稳定 |
 | 适配器集成 | `packages/adapters-{sqlite,vault,search-memory}/test` | 真实临时目录 / `:memory:` SQLite / 真实 git | 46 | 迁移、事务、乐观锁、路径逃逸、锁 |
-| 应用集成 | `packages/app/test` | 真实 git + SQLite + MockAgent + 假 Composer | 17 | 完整流程 + 用量账本 + 崩溃恢复 4 例 + 主编台版本链 6 例 |
+| 应用集成 | `packages/app/test` | 真实 git + SQLite + MockAgent + 假 Composer | 20 | 完整流程 + 用量账本 + 崩溃恢复 4 例 + 主编台版本链与材料抽样 9 例 |
 | 端到端 | `apps/server/test/e2e.test.ts` | 真实 HTTP 服务 + 浏览器级 HTML + MockComposer | 9 | 起服务、走 UI 路由、断言 wiki/git/主编台生成 |
 | 云端链路 | `apps/server/test/cloud.test.ts` | 本地假 OpenAI 服务，无外网/无费用 | 2 | provider→runner→存储→入库→usage 全链路 |
 | 运行时 | `packages/agent-runtime/test` | fake provider，无真实模型 | 48 | 路由/预算/缓存/重试/降级/契约校验/配置解析/compose 文本契约 13 例 |
@@ -20,7 +20,7 @@
 | worker | `apps/worker/test` | 临时 vault + 内存 SQLite | 4 | 自动流水线 tick、背压、暂停语义 |
 | 测试夹具包 | `packages/testing/test` | 临时目录 + 内存 SQLite | 8 | harness 自检 + MockComposer 确定性输出 |
 
-当前总数：**223 例 / 29 个文件**。
+当前总数：**226 例 / 29 个文件**。
 
 ---
 

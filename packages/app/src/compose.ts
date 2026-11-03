@@ -77,14 +77,41 @@ interface ArticleMaterial {
   readonly nodes: readonly ComposeNodeMaterial[];
 }
 
-/** 把文章的节点名映射回 search 索引，拿到全部 claims 作为生成材料。 */
+/** 每个节点喂给模型的 claims 上限；顶级主题节点可能有几百条，全量喂会让 prompt 与成本失控。 */
+export const MAX_CLAIMS_PER_NODE = 60;
+
+/**
+ * 生成材料的 claims 抽样：等距取样，保持时间跨度，并去重文本。
+ * 用途是给模型"可引用的判断池"，不是全量知识；引用仍以原文路径为准。
+ */
+export function sampleClaimsForPrompt(
+  claims: readonly { readonly text: string; readonly source: string }[],
+): readonly { readonly text: string; readonly source: string }[] {
+  if (claims.length <= MAX_CLAIMS_PER_NODE) return claims;
+  const step = claims.length / MAX_CLAIMS_PER_NODE;
+  const picked: { text: string; source: string }[] = [];
+  const seen = new Set<string>();
+  for (let index = 0; index < MAX_CLAIMS_PER_NODE; index++) {
+    const claim = claims[Math.floor(index * step)];
+    if (claim === undefined || seen.has(claim.text)) continue;
+    seen.add(claim.text);
+    picked.push({ text: claim.text, source: claim.source });
+  }
+  return picked;
+}
+
+/** 把文章的节点名映射回 search 索引，拿到 claims 作为生成材料（按节点抽样）。 */
 async function loadArticleMaterial(ctx: AppContext, id: string): Promise<ArticleMaterial> {
   const article = await ctx.store.transaction(async (tx) => tx.articles.get(id));
   if (!article) throw new AppError('NOT_FOUND', `文章不存在：${id}`);
   const docs = ctx.search.allDocs();
   const nodes = article.nodeIds.map((name) => {
     const doc = docs.find((entry) => entry.name === name || entry.aliases.includes(name));
-    return { name, nodeType: doc?.nodeType ?? 'unknown', claims: doc ? claimsIn(doc.body) : [] };
+    return {
+      name,
+      nodeType: doc?.nodeType ?? 'unknown',
+      claims: doc ? sampleClaimsForPrompt(claimsIn(doc.body)) : [],
+    };
   });
   return { article, nodes };
 }
