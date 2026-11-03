@@ -49,6 +49,7 @@ import {
   overview,
   pendingReviewList,
   committedClaims,
+  wikiClaims,
 } from '@sb/app';
 import { parseDraftId, parseRawPath, type DraftId, type RawPath } from '@sb/domain';
 import type { Runtime } from './runtime';
@@ -137,7 +138,7 @@ export function createServer(runtime: Runtime): http.Server {
       }
 
       if (req.method === 'GET' && path === '/claims') {
-        return sendHtml(res, claimsPage(await committedClaims(runtime.ctx)));
+        return sendHtml(res, claimsPage(await wikiClaims(runtime.ctx)));
       }
       if (req.method === 'GET' && path === '/guide') {
         return sendHtml(res, guidePage());

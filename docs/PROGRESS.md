@@ -1229,3 +1229,9 @@ sync: vault/raw 均 "Already up to date"
 - `/claims`：已入库草稿的全部 claims（判断句、是否推断、来源原文、所属草稿）；
 - `/guide`：产出如何使用（Obsidian 阅读、检索、审核追溯、JSON API、git 回滚）；
 - 测试 188 例全绿。
+
+
+### 38.1 修正（2026-11-03）
+
+`/claims` 之前读"已审核草稿"，而服务器尚无 accept 记录（1,253 篇 legacy 导入没有草稿记录）→ 显示 0。
+改为**从 wiki Markdown 反向解析 claims**（节点内 `- 文本（来源：[[raw/…]]）`），可立即看到已入库知识。

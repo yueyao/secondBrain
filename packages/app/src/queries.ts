@@ -545,3 +545,26 @@ export async function committedClaims(ctx: AppContext, limit = 500): Promise<rea
   }
   return rows;
 }
+
+
+/** 从 wiki 节点 Markdown 反向解析 claims（已入库知识）。 */
+export async function wikiClaims(ctx: AppContext, limit = 2000): Promise<readonly ClaimRowV1[]> {
+  const files = await ctx.vault.listNodes();
+  const rows: ClaimRowV1[] = [];
+  for (const file of files) {
+    let content: string;
+    try {
+      content = await ctx.vault.readNode(file);
+    } catch {
+      continue;
+    }
+    for (const line of content.split('\n')) {
+      if (!line.startsWith('- ')) continue;
+      const match = line.match(/^- (.+?)（来源：\[\[(raw\/[^\]]+)\]\]/);
+      if (!match) continue;
+      rows.push({ draftId: file, text: match[1] as string, inference: line.includes('（推断）'), source: match[2] as string });
+      if (rows.length >= limit) return rows;
+    }
+  }
+  return rows;
+}
