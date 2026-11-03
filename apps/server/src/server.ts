@@ -100,6 +100,11 @@ export function createServer(runtime: Runtime): http.Server {
       if (req.method === 'GET' && path === '/articles') {
         const data = await listArticles(runtime.ctx, {
           state: url.searchParams.get('state') ?? 'all',
+          group: url.searchParams.get('group') ?? 'all',
+          source: url.searchParams.get('source') ?? 'all',
+          days: Number(url.searchParams.get('days') ?? '0'),
+          triage: url.searchParams.get('triage') ?? 'all',
+          sort: (url.searchParams.get('sort') as 'updated' | 'judgments' | 'chars' | 'title' | null) ?? 'updated',
           query: url.searchParams.get('q') ?? '',
           page: Number(url.searchParams.get('page') ?? '1'),
         });

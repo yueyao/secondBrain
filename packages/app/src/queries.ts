@@ -202,10 +202,24 @@ export interface ArticleRowV1 {
 
 export interface ArticleListOptions {
   readonly state?: string;
+  readonly group?: string;
+  readonly source?: string;
+  readonly days?: number;
+  readonly triage?: string;
+  readonly sort?: 'updated' | 'judgments' | 'chars' | 'title';
   readonly query?: string;
   readonly page?: number;
   readonly pageSize?: number;
 }
+
+export const ARTICLE_GROUPS: Readonly<Record<string, readonly string[]>> = {
+  all: [],
+  queue: ['queued', 'ingested', 'triaged'],
+  review: ['draft_ready', 'in_review'],
+  committed: ['committed'],
+  deferred: ['deferred', 'rejected'],
+  error: ['failed', 'blocked', 'rolled_back', 'expired', 'abandoned', 'quarantined'],
+};
 
 export interface ArticleListV1 {
   readonly items: readonly ArticleRowV1[];
@@ -216,6 +230,13 @@ export interface ArticleListV1 {
   readonly states: readonly string[];
   readonly state: string;
   readonly query: string;
+  readonly group: string;
+  readonly source: string;
+  readonly days: number;
+  readonly triage: string;
+  readonly sort: string;
+  readonly groupCounts: Readonly<Record<string, number>>;
+  readonly sources: readonly string[];
 }
 
 function triageOfState(state: { readonly kind: string } & Record<string, unknown>): { status: string; score: number; judgments: number } | null {
@@ -231,19 +252,45 @@ export async function listArticles(ctx: AppContext, options: ArticleListOptions 
   const query = (options.query ?? '').trim();
 
   let filtered = all;
+  if (options.group && options.group !== 'all') {
+    const kinds = ARTICLE_GROUPS[options.group] ?? [];
+    if (kinds.length > 0) filtered = filtered.filter((item) => kinds.includes(item.state.kind));
+  }
   if (state !== 'all') filtered = filtered.filter((item) => item.state.kind === state);
+  if (options.source && options.source !== 'all') filtered = filtered.filter((item) => item.sourceKey === options.source);
+  if (options.days && options.days > 0) {
+    const cutoff = Date.parse(ctx.clock.now()) - options.days * 86_400_000;
+    filtered = filtered.filter((item) => Date.parse(item.updatedAt) >= cutoff);
+  }
+  if (options.triage && options.triage !== 'all') {
+    filtered = filtered.filter((item) => triageOfState(item.state as never)?.status === options.triage);
+  }
   if (query !== '') {
     const needle = query.toLowerCase();
     filtered = filtered.filter(
       (item) => item.title.toLowerCase().includes(needle) || String(item.rawPath).toLowerCase().includes(needle),
     );
   }
-  filtered = [...filtered].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  const sort = options.sort ?? 'updated';
+  filtered = [...filtered].sort((a, b) => {
+    if (sort === 'title') return a.title.localeCompare(b.title, 'zh');
+    if (sort === 'chars') return b.charCount - a.charCount;
+    if (sort === 'judgments') {
+      return (triageOfState(b.state as never)?.judgments ?? 0) - (triageOfState(a.state as never)?.judgments ?? 0);
+    }
+    return b.updatedAt.localeCompare(a.updatedAt);
+  });
 
   const pageSize = Math.min(200, Math.max(10, options.pageSize ?? 50));
   const total = filtered.length;
   const pages = Math.max(1, Math.ceil(total / pageSize));
   const page = Math.min(pages, Math.max(1, Math.trunc(options.page ?? 1)));
+
+  const groupCounts: Record<string, number> = {};
+  for (const [group, kinds] of Object.entries(ARTICLE_GROUPS)) {
+    groupCounts[group] = group === 'all' ? all.length : all.filter((item) => kinds.includes(item.state.kind)).length;
+  }
+  const sources = [...new Set(all.map((item) => item.sourceKey))].sort();
 
   const items = filtered.slice((page - 1) * pageSize, page * pageSize).map((item): ArticleRowV1 => ({
     schemaVersion: 1,
@@ -256,7 +303,7 @@ export async function listArticles(ctx: AppContext, options: ArticleListOptions 
     triage: triageOfState(item.state as never),
   }));
 
-  return { items, total, page, pages, pageSize, states, state, query };
+  return { items, total, page, pages, pageSize, states, state, query, group: options.group ?? 'all', source: options.source ?? 'all', days: options.days ?? 0, triage: options.triage ?? 'all', sort, groupCounts, sources };
 }
 
 export interface ArticleDetailV1 {

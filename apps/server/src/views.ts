@@ -335,12 +335,44 @@ export interface ArticlesPageData {
   readonly states: readonly string[];
   readonly state: string;
   readonly query: string;
+  readonly group: string;
+  readonly source: string;
+  readonly days: number;
+  readonly triage: string;
+  readonly sort: string;
+  readonly groupCounts: Readonly<Record<string, number>>;
+  readonly sources: readonly string[];
 }
 
 export function articlesPage(data: ArticlesPageData): string {
-  const stateOptions = ['all', ...data.states]
-    .map((value) => `<option value="${esc(value)}"${value === data.state ? ' selected' : ''}>${value === 'all' ? '全部状态' : esc(stateLabel(value))}</option>`)
-    .join('');
+  const GROUP_TABS: ReadonlyArray<[string, string]> = [
+    ['all', '全部'], ['queue', '待处理'], ['review', '待审核'],
+    ['committed', '已入库'], ['deferred', '已延后'], ['error', '异常'],
+  ];
+  const qs = (extra: Record<string, string | number>): string => {
+    const params = new URLSearchParams({
+      group: data.group, source: data.source, days: String(data.days),
+      triage: data.triage, sort: data.sort, q: data.query, page: '1', ...extra,
+    });
+    for (const [key, value] of [...params.entries()]) {
+      if (value === 'all' || value === '' || value === '0') params.delete(key);
+    }
+    const text = params.toString();
+    return text === '' ? '' : `?${text}`;
+  };
+
+  const tabs = GROUP_TABS.map(([key, label]) =>
+    `<a class="btn" style="${key === data.group ? 'background:#1f6feb;color:#fff' : ''}" href="/articles${qs({ group: key })}">${label} <span class="muted">${data.groupCounts[key] ?? 0}</span></a>`,
+  ).join('');
+
+  const sourceOptions = ['all', ...data.sources]
+    .map((value) => `<option value="${esc(value)}"${value === data.source ? ' selected' : ''}>${value === 'all' ? '全部来源' : esc(value)}</option>`).join('');
+  const dayOptions = [[0, '全部时间'], [1, '今天'], [7, '近 7 天'], [30, '近 30 天']]
+    .map(([value, label]) => `<option value="${value}"${Number(value) === data.days ? ' selected' : ''}>${label}</option>`).join('');
+  const triageOptions = [['all', '全部等级'], ['high', '高'], ['medium', '中'], ['low', '低']]
+    .map(([value, label]) => `<option value="${value}"${value === data.triage ? ' selected' : ''}>${label}</option>`).join('');
+  const sortOptions = [['updated', '最近更新'], ['judgments', '判断句数'], ['chars', '字数'], ['title', '标题']]
+    .map(([value, label]) => `<option value="${value}"${value === data.sort ? ' selected' : ''}>按${label}</option>`).join('');
 
   const rows = data.items.map((item) => `<tr>
     <td><a href="/articles/${encodeURIComponent(item.rawPath)}">${esc(item.title)}</a></td>
@@ -351,15 +383,18 @@ export function articlesPage(data: ArticlesPageData): string {
     <td class="muted">${esc(item.updatedAt.slice(0, 10))}</td></tr>`).join('')
     || '<tr><td colspan="6" class="muted">没有匹配的文章</td></tr>';
 
-  const prev = data.page > 1
-    ? `<a class="btn" href="/articles?state=${encodeURIComponent(data.state)}&q=${encodeURIComponent(data.query)}&page=${data.page - 1}">← 上一页</a>` : '';
-  const next = data.page < data.pages
-    ? `<a class="btn" href="/articles?state=${encodeURIComponent(data.state)}&q=${encodeURIComponent(data.query)}&page=${data.page + 1}">下一页 →</a>` : '';
+  const prev = data.page > 1 ? `<a class="btn" href="/articles${qs({ page: data.page - 1 })}">← 上一页</a>` : '';
+  const next = data.page < data.pages ? `<a class="btn" href="/articles${qs({ page: data.page + 1 })}">下一页 →</a>` : '';
 
   return layout('文章库', `${nav()}
   <div class="row" style="justify-content:space-between"><h1>文章库</h1><span class="muted">${data.total.toLocaleString()} 篇 · 第 ${data.page}/${data.pages} 页</span></div>
-  <form class="row" method="get" action="/articles" style="gap:8px;margin:12px 0">
-    <select name="state">${stateOptions}</select>
+  <div class="row" style="gap:6px;margin:12px 0;flex-wrap:wrap">${tabs}</div>
+  <form class="row" method="get" action="/articles" style="gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <input type="hidden" name="group" value="${esc(data.group)}">
+    <select name="source">${sourceOptions}</select>
+    <select name="days">${dayOptions}</select>
+    <select name="triage">${triageOptions}</select>
+    <select name="sort">${sortOptions}</select>
     <input name="q" value="${esc(data.query)}" placeholder="搜索标题或路径">
     <button class="btn" type="submit">筛选</button>
     <a class="btn" href="/articles">重置</a>
