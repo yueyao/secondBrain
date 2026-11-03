@@ -26,6 +26,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@sb/adapters-agent-openai':
+        specifier: workspace:*
+        version: link:../../packages/adapters-agent-openai
       '@sb/adapters-search-memory':
         specifier: workspace:*
         version: link:../../packages/adapters-search-memory
@@ -35,6 +38,9 @@ importers:
       '@sb/adapters-vault':
         specifier: workspace:*
         version: link:../../packages/adapters-vault
+      '@sb/agent-runtime':
+        specifier: workspace:*
+        version: link:../../packages/agent-runtime
       '@sb/app':
         specifier: workspace:*
         version: link:../../packages/app
@@ -47,6 +53,24 @@ importers:
       '@sb/testing':
         specifier: workspace:*
         version: link:../../packages/testing
+
+  apps/worker:
+    dependencies:
+      '@sb/app':
+        specifier: workspace:*
+        version: link:../../packages/app
+      '@sb/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+
+  packages/adapters-agent-openai:
+    dependencies:
+      '@sb/agent-runtime':
+        specifier: workspace:*
+        version: link:../agent-runtime
+      '@sb/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   packages/adapters-search-memory:
     dependencies:
@@ -67,6 +91,15 @@ importers:
         version: link:../domain
 
   packages/adapters-vault:
+    dependencies:
+      '@sb/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@sb/domain':
+        specifier: workspace:*
+        version: link:../domain
+
+  packages/agent-runtime:
     dependencies:
       '@sb/contracts':
         specifier: workspace:*
