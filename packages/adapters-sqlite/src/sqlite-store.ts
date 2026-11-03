@@ -8,6 +8,8 @@
  */
 import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import type {
+  ArticleRecord,
+  ArticleVersionRecord,
   Clock,
   CommitRecord,
   DraftRecord,
@@ -21,6 +23,8 @@ import type {
   StateStore,
   Transaction,
   UsageRecord,
+  ArticleRepo,
+  ArticleVersionRepo,
 } from '@sb/contracts';
 import type { DraftId, RawPath, RawState } from '@sb/domain';
 import {
@@ -59,6 +63,8 @@ export class SqliteStore implements StateStore {
       jobs: new Jobs(this),
       events: new Events(this),
       usage: new Usage(this),
+      articles: new Articles(this),
+      articleVersions: new ArticleVersions(this),
     };
   }
 
@@ -340,4 +346,84 @@ class Usage {
 /** 供 doctor / 测试使用的便捷构造。 */
 export function openMemoryStore(clock: Clock): SqliteStore {
   return SqliteStore.open({ path: ':memory:', clock });
+}
+
+
+class Articles implements ArticleRepo {
+  constructor(private readonly store: SqliteStore) {}
+
+  private row(row: Record<string, unknown>): ArticleRecord {
+    return {
+      id: String(row.id), title: String(row.title), theme: String(row.theme),
+      nodeIds: JSON.parse(String(row.node_ids)) as string[],
+      outline: row.outline === null ? null : String(row.outline),
+      status: String(row.status) as ArticleRecord['status'],
+      currentVersionId: row.current_version_id === null ? null : String(row.current_version_id),
+      createdAt: String(row.created_at), updatedAt: String(row.updated_at),
+    };
+  }
+
+  async insert(record: ArticleRecord): Promise<void> {
+    this.store.stmt('INSERT INTO article (id,title,theme,node_ids,outline,status,current_version_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)')
+      .run(record.id, record.title, record.theme, JSON.stringify(record.nodeIds), record.outline, record.status, record.currentVersionId, record.createdAt, record.updatedAt);
+  }
+
+  async get(id: string): Promise<ArticleRecord | null> {
+    const row = this.store.stmt('SELECT * FROM article WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+    return row ? this.row(row) : null;
+  }
+
+  async list(): Promise<readonly ArticleRecord[]> {
+    const rows = this.store.stmt('SELECT * FROM article ORDER BY updated_at DESC').all() as Record<string, unknown>[];
+    return rows.map((row) => this.row(row));
+  }
+
+  async setOutline(id: string, outline: string, updatedAt: string): Promise<void> {
+    this.store.stmt('UPDATE article SET outline = ?, updated_at = ? WHERE id = ?').run(outline, updatedAt, id);
+  }
+
+  async setCurrentVersion(id: string, versionId: string, updatedAt: string): Promise<void> {
+    this.store.stmt('UPDATE article SET current_version_id = ?, updated_at = ? WHERE id = ?').run(versionId, updatedAt, id);
+  }
+
+  async setStatus(id: string, status: ArticleRecord['status'], updatedAt: string): Promise<void> {
+    this.store.stmt('UPDATE article SET status = ?, updated_at = ? WHERE id = ?').run(status, updatedAt, id);
+  }
+}
+
+class ArticleVersions implements ArticleVersionRepo {
+  constructor(private readonly store: SqliteStore) {}
+
+  private row(row: Record<string, unknown>): ArticleVersionRecord {
+    return {
+      id: String(row.id), articleId: String(row.article_id), versionNo: Number(row.version_no),
+      contentMd: String(row.content_md), citations: JSON.parse(String(row.citations)) as ArticleVersionRecord['citations'],
+      basedOnVersionId: row.based_on_version_id === null ? null : String(row.based_on_version_id),
+      source: String(row.source) as ArticleVersionRecord['source'],
+      instruction: row.instruction === null ? null : String(row.instruction),
+      provider: row.provider === null ? null : String(row.provider),
+      model: row.model === null ? null : String(row.model),
+      promptVersion: row.prompt_version === null ? null : Number(row.prompt_version),
+      inputTokens: row.input_tokens === null ? null : Number(row.input_tokens),
+      outputTokens: row.output_tokens === null ? null : Number(row.output_tokens),
+      cost: row.cost === null ? null : Number(row.cost),
+      note: row.note === null ? null : String(row.note),
+      createdAt: String(row.created_at),
+    };
+  }
+
+  async append(record: ArticleVersionRecord): Promise<void> {
+    this.store.stmt('INSERT INTO article_version (id,article_id,version_no,content_md,citations,based_on_version_id,source,instruction,provider,model,prompt_version,input_tokens,output_tokens,cost,note,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(record.id, record.articleId, record.versionNo, record.contentMd, JSON.stringify(record.citations), record.basedOnVersionId, record.source, record.instruction, record.provider, record.model, record.promptVersion, record.inputTokens, record.outputTokens, record.cost, record.note, record.createdAt);
+  }
+
+  async listByArticle(articleId: string): Promise<readonly ArticleVersionRecord[]> {
+    const rows = this.store.stmt('SELECT * FROM article_version WHERE article_id = ? ORDER BY version_no DESC').all(articleId) as Record<string, unknown>[];
+    return rows.map((row) => this.row(row));
+  }
+
+  async get(id: string): Promise<ArticleVersionRecord | null> {
+    const row = this.store.stmt('SELECT * FROM article_version WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+    return row ? this.row(row) : null;
+  }
 }

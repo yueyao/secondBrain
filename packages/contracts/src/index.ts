@@ -4,6 +4,7 @@ export * from './ports/lock';
 export * from './ports/ids';
 export * from './ports/usage';
 export * from './ports/hash';
+export * from './ports/article';
 export * from './ports/state-store';
 export * from './ports/vault';
 export * from './ports/search-index';

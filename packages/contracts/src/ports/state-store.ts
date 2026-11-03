@@ -12,6 +12,7 @@ import type {
   RawState,
 } from '@sb/domain';
 import type { UsageRepo } from './usage';
+import type { ArticleRepo, ArticleVersionRepo } from './article';
 
 export interface RawItemRecord {
   readonly id: number;
@@ -133,6 +134,8 @@ export interface Transaction {
   readonly jobs: JobRepo;
   readonly events: EventRepo;
   readonly usage: UsageRepo;
+  readonly articles: ArticleRepo;
+  readonly articleVersions: ArticleVersionRepo;
 }
 
 export interface StateStore {

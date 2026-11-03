@@ -64,6 +64,8 @@ function fakeTransaction(): Transaction {
     jobs: { enqueue: nope('enqueue'), claimNext: nope('claimNext'), finish: nope('finish') },
     events: { append: nope('append'), listSince: nope('listSince') },
     usage: { append: nope('append'), listAll: nope('listAll'), listByDay: nope('listByDay') },
+    articles: { insert: nope('insert'), get: nope('get'), list: nope('list'), setOutline: nope('setOutline'), setCurrentVersion: nope('setCurrentVersion'), setStatus: nope('setStatus') },
+    articleVersions: { append: nope('append'), listByArticle: nope('listByArticle'), get: nope('get') },
   };
 }
 
