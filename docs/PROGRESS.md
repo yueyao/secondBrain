@@ -1306,3 +1306,8 @@ sync: vault/raw 均 "Already up to date"
 - app：`createArticle` / `saveArticleOutline` / `listComposeArticles`；
 - `/compose` 页面：节点多选（前 20 个 + claims 数）、标题/主题、创建文章、文章列表；
 - 下一轮：文章详情页 + 大纲 AI 生成 + v1 正文生成（C2）。
+
+
+### 44.1 修订：面积图改为矩形树图（2026-11-03）
+
+用户要求"所有节点按大小生成矩形结构"，`/nodes` 顶部改为 **squarified treemap**：每个节点一个矩形，面积 ∝ claims 数，颜色按节点类型（概念/主题/人物），悬浮显示名称与 claims 数，标签仅在大矩形内显示。

@@ -743,23 +743,17 @@ export function nodesPage(rows: readonly { name: string; file: string; nodeType:
     <td><a href="/nodes/${encodeURIComponent(row.file)}">${esc(row.name)}</a>${row.aliases.length > 0 ? ` <span class="muted">（${row.aliases.map((a) => esc(a)).join('、')}）</span>` : ''}</td>
     <td>${esc(row.nodeType)}</td><td>${row.claimCount}</td><td>${row.sourceCount}</td></tr>`).join('')
     || '<tr><td colspan="4" class="muted">没有匹配的节点</td></tr>';
-  const W = 880; const H = 180; const PAD = 28;
-  const max = Math.max(1, ...stats.bins.map((bin) => bin.count));
-  const step = stats.bins.length > 1 ? (W - PAD * 2) / (stats.bins.length - 1) : 0;
-  const points = stats.bins.map((bin, index) => {
-    const x = PAD + step * index;
-    const y = H - PAD - (bin.count / max) * (H - PAD * 2);
-    return { x, y, bin };
-  });
-  const line = points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ');
-  const area = `${line} L${points[points.length - 1]?.x ?? PAD} ${H - PAD} L${PAD} ${H - PAD} Z`;
-  const chart = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" role="img" aria-label="节点按 claims 数分布">
-    <path d="${area}" fill="rgba(94,234,212,.12)"></path>
-    <path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2"></path>
-    ${points.map((point) => `<circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="3" fill="var(--accent)"></circle>`).join('')}
-    ${points.map((point) => `<text x="${point.x.toFixed(1)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--dim)">${esc(point.bin.label)}</text>`).join('')}
-    ${points.map((point) => `<text x="${point.x.toFixed(1)}" y="${(point.y - 9).toFixed(1)}" text-anchor="middle" font-size="11" fill="var(--ink)">${point.bin.count}</text>`).join('')}
-  </svg>`;
+  const treemap = buildTreemap(rows.map((row) => ({ label: row.name, value: Math.max(1, row.claimCount), type: row.nodeType })), 880, 460);
+  const COLORS: Record<string, string> = { concept: '#5eead4', topic: '#e3b341', person: '#8f9bb3' };
+  const rects = treemap.map((rect) => {
+    const color = COLORS[rect.item.type] ?? '#8b939e';
+    const showLabel = rect.w > 92 && rect.h > 26;
+    return `<g><title>${esc(rect.item.label)} · ${rect.item.value} claims</title>
+      <rect x="${rect.x.toFixed(1)}" y="${rect.y.toFixed(1)}" width="${Math.max(0, rect.w - 2).toFixed(1)}" height="${Math.max(0, rect.h - 2).toFixed(1)}" rx="2" fill="${color}" fill-opacity="${rect.w * rect.h > 4000 ? 0.32 : 0.18}" stroke="${color}" stroke-opacity="0.5" stroke-width="1"></rect>
+      ${showLabel ? `<text x="${(rect.x + 7).toFixed(1)}" y="${(rect.y + 17).toFixed(1)}" font-size="11.5" fill="var(--ink)">${esc(rect.item.label.slice(0, Math.floor(rect.w / 12)))}</text>` : ''}
+    </g>`;
+  }).join('');
+  const chart = `<svg viewBox="0 0 880 460" style="width:100%;height:auto;display:block" role="img" aria-label="节点矩形树图">${rects}</svg>`;
 
   return layout('知识节点', `${nav()}
   <h1>知识节点（${stats.total}）</h1>
@@ -801,4 +795,64 @@ export function composePage(data: { articles: readonly { id: string; title: stri
   </form></div>
   <h2>我的文章</h2>
   <div class="card" style="padding:4px 0"><table><tr><th>标题</th><th>主题</th><th>节点</th><th>状态</th><th>大纲</th><th>更新</th></tr>${list}</table></div>`);
+}
+
+
+interface TreemapItem { label: string; value: number; type: string }
+interface TreemapRect { x: number; y: number; w: number; h: number; item: TreemapItem }
+
+/** Squarified treemap：面积 ∝ value。 */
+function buildTreemap(items: readonly TreemapItem[], width: number, height: number): TreemapRect[] {
+  const sorted = [...items].sort((a, b) => b.value - a.value);
+  const total = sorted.reduce((sum, item) => sum + item.value, 0) || 1;
+  const scale = (width * height) / total;
+  const rects: TreemapRect[] = [];
+
+  const worst = (row: TreemapItem[], side: number): number => {
+    const sum = row.reduce((acc, item) => acc + item.value * scale, 0);
+    const max = Math.max(...row.map((item) => item.value * scale));
+    const min = Math.min(...row.map((item) => item.value * scale));
+    if (sum <= 0 || min <= 0) return Infinity;
+    const a = (side * side * max) / (sum * sum);
+    const b = (sum * sum) / (side * side * min);
+    return Math.max(a, b);
+  };
+
+  const layoutRow = (row: TreemapItem[], x: number, y: number, w: number, h: number): { x: number; y: number; w: number; h: number } => {
+    const sum = row.reduce((acc, item) => acc + item.value * scale, 0);
+    if (w >= h) {
+      const colW = sum / h;
+      let offset = y;
+      for (const item of row) {
+        const itemH = (item.value * scale) / colW;
+        rects.push({ x, y: offset, w: colW, h: itemH, item });
+        offset += itemH;
+      }
+      return { x: x + colW, y, w: w - colW, h };
+    }
+    const rowH = sum / w;
+    let offset = x;
+    for (const item of row) {
+      const itemW = (item.value * scale) / rowH;
+      rects.push({ x: offset, y, w: itemW, h: rowH, item });
+      offset += itemW;
+    }
+    return { x, y: y + rowH, w, h: h - rowH };
+  };
+
+  const place = (list: TreemapItem[], x: number, y: number, w: number, h: number): void => {
+    if (list.length === 0) return;
+    if (w <= 0 || h <= 0) return;
+    const side = Math.min(w, h);
+    const row: TreemapItem[] = [];
+    for (let index = 0; index < list.length; index += 1) {
+      const candidate = [...row, list[index] as TreemapItem];
+      if (row.length === 0 || worst(candidate, side) <= worst(row, side)) row.push(list[index] as TreemapItem);
+      else { const rest = layoutRow(row, x, y, w, h); return place(list.slice(index), rest.x, rest.y, rest.w, rest.h); }
+    }
+    layoutRow(row, x, y, w, h);
+  };
+
+  place(sorted, 0, 0, width, height);
+  return rects;
 }
