@@ -11,42 +11,42 @@ const LEVEL: Record<string, string> = { block: '阻断', warn: '注意', ok: '�
 const CSS = `
 :root{--bg:#0a0b0d;--panel:#101216;--paper:#15181d;--ink:#e8eaed;--dim:#8b939e;--line:#23272e;--accent:#5eead4;--warn:#e3b341;--bad:#ef5f6b;--ok:#3fb950}
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--ink);font:14px/1.55 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0}
-.wrap{margin-left:224px;padding:28px 32px 48px;max-width:1280px}
-.nav{position:fixed;inset:0 auto 0 0;width:224px;display:flex;flex-direction:column;gap:1px;padding:20px 12px;border-right:1px solid var(--line);background:var(--bg);z-index:10;overflow:auto}
-.nav a[href="/"]{color:var(--ink);font-weight:700;font-size:15px;letter-spacing:-.01em;padding:0 10px 16px}
+body{background:var(--bg);color:var(--ink);font:15px/1.65 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0}
+.wrap{margin-left:248px;padding:40px 44px 72px;max-width:1360px}
+.nav{position:fixed;inset:0 auto 0 0;width:248px;display:flex;flex-direction:column;gap:2px;padding:26px 14px;border-right:1px solid var(--line);background:var(--bg);z-index:10;overflow:auto}
+.nav a[href="/"]{color:var(--ink);font-weight:700;font-size:19px;letter-spacing:-.02em;padding:0 10px 22px}
 .nav a[href="/"]:hover{background:none}
-.nav a{color:var(--dim);padding:6px 10px;border-radius:4px;font-size:13.5px;text-decoration:none;white-space:nowrap}
-.nav a:hover{color:var(--ink);background:var(--panel)}
+.nav a{color:var(--dim);padding:8px 12px;border-radius:5px;font-size:14.5px;text-decoration:none;white-space:nowrap}
+.nav a:hover{color:var(--ink);background:var(--panel);box-shadow:inset 2px 0 0 var(--accent)}
 .nav a[href="/"]{color:var(--ink)}
-#worker-light{color:var(--dim);font-size:12px;padding:14px 10px 2px;white-space:nowrap}
+#worker-light{color:var(--dim);font-size:12.5px;padding:20px 12px 4px;white-space:nowrap}
 #pending-badge{background:none;border:1px solid var(--line);color:var(--ink);font-size:11px;padding:2px 6px;margin:0 10px}
 .refresh-bar{display:none;position:sticky;top:0;background:#1b1a10;color:var(--warn);border-bottom:1px solid #3d361a;padding:7px 16px;cursor:pointer;z-index:11;text-align:center;font-size:12.5px}
-h1{font-size:24px;font-weight:600;letter-spacing:-.02em;margin:0 0 8px}
-h2{font-size:12px;font-weight:500;color:var(--dim);margin:30px 0 8px;letter-spacing:0;text-transform:none}
+h1{font-size:34px;font-weight:650;letter-spacing:-.03em;margin:0 0 10px}
+h2{font-size:14px;font-weight:600;color:var(--dim);margin:40px 0 12px;letter-spacing:.01em;text-transform:none}
 p{margin:8px 0}
 a{color:var(--accent);text-decoration:none}
 a:hover{text-decoration:underline}
-.muted{color:var(--dim);font-size:12.5px}
+.muted{color:var(--dim);font-size:13.5px}
 .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;margin:0}
-.row:has(.stat){gap:0;border:1px solid var(--line);border-radius:6px;background:var(--panel);overflow:hidden;margin:8px 0}
-.stat{flex:1 1 120px;padding:12px 16px;border-right:1px solid var(--line);background:var(--panel)}
+.row:has(.stat){gap:0;border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:hidden;margin:12px 0}
+.stat{flex:1 1 140px;padding:18px 22px;border-right:1px solid var(--line);background:var(--panel)}
 .row:has(.stat) .stat:last-child{border-right:0}
-.stat b{display:block;font-size:22px;font-weight:500;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
-.stat span{display:block;font-size:12px;color:var(--dim);margin-top:2px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px;margin:8px 0}
+.stat b{display:block;font-size:32px;font-weight:600;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.15}
+.stat span{display:block;font-size:12.5px;color:var(--dim);margin-top:4px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px 20px;margin:12px 0}
 table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-th{font-size:12px;color:var(--dim);font-weight:400;text-align:left;padding:7px 10px;border-bottom:1px solid var(--line)}
-td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.045);vertical-align:top}
+th{font-size:12.5px;color:var(--dim);font-weight:500;text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
+td{padding:11px 12px;font-size:14.5px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:top}
 tr:last-child td{border-bottom:0}
 th:nth-child(n+3),td:nth-child(n+3){text-align:right}
-.badge{display:inline-block;font-size:11px;padding:1px 6px;border-radius:3px;border:1px solid var(--line);color:#b7c0cc;background:var(--paper);white-space:nowrap}
+.badge{display:inline-block;font-size:12px;padding:2px 8px;border-radius:3px;border:1px solid var(--line);color:#b7c0cc;background:var(--paper);white-space:nowrap}
 .b-ok{color:var(--ok);border-color:rgba(63,185,80,.35)}
 .b-warn{color:var(--warn);border-color:rgba(227,179,65,.35)}
 .b-block{color:var(--bad);border-color:rgba(239,95,107,.35)}
-.btn{display:inline-block;background:transparent;border:1px solid var(--line);color:var(--ink);padding:6px 12px;border-radius:4px;font:inherit;font-size:13px;cursor:pointer;text-decoration:none}
+.btn{display:inline-block;background:transparent;border:1px solid var(--line);color:var(--ink);padding:8px 15px;border-radius:5px;font:inherit;font-size:14px;cursor:pointer;text-decoration:none}
 .btn:hover{border-color:var(--accent);color:var(--accent);text-decoration:none}
-input,select{background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:6px 9px;font:inherit;font-size:13px}
+input,select{background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:8px 11px;font:inherit;font-size:14px}
 input:focus,select:focus,.btn:focus-visible,a:focus-visible{outline:1px solid var(--accent);outline-offset:1px}
 pre{background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:12px;overflow:auto;font-size:12.5px;color:#c7d0da}
 ul,ol{margin:8px 0;padding-left:20px}
