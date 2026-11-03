@@ -305,3 +305,16 @@ describe('主编台 C3/C4（改稿/对比/恢复/定稿/导出）', () => {
     expect(reopenedPage).toContain('待主编审');
   });
 });
+
+describe('关于页（功能地图）', () => {
+  it('关于页可打开，介绍工作台全部功能并带实时数据', async () => {
+    const response = await fetch(`${base}/about`);
+    const html = await response.text();
+    expect(response.status).toBe(200);
+    for (const keyword of ['关于本工作台', '工作流', '功能地图', '核心概念', '系统能力', '运行信息', '主编台', '审核中心', '运维中心', '使用说明', '导出 Markdown']) {
+      expect(html).toContain(keyword);
+    }
+    // 导航里有「关于」入口
+    expect(html).toContain('href="/about"');
+  });
+});

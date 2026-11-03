@@ -40,6 +40,7 @@ pnpm demo          # → http://127.0.0.1:8787（自动播种 mock 数据）
 首页「扫描 raw/ 并分档」→ 队列「生成草稿」→ 审阅页「通过并入库」，每一步都会在 demo vault 里产生真实 git commit。
 主编台 `/compose`：选知识节点创建文章 →「AI 生成大纲」→「生成正文 v1」→ 正文里的引用可点回原文，版本历史逐版累积（mock 模式自动使用 MockComposer，不产生费用）。
 测试方案见 [docs/TESTING.md](docs/TESTING.md)，页面快照见 `docs/snapshots/`。
+关于页 `/about` 汇总工作台全部功能与实时数据概览。
 
 ## 支持哪些模型
 
@@ -107,7 +108,7 @@ pnpm run check     # boundaries → typecheck → depcruise → test
 pnpm run boundaries   # 包边界、深引、纯度（无 node: / 无第三方 / 无 throw / 无时钟）
 pnpm run typecheck    # tsc --noEmit（strict + exactOptionalPropertyTypes）
 pnpm run depcruise    # 依赖方向、环形依赖
-pnpm test             # vitest：31 个文件 / 259 例
+pnpm test             # vitest：31 个文件 / 260 例
 ```
 
 ## 能证明什么

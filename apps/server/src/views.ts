@@ -77,6 +77,22 @@ code{font-size:12.5px;color:var(--accent)}
 .diff-del{background:rgba(239,95,107,.10)}
 .diff-del td:first-child,.diff-del td:last-child{color:#f0a6ac}
 .diff-same td:last-child{color:#9aa3ae}
+.feature-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin:14px 0}
+.feature{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px 18px}
+.feature h3{font-size:16px;font-weight:600;margin:0 0 8px;color:var(--ink)}
+.feature p{margin:0;font-size:13.5px;color:var(--dim);line-height:1.75}
+.feature .chip{display:inline-block;font-size:11.5px;color:var(--accent);border:1px solid rgba(94,234,212,.3);border-radius:3px;padding:1px 7px;margin-bottom:9px}
+.feature a{font-size:12.5px}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:14px 0}
+.step{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
+.step b{display:block;color:var(--ink);margin-bottom:5px;font-size:14px}
+.step span{font-size:13px;color:var(--dim);line-height:1.65;display:block}
+.step i{position:absolute;top:10px;right:12px;font-style:normal;font-size:11px;color:var(--accent);opacity:.7}
+.defs{margin:6px 0 0}
+.defs>div{display:grid;grid-template-columns:180px 1fr;gap:12px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.defs>div:last-child{border-bottom:0}
+.defs b{font-size:14px;font-weight:600}
+.defs span{font-size:13.5px;color:var(--dim);line-height:1.7}
 @media(max-width:860px){
   .nav{position:static;width:auto;flex-direction:row;flex-wrap:wrap;align-items:center;border-right:0;border-bottom:1px solid var(--line);padding:8px 10px;gap:2px}
   .nav a[href="/"]{padding:4px 8px 4px 4px}
@@ -368,7 +384,7 @@ function nav(): string {
   const links = [
     ['/', '工作台'], ['/articles', '素材库'], ['/nodes', '节点'], ['/compose', '主编台'], ['/review', '审核'],
     ['/claims', 'claims'], ['/operations', '运维'], ['/exceptions', '异常'],
-    ['/usage', '用量'], ['/search', '搜索'],
+    ['/usage', '用量'], ['/search', '搜索'], ['/guide', '说明'], ['/about', '关于'],
   ];
   const items = links.map(([href, label]) =>
     `<a href="${href}" style="padding:5px 9px;border-radius:6px;color:#9fb4ff;text-decoration:none;white-space:nowrap">${label}</a>`,
@@ -1037,4 +1053,129 @@ export function composeDiffPage(data: {
   <div class="row" style="gap:10px;margin:14px 0"><span class="badge b-ok">新增 ${data.stats.added}</span><span class="badge b-block">删除 ${data.stats.removed}</span><span class="badge">未变 ${data.stats.same}</span></div>
   <div class="card" style="padding:4px 0"><table class="diff"><tr><th></th><th>旧 v${data.from.versionNo}</th><th>新 v${data.to.versionNo}</th><th>内容</th></tr>${rows}</table></div>
   <div class="muted">行级 diff（LCS）：绿色为新增行，红色为删除行，灰色为未变行。</div>`);
+}
+
+export interface AboutStats {
+  readonly rawTotal: number;
+  readonly committed: number;
+  readonly queued: number;
+  readonly deferred: number;
+  readonly pendingDrafts: number;
+  readonly nodes: number;
+  readonly claims: number;
+  readonly articles: number;
+  readonly calls: number;
+  readonly estimatedCost: number;
+}
+
+export interface AboutPageData {
+  readonly mode: string;
+  readonly head: string;
+  readonly dataDir: string;
+  readonly vaultRoot: string;
+  readonly workerPhase: string;
+  readonly generatedAt: string;
+  readonly stats: AboutStats;
+}
+
+/** 关于页：整个工作台的功能地图 + 实时数据概览（独立页面，便于向人介绍这套系统）。 */
+export function aboutPage(data: AboutPageData): string {
+  const stat = (value: string, label: string): string => `<div class="stat"><b>${value}</b><span>${label}</span></div>`;
+  const n = (value: number): string => value.toLocaleString('zh-CN');
+
+  const features: readonly { title: string; href: string; body: string }[] = [
+    { title: '工作台', href: '/', body: '今日进度、队列与待办、快捷操作（扫描 / 起草）、最近动态。回答"今天该做什么"。' },
+    { title: '素材库', href: '/articles', body: '全部原文（含 4k+ 条 legacy）：6 个分组、来源/时间/triage 筛选、排序、分页；详情含 triage 理由、草稿 claims、来源与事件时间线。' },
+    { title: '审核中心', href: '/review', body: 'AI 草稿在这里过人审：逐篇预览 claims/节点/finding，键盘 j/k/a/r 操作，支持勾选批量通过（服务端逐篇校验、二次确认、结果回显）。' },
+    { title: '主编台', href: '/compose', body: '把知识节点写成文章：选节点 → AI 大纲 → 大纲可编辑 → 生成正文 → 改稿指令生成 vN+1 → 行级 diff → 恢复旧版 → 定稿 → 导出 Markdown。版本只增不改。' },
+    { title: '知识节点', href: '/nodes', body: '已入库知识的结构化视图：Top N 枢纽气泡图（面积 ∝ claims 数）、类型筛选、搜索；节点详情含定义、claims、来源原文与相关概念。' },
+    { title: 'claims', href: '/claims', body: '已入库草稿的全部判断句与来源，用来抽查"知识到底沉淀了什么"、追溯每句话的原文出处。' },
+    { title: '搜索', href: '/search', body: '站内检索知识库（节点名 / 别名 / 正文），结果可直接打开节点。' },
+    { title: '异常', href: '/exceptions', body: '集中查看 failed / blocked / rolled_back / quarantined 等异常原文，按分组筛选，便于排查或重跑。' },
+    { title: '运维中心', href: '/operations', body: '系统运行态：今日进度、worker 心跳/阶段、暂停与继续、立即扫描/同步/备份、待审背压配置、吞吐图、最近事件与 worker 日志。' },
+    { title: '用量', href: '/usage', body: '模型调用账本：每日调用数、输入/输出 tokens、估算成本、按 profile 汇总、cache 命中与速率/ETA。' },
+    { title: '使用说明', href: '/guide', body: '产出怎么用：Obsidian 阅读、检索、审核追溯、JSON API、git 回滚。' },
+  ];
+  const featureCards = features.map((feature) => `<div class="feature">
+    <span class="chip">页面</span>
+    <h3>${esc(feature.title)}</h3>
+    <p>${esc(feature.body)}</p>
+    <p style="margin-top:8px"><a href="${feature.href}">打开 ${esc(feature.href)} →</a></p>
+  </div>`).join('');
+
+  const steps: readonly { title: string; body: string }[] = [
+    { title: '扫描原文', body: 'worker 扫描 vault/raw 的新文件，写入状态库并做 triage 分档。' },
+    { title: 'AI 起草', body: '模型把原文提炼成 claims + 节点变更（JSON 契约校验、预算与重试），产出草稿。' },
+    { title: '人工审核', body: '人在审核台判断。阻断级 finding 不允许通过；通过才会入库。' },
+    { title: '入库 wiki', body: '应用层写 Markdown 节点并 git commit；每次入库都可回滚。' },
+    { title: '主编成文', body: '主编台基于节点 claims 生成大纲与正文，写改稿指令迭代，对比版本、恢复旧版。' },
+    { title: '定稿导出', body: '定稿后导出 Markdown（带引用来源清单），交给 Obsidian / 外部渠道发布。' },
+  ];
+  const stepCards = steps.map((step, index) => `<div class="step"><i>${String(index + 1).padStart(2, '0')}</i><b>${esc(step.title)}</b><span>${esc(step.body)}</span></div>`).join('');
+
+  const defs: readonly { term: string; body: string }[] = [
+    { term: 'raw/ 原文', body: '只读原文（剪藏 / 播客转录 / 课程笔记），按来源分类；状态机 18 态，扫描后立即分档。' },
+    { term: '草稿 draft', body: '模型"提议"的产物：claims + 要 patch / new 的节点。草稿不写 wiki，必须人工通过。' },
+    { term: 'claims', body: '可长期复用的判断句，每句都带 raw 来源路径；知识节点由 claims 支撑，正文引用同样回溯到 raw。' },
+    { term: 'wiki 节点', body: '概念 / 主题 / 人物，Markdown + git 版本化，跨文章长期累积。' },
+    { term: '文章 / 版本链', body: '主编台文章独立于 wiki；每次生成/改稿/恢复都追加一个版本（ai_initial / ai_refine / restore），只增不改。' },
+    { term: '人工闸门', body: '模型只做提议：草稿必须人工通过才会入库，文章必须人工定稿才算可发布。' },
+  ];
+  const defRows = defs.map((item) => `<div><b>${esc(item.term)}</b><span>${esc(item.body)}</span></div>`).join('');
+
+  const capabilityCards: readonly { title: string; body: string }[] = [
+    { title: '自动化流水线', body: 'server 与 worker 双进程由 systemd 托管；worker 每 2 分钟一轮：ingest 新原文 → 取队列前 8 篇起草 → 写心跳 → 休眠。失败单篇重试，崩溃后幂等恢复。' },
+    { title: '节奏控制', body: '运维页可暂停/继续 worker；待审草稿达到上限（默认 300）自动触发背压停止起草，防止审核跟不上时持续烧模型费用。' },
+    { title: '模型与成本', body: 'DeepSeek（OpenAI 兼容端点）：digest 用 JSON 模式、主编台用 text 模式；路由 / 预算 / 重试 / 降级 / 缓存 / 契约校验统一在 agent-runtime；成本按 tokens 估算并记账。' },
+    { title: '数据与安全', body: 'state.db 是服务端唯一写者，文章版本与事件同事务；wiki 在 vault 里由 git 版本化；API key 只在服务端环境变量；UI 目前仅本机 / SSH 隧道访问。' },
+    { title: '同步与备份', body: 'sync timer 每 15 分钟 pull vault 与 raw；backup timer 每日 03:17 生成 state.db 快照；运维页可手动触发一次。' },
+    { title: '工程约束', body: '依赖方向由边界检查强制；状态机/规则有穷举测试；模型调用全部可离线测（MockAgent / MockComposer）；文档按 ADR + PROGRESS 纪律维护。' },
+  ];
+  const capabilityCardsHtml = capabilityCards.map((card) => `<div class="feature"><h3>${esc(card.title)}</h3><p>${esc(card.body)}</p></div>`).join('');
+
+  const workerPhaseLabel = data.workerPhase === 'drafting' ? '起草中'
+    : data.workerPhase === 'ingesting' ? '扫描原文'
+      : data.workerPhase === 'paused' ? '已暂停'
+        : data.workerPhase === 'sleeping' ? '等待下一轮'
+          : data.workerPhase;
+
+  return layout('关于本工作台', `${nav()}
+  <h1>关于本工作台</h1>
+  <div class="muted" style="max-width:860px">secondBrain 是一个"把原文变成可复用知识，再把知识写成文章"的个人知识工作台。
+  模型负责提炼与起草，人负责审核与定稿；知识以 Markdown + git 保存，文章在主编台里按版本迭代。本页汇总所有功能与当前数据概览。</div>
+
+  <div class="row" style="margin:18px 0">
+    ${stat(n(data.stats.rawTotal), '原文总数')}
+    ${stat(n(data.stats.committed), '已入库')}
+    ${stat(n(data.stats.pendingDrafts), '待审草稿')}
+    ${stat(n(data.stats.nodes), '知识节点')}
+    ${stat(n(data.stats.claims), 'claims')}
+    ${stat(n(data.stats.articles), '主编台文章')}
+    ${stat(n(data.stats.calls), '今日模型调用')}
+    ${stat(`$${data.stats.estimatedCost.toFixed(3)}`, '今日估算成本')}
+  </div>
+
+  <h2>工作流</h2>
+  <div class="steps">${stepCards}</div>
+
+  <h2>功能地图</h2>
+  <div class="feature-grid">${featureCards}</div>
+
+  <h2>核心概念</h2>
+  <div class="card"><div class="defs">${defRows}</div></div>
+
+  <h2>系统能力</h2>
+  <div class="feature-grid">${capabilityCardsHtml}</div>
+
+  <h2>运行信息</h2>
+  <div class="card" style="padding:4px 0"><table>
+    <tr><th style="width:180px">模式</th><td><span class="badge ${data.mode === 'cloud' ? 'b-ok' : ''}">${data.mode === 'cloud' ? '云端模型' : 'mock 模式'}</span>${data.mode === 'mock' ? ' <span class="muted">（未配置 MODEL_BASE_URL，使用 MockAgent / MockComposer）</span>' : ''}</td></tr>
+    <tr><th>worker 阶段</th><td>${esc(workerPhaseLabel)}</td></tr>
+    <tr><th>vault HEAD</th><td class="muted"><code>${esc(data.head.slice(0, 12))}</code></td></tr>
+    <tr><th>数据目录</th><td class="muted">${esc(data.dataDir)}</td></tr>
+    <tr><th>vault 根目录</th><td class="muted">${esc(data.vaultRoot)}</td></tr>
+    <tr><th>页面生成时间</th><td class="muted">${esc(data.generatedAt.replace('T', ' ').slice(0, 19))}</td></tr>
+  </table></div>
+
+  <div class="muted" style="margin-top:18px">快捷入口：<a href="/">工作台</a> · <a href="/articles">素材库</a> · <a href="/review">审核</a> · <a href="/compose">主编台</a> · <a href="/operations">运维</a> · <a href="/guide">使用说明</a></div>`);
 }

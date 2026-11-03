@@ -70,7 +70,7 @@ import {
 } from '@sb/app';
 import { parseDraftId, parseRawPath, type DraftId, type RawPath } from '@sb/domain';
 import type { Runtime } from './runtime';
-import { adminPage, articlePage, articlesPage, claimsPage, composeArticlePage, composeDiffPage, composePage, dashboard, errorPage, guidePage, nodePage, nodesPage, reviewListPage, reviewPage, searchPage, usagePage } from './views';
+import { aboutPage, adminPage, articlePage, articlesPage, claimsPage, composeArticlePage, composeDiffPage, composePage, dashboard, errorPage, guidePage, nodePage, nodesPage, reviewListPage, reviewPage, searchPage, usagePage } from './views';
 
 function redirect(res: http.ServerResponse, location: string): void {
   res.writeHead(303, { location });
@@ -262,6 +262,40 @@ export function createServer(runtime: Runtime): http.Server {
       }
       if (req.method === 'GET' && path === '/guide') {
         return sendHtml(res, guidePage());
+      }
+      if (req.method === 'GET' && path === '/about') {
+        const [pending, rawCounts, usage, nodeSummary, articles] = await Promise.all([
+          listPendingDrafts(runtime.ctx),
+          counts(runtime),
+          usageSummary(runtime.ctx),
+          nodeStats(runtime.ctx),
+          listComposeArticles(runtime.ctx),
+        ]);
+        let workerPhase = 'unknown';
+        try {
+          const status = JSON.parse(fs.readFileSync(join(runtime.dataDir, 'worker-status.json'), 'utf8')) as { phase?: string };
+          workerPhase = String(status.phase ?? 'unknown');
+        } catch { /* worker 未启动过：保持 unknown */ }
+        return sendHtml(res, aboutPage({
+          mode: runtime.mode,
+          head: (await runtime.vault.head()) ?? 'unknown',
+          dataDir: runtime.dataDir,
+          vaultRoot: runtime.vaultRoot,
+          workerPhase,
+          generatedAt: runtime.ctx.clock.now(),
+          stats: {
+            rawTotal: rawCounts.items,
+            committed: rawCounts.committed,
+            queued: rawCounts.queued,
+            deferred: rawCounts.deferred,
+            pendingDrafts: pending.length,
+            nodes: nodeSummary.total,
+            claims: nodeSummary.totalClaims,
+            articles: articles.length,
+            calls: usage.totals.calls,
+            estimatedCost: usage.totals.estimatedCost,
+          },
+        }));
       }
       if (req.method === 'GET' && path === '/exceptions') {
         return redirect(res, '/articles?group=error');
