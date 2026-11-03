@@ -404,3 +404,22 @@ describe('去 AI 味（独立能力）', () => {
     expect(page).toContain('去 AI 味');
   });
 });
+
+describe('导航信息架构（一级分组 + 二级菜单）', () => {
+  it('一级导航收敛为 6 个入口，其余页面收进分组菜单', async () => {
+    const home = await (await fetch(`${base}/`)).text();
+    expect(home).toContain('class="nav-group"');
+    for (const label of ['工作台', '内容', '知识', '写作', '运维', '帮助']) {
+      expect(home).toContain(label);
+    }
+    for (const href of ['/articles', '/review', '/exceptions', '/nodes', '/claims', '/search', '/compose', '/deai', '/operations', '/usage', '/guide', '/about']) {
+      expect(home).toContain(`href="${href}"`);
+    }
+    // 首页：工作台 active；主编台：写作分组 active
+    expect(home).toMatch(/nav-item active"[^>]*>工作台/);
+    const compose = await (await fetch(`${base}/compose`)).text();
+    expect(compose).toMatch(/nav-item active">写作/);
+    const operations = await (await fetch(`${base}/operations`)).text();
+    expect(operations).toMatch(/nav-item active">运维/);
+  });
+});

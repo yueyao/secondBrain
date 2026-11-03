@@ -14,12 +14,23 @@ const CSS = `
 :root{--bg:#0a0b0d;--panel:#101216;--paper:#15181d;--ink:#e8eaed;--dim:#8b939e;--line:#23272e;--accent:#5eead4;--warn:#e3b341;--bad:#ef5f6b;--ok:#3fb950}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font:15px/1.65 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0}
-.wrap{margin-left:248px;padding:40px 44px 72px;max-width:1360px}
-.nav{position:fixed;inset:0 auto 0 0;width:248px;display:flex;flex-direction:column;gap:2px;padding:26px 14px;border-right:1px solid var(--line);background:var(--bg);z-index:10;overflow:auto}
-.nav a[href="/"]{color:var(--ink);font-weight:700;font-size:19px;letter-spacing:-.02em;padding:0 10px 22px}
-.nav a[href="/"]:hover{background:none}
-.nav a{color:var(--dim);padding:8px 12px;border-radius:5px;font-size:14.5px;text-decoration:none;white-space:nowrap}
-.nav a:hover{color:var(--ink);background:var(--panel);box-shadow:inset 2px 0 0 var(--accent)}
+.wrap{margin:0 auto;max-width:1400px;padding:24px 32px 72px}
+.nav{display:flex;align-items:center;gap:6px;padding:8px 0 10px;border-bottom:1px solid var(--line);margin-bottom:18px;position:relative;z-index:20}
+.nav-brand{color:var(--ink);font-weight:700;font-size:18px;letter-spacing:-.02em;text-decoration:none;padding:6px 10px;white-space:nowrap}
+.nav-groups{display:flex;align-items:center;gap:2px;flex-wrap:wrap}
+.nav-item{display:inline-flex;align-items:center;gap:3px;color:var(--dim);padding:7px 11px;border-radius:6px;font-size:14.5px;text-decoration:none;white-space:nowrap;background:none;border:0;font:inherit;cursor:pointer}
+.nav-item:hover{color:var(--ink);background:var(--panel)}
+.nav-item.active{color:var(--accent);background:var(--panel);box-shadow:inset 0 -2px 0 var(--accent)}
+.nav-group{position:relative}
+.nav-group>summary{list-style:none}
+.nav-group>summary::-webkit-details-marker{display:none}
+.nav-group>summary::after{content:'▾';font-size:10px;opacity:.55;margin-left:1px}
+.nav-group[open]>summary{color:var(--ink);background:var(--panel)}
+.nav-menu{position:absolute;top:calc(100% + 6px);left:0;min-width:190px;display:flex;flex-direction:column;gap:2px;padding:8px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.45);z-index:30}
+.nav-menu a{color:var(--dim);padding:7px 10px;border-radius:5px;font-size:14px;text-decoration:none;white-space:nowrap}
+.nav-menu a:hover{color:var(--ink);background:var(--paper)}
+.nav-menu a.active{color:var(--accent)}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:8px}
 .nav a[href="/"]{color:var(--ink)}
 #worker-light{color:var(--dim);font-size:12.5px;padding:20px 12px 4px;white-space:nowrap}
 #pending-badge{background:none;border:1px solid var(--line);color:var(--ink);font-size:11px;padding:2px 6px;margin:0 10px}
@@ -95,13 +106,16 @@ code{font-size:12.5px;color:var(--accent)}
 .defs>div:last-child{border-bottom:0}
 .defs b{font-size:14px;font-weight:600}
 .defs span{font-size:13.5px;color:var(--dim);line-height:1.7}
-@media(max-width:860px){
-  .nav{position:static;width:auto;flex-direction:row;flex-wrap:wrap;align-items:center;border-right:0;border-bottom:1px solid var(--line);padding:8px 10px;gap:2px}
-  .nav a[href="/"]{padding:4px 8px 4px 4px}
+@media(max-width:900px){
+  .wrap{padding:14px}
+  .nav{flex-wrap:wrap;gap:2px}
+  .nav-brand{padding:4px 6px 4px 2px}
+  .nav-group{position:static}
+  .nav-menu{position:static;margin:4px 0 6px;box-shadow:none;min-width:0;background:var(--paper)}
+  .nav-right{width:100%;margin-left:0;padding:2px 4px 0}
   #worker-light{padding:2px 6px}
   #pending-badge{margin:0 4px}
-  .wrap{margin-left:0;padding:16px}
-  h1{font-size:20px}
+  h1{font-size:22px}
 }
 `;
 
@@ -127,6 +141,12 @@ function layout(title: string, body: string): string {
     if(d.version!==version&&document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){show('有更新（当前有输入，未自动刷新）· 点击刷新');return;}
     if(d.version!==version){version=d.version;show('有更新 · 点击刷新');}
   }).catch(function(){});}
+  var navGroups=document.querySelectorAll('.nav-group');
+  navGroups.forEach(function(group){
+    group.addEventListener('toggle',function(){if(group.open){navGroups.forEach(function(other){if(other!==group)other.open=false;});}});
+  });
+  document.addEventListener('click',function(event){navGroups.forEach(function(group){if(group.open&&!group.contains(event.target))group.open=false;});});
+  document.addEventListener('keydown',function(event){if(event.key==='Escape'){navGroups.forEach(function(group){group.open=false;});}});
   poll();setInterval(poll,5000);
 })();
 </script></body></html>`;
@@ -205,7 +225,7 @@ export function dashboard(data: DashboardData): string {
              <button class="btn" type="submit">生成草稿</button></form>`}</td></tr>`).join('')
     || '<tr><td colspan="4" class="muted">队列为空。</td></tr>';
 
-  return layout('审核台', `${nav()}
+  return layout('审核台', `${nav('/')}
   <h1>secondBrain 审核台</h1>
   <div class="muted">${data.mode === 'cloud' ? '云模型模式' : 'mock 模型模式'} · 真实状态机 · 每次入库一次 git commit</div>
 
@@ -319,7 +339,7 @@ export function searchPage(query: string, hits: readonly ScoredHit[]): string {
     <td><b>${esc(hit.name)}</b><div class="mono">${esc(hit.file)} · ${esc(hit.matchType)}</div></td></tr>`).join('')
     || '<tr><td colspan="2" class="muted">没有命中</td></tr>';
 
-  return layout('搜索', `${nav()}
+  return layout('搜索', `${nav('/search')}
   <div class="row" style="justify-content:space-between"><h1>搜索知识库</h1><a class="btn" href="/">← 返回</a></div>
   <form class="card" method="get" action="/search" style="margin-top:12px">
     <input type="text" name="q" value="${esc(query)}" placeholder="概念 / 人物 / 关键词">
@@ -355,7 +375,7 @@ export function usagePage(data: UsagePageData): string {
     <td>${entry.outputTokens.toLocaleString()}</td>
     <td>${entry.estimatedCost}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">还没有调用记录</td></tr>';
 
-  return layout('用量', `${nav()}
+  return layout('用量', `${nav('/usage')}
   <div class="row" style="justify-content:space-between"><h1>模型用量</h1><a class="btn" href="/">← 返回</a></div>
   <div class="muted">只计量、不拦截（ADR 0005 修订）。价格未配置时成本显示 0，tokens 仍然准确。</div>
 
@@ -382,21 +402,77 @@ export function usagePage(data: UsagePageData): string {
 // 文章库 / 管理后台（2026-11-03）
 // ---------------------------------------------------------------------------
 
-function nav(): string {
-  const links = [
-    ['/', '工作台'], ['/articles', '素材库'], ['/nodes', '节点'], ['/compose', '主编台'], ['/review', '审核'],
-    ['/claims', 'claims'], ['/operations', '运维'], ['/exceptions', '异常'],
-    ['/usage', '用量'], ['/search', '搜索'], ['/deai', '去 AI 味'], ['/guide', '说明'], ['/about', '关于'],
-  ];
-  const items = links.map(([href, label]) =>
-    `<a href="${href}" style="padding:5px 9px;border-radius:6px;color:#9fb4ff;text-decoration:none;white-space:nowrap">${label}</a>`,
-  ).join('');
-  return `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:2px;padding:10px 0;border-bottom:1px solid #262b36;margin-bottom:18px">
-    <a href="/" style="font-weight:700;color:#e7e9ee;text-decoration:none;padding:5px 9px;white-space:nowrap">secondBrain</a>
-    ${items}
-    <span style="flex:1;min-width:12px"></span>
-    <span id="worker-light" style="color:#9aa3b2;font-size:12.5px;white-space:nowrap">worker: --</span>
-    <span id="pending-badge" class="badge b-warn" style="margin-left:8px">待审 0</span>
+interface NavGroup {
+  readonly label: string;
+  readonly href?: string;
+  readonly children?: readonly { readonly href: string; readonly label: string }[];
+}
+
+/**
+ * 信息架构：一级导航只保留 6 个入口（工作台 + 5 个分组），其余页面收进分组的二级菜单。
+ * 分组原则：内容=生产流水线，知识=检索与知识资产，写作=主编台相关，运维=系统与用量，帮助=文档类。
+ */
+const NAV_GROUPS: readonly NavGroup[] = [
+  { label: '工作台', href: '/' },
+  {
+    label: '内容',
+    children: [
+      { href: '/articles', label: '素材库' },
+      { href: '/review', label: '审核' },
+      { href: '/exceptions', label: '异常' },
+    ],
+  },
+  {
+    label: '知识',
+    children: [
+      { href: '/nodes', label: '知识节点' },
+      { href: '/claims', label: 'claims' },
+      { href: '/search', label: '搜索' },
+    ],
+  },
+  {
+    label: '写作',
+    children: [
+      { href: '/compose', label: '主编台' },
+      { href: '/deai', label: '去 AI 味' },
+    ],
+  },
+  {
+    label: '运维',
+    children: [
+      { href: '/operations', label: '运维中心' },
+      { href: '/usage', label: '用量' },
+    ],
+  },
+  {
+    label: '帮助',
+    children: [
+      { href: '/guide', label: '使用说明' },
+      { href: '/about', label: '关于本工作台' },
+    ],
+  },
+];
+
+function nav(active = ''): string {
+  const isActive = (href: string): boolean => active === href || (href !== '/' && active.startsWith(`${href}/`));
+  const groupActive = (group: NavGroup): boolean =>
+    group.href !== undefined ? isActive(group.href) : (group.children ?? []).some((child) => isActive(child.href));
+  const items = NAV_GROUPS.map((group) => {
+    if (group.href !== undefined) {
+      return `<a class="nav-item${groupActive(group) ? ' active' : ''}" href="${group.href}">${esc(group.label)}</a>`;
+    }
+    const children = (group.children ?? [])
+      .map((child) => `<a href="${child.href}" class="${isActive(child.href) ? 'active' : ''}">${esc(child.label)}</a>`)
+      .join('');
+    return `<details class="nav-group"><summary class="nav-item${groupActive(group) ? ' active' : ''}">${esc(group.label)}</summary><div class="nav-menu">${children}</div></details>`;
+  }).join('');
+  return `<div class="nav">
+    <a class="nav-brand" href="/">secondBrain</a>
+    <div class="nav-groups">${items}</div>
+    <span class="nav-right">
+      <span id="worker-light" style="color:#9aa3b2;font-size:12.5px;white-space:nowrap">worker: --</span>
+      <span id="pending-badge" class="badge b-warn" style="margin-left:8px">待审 0</span>
+    </span>
   </div>`;
 }
 
@@ -459,7 +535,7 @@ export function articlesPage(data: ArticlesPageData): string {
   const prev = data.page > 1 ? `<a class="btn" href="/articles${qs({ page: data.page - 1 })}">← 上一页</a>` : '';
   const next = data.page < data.pages ? `<a class="btn" href="/articles${qs({ page: data.page + 1 })}">下一页 →</a>` : '';
 
-  return layout('素材库', `${nav()}
+  return layout('素材库', `${nav('/articles')}
   <div class="row" style="justify-content:space-between"><h1>素材库</h1><span class="muted">${data.total.toLocaleString()} 篇 · 第 ${data.page}/${data.pages} 页</span></div>
   <div class="row" style="gap:6px;margin:12px 0;flex-wrap:wrap">${tabs}</div>
   <form class="row" method="get" action="/articles" style="gap:8px;margin-bottom:12px;flex-wrap:wrap">
@@ -504,7 +580,7 @@ export function articlePage(data: ArticlePageData): string {
   const draftLink = data.draft && data.draft.status === 'pending'
     ? `<a class="btn" href="/review/${encodeURIComponent(data.draft.id)}">去审阅 →</a>` : '';
 
-  return layout('文章详情', `${nav()}
+  return layout('文章详情', `${nav('/articles')}
   <div class="row" style="justify-content:space-between"><h1>${esc(data.title)}</h1><a class="btn" href="/articles">← 文章库</a></div>
   <div class="muted">${esc(data.rawPath)}</div>
   <div class="row" style="margin-top:12px">
@@ -663,7 +739,7 @@ export function adminPage(data: AdminPageData): string {
        ${worker.stale ? '<div class="card" style="margin-top:10px;border-color:#a33">⚠️ worker 状态超过 10 分钟未更新，可能未运行</div>' : ''}`
     : '<div class="card muted">没有 worker 状态（worker 可能未启动）</div>';
 
-  return layout('运维中心', `${nav()}
+  return layout('运维中心', `${nav('/operations')}
   <div class="row" style="justify-content:space-between"><h1>运维中心</h1><span class="muted">${esc(data.env.mode)} 模式</span></div>
 
   <h2>运行状态</h2>
@@ -785,7 +861,7 @@ export function reviewListPage(data: ReviewListPageData): string {
   const flash = data.accepted > 0 || data.failed > 0
     ? `<div class="card" style="border-color:#3fb950">批量结果：成功 ${data.accepted} 篇${data.failed > 0 ? `，失败 ${data.failed} 篇（失败项仍在待审，见日志）` : ''}</div>` : '';
 
-  return layout('审核中心', `${nav()}
+  return layout('审核中心', `${nav('/review')}
   <div class="row" style="justify-content:space-between"><h1>审核中心</h1><span class="muted">${data.items.length} 篇待审</span></div>
   ${flash}
   ${data.jobId ? `<div class="card" id="job-progress">批量处理中… <span id="job-text"></span></div><script>(function(){var id=${JSON.stringify(data.jobId)};var t=setInterval(function(){fetch("/api/jobs/"+id).then(function(r){return r.json()}).then(function(d){document.getElementById("job-text").textContent=d.done+"/"+d.total+"（成功 "+d.ok+"，失败 "+d.failed+"）";if(d.status==="done"){clearInterval(t);document.getElementById("job-progress").textContent="完成："+d.ok+" 成功 / "+d.failed+" 失败，刷新中…";setTimeout(function(){location.href="/review";},800);}});},1000);})();</script>` : ""}
@@ -819,14 +895,14 @@ export function claimsPage(rows: readonly { draftId: string; text: string; infer
   const items = rows.map((row) => `<li>${esc(row.text)}${row.inference ? ' <span class="badge b-warn">推断</span>' : ''}
     <div class="muted">来源：${esc(row.source)} · 草稿 ${esc(row.draftId)}</div></li>`).join('')
     || '<li class="muted">还没有已入库的 claims</li>';
-  return layout('claims', `${nav()}
+  return layout('claims', `${nav('/claims')}
   <h1>已入库 claims（${rows.length}）</h1>
   <div class="muted">来自已通过审核并入库的草稿。每个 claim 都带来源原文与所属草稿。</div>
   <div class="card"><ol>${items}</ol></div>`);
 }
 
 export function guidePage(): string {
-  return layout('使用说明', `${nav()}
+  return layout('使用说明', `${nav('/guide')}
   <h1>产出如何使用</h1>
   <div class="card">
   <h2>1. 阅读（Obsidian / 文件）</h2>
@@ -912,7 +988,7 @@ export function nodesPage(rows: readonly { name: string; file: string; nodeType:
     })();
     </script>`;
 
-  return layout('知识节点', `${nav()}
+  return layout('知识节点', `${nav('/nodes')}
   <h1>知识节点（${stats.total}）</h1>
   <div class="muted">共 ${stats.totalClaims.toLocaleString()} 条 claims · 横轴为每个节点的 claims 数，纵轴为节点数量</div>
   <div class="card" style="margin-top:12px">${chart}
@@ -929,7 +1005,7 @@ export function nodesPage(rows: readonly { name: string; file: string; nodeType:
 export function nodePage(node: { name: string; file: string; nodeType: string; aliases: readonly string[]; definition: string; claims: readonly { text: string; source: string }[]; related: readonly string[] }): string {
   const claims = node.claims.map((claim) => `<li>${esc(claim.text)}<div class="muted">来源：<a href="/articles/${encodeURIComponent(claim.source)}">${esc(claim.source)}</a></div></li>`).join('') || '<li class="muted">暂无 claims</li>';
   const related = node.related.map((name) => `<span class="badge">${esc(name)}</span>`).join(' ') || '<span class="muted">无</span>';
-  return layout(node.name, `${nav()}
+  return layout(node.name, `${nav('/nodes')}
   <div class="row" style="justify-content:space-between"><h1>${esc(node.name)}</h1><a class="btn" href="/nodes">← 节点</a></div>
   <div class="muted">${esc(node.file)} · ${esc(node.nodeType)}${node.aliases.length > 0 ? ` · 别名：${node.aliases.map((a) => esc(a)).join('、')}` : ''}</div>
   <h2>定义（${node.claims.length} 条 claims）</h2>
@@ -942,7 +1018,7 @@ export function nodePage(node: { name: string; file: string; nodeType: string; a
 export function composePage(data: { articles: readonly { id: string; title: string; theme: string; nodeIds: readonly string[]; status: string; outline: string | null; updatedAt: string }[]; nodes: readonly { name: string; claimCount: number }[] }): string {
   const list = data.articles.map((article) => `<tr><td><a href="/compose/${encodeURIComponent(article.id)}">${esc(article.title)}</a></td><td>${esc(article.theme || '—')}</td><td>${article.nodeIds.length}</td><td>${esc(article.status)}</td><td class="muted">${article.outline ? '有大纲' : '未生成'}</td><td class="muted">${esc(article.updatedAt.slice(0, 10))}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">还没有文章，先创建一篇</td></tr>';
   const nodeOptions = data.nodes.map((node) => `<label class="muted" style="display:inline-flex;gap:6px;align-items:center;margin:2px 10px 2px 0"><input type="checkbox" name="node" value="${esc(node.name)}">${esc(node.name)} <span style="opacity:.6">${node.claimCount}</span></label>`).join('');
-  return layout('主编台', `${nav()}
+  return layout('主编台', `${nav('/compose')}
   <h1>主编台</h1>
   <div class="muted">主编台：选择知识节点，由模型生成大纲与正文；文中每个判断都带 raw 原文引用，可点开核对</div>
   <div class="card" style="margin-top:12px"><form method="post" action="/actions/compose/create">
@@ -1074,7 +1150,7 @@ export function composeArticlePage(data: {
       : '',
   ].filter((entry) => entry !== '').join(' ');
 
-  return layout('主编台 · 文章', `${nav()}
+  return layout('主编台 · 文章', `${nav('/compose')}
   <div class="row" style="justify-content:space-between;align-items:center"><h1>${esc(data.title)}</h1><div class="row" style="gap:8px;align-items:center"><a class="btn" href="/compose">← 主编台</a>${actions}</div></div>
   <div class="muted">${esc(data.theme || '未设主题')} · <span class="badge${data.status === 'final' ? ' b-ok' : ''}">${esc(statusLabel)}</span> · 更新 ${esc(data.updatedAt.slice(0, 16))}</div>
 
@@ -1123,7 +1199,7 @@ export function composeDiffPage(data: {
     const toNo = line.toNo === null ? '' : String(line.toNo);
     return `<tr class="diff-${line.kind}"><td>${mark}</td><td>${fromNo}</td><td>${toNo}</td><td>${esc(line.text) || '&nbsp;'}</td></tr>`;
   }).join('');
-  return layout('版本对比', `${nav()}
+  return layout('版本对比', `${nav('/compose')}
   <div class="row" style="justify-content:space-between"><h1>版本对比</h1><a class="btn" href="/compose/${encodeURIComponent(data.articleId)}">← 回到文章</a></div>
   <div class="muted">${esc(data.title)} · v${data.from.versionNo}（${esc(ARTICLE_SOURCE_LABEL[data.from.source] ?? data.from.source)}）→ v${data.to.versionNo}（${esc(ARTICLE_SOURCE_LABEL[data.to.source] ?? data.to.source)}）</div>
   <div class="row" style="gap:10px;margin:14px 0"><span class="badge b-ok">新增 ${data.stats.added}</span><span class="badge b-block">删除 ${data.stats.removed}</span><span class="badge">未变 ${data.stats.same}</span></div>
@@ -1159,22 +1235,22 @@ export function aboutPage(data: AboutPageData): string {
   const stat = (value: string, label: string): string => `<div class="stat"><b>${value}</b><span>${label}</span></div>`;
   const n = (value: number): string => value.toLocaleString('zh-CN');
 
-  const features: readonly { title: string; href: string; body: string }[] = [
-    { title: '工作台', href: '/', body: '今日进度、队列与待办、快捷操作（扫描 / 起草）、最近动态。回答"今天该做什么"。' },
-    { title: '素材库', href: '/articles', body: '全部原文（含 4k+ 条 legacy）：6 个分组、来源/时间/triage 筛选、排序、分页；详情含 triage 理由、草稿 claims、来源与事件时间线。' },
-    { title: '审核中心', href: '/review', body: 'AI 草稿在这里过人审：逐篇预览 claims/节点/finding，键盘 j/k/a/r 操作，支持勾选批量通过（服务端逐篇校验、二次确认、结果回显）。' },
-    { title: '主编台', href: '/compose', body: '把知识节点写成文章：选节点 → AI 大纲 → 大纲可编辑 → 生成正文 → 改稿指令生成 vN+1 → 行级 diff → 恢复旧版 → 定稿 → 导出 Markdown。版本只增不改。' },
-    { title: '去 AI 味', href: '/deai', body: '独立能力：先用规则做 AI 味体检（框架词/黑话/对仗/宏大叙事/句长均匀/标点痕迹，加权评分），再由模型按命中清单改写；保留事实、数字与引用，主编台正文可一键生成新版本。' },
-    { title: '知识节点', href: '/nodes', body: '已入库知识的结构化视图：Top N 枢纽气泡图（面积 ∝ claims 数）、类型筛选、搜索；节点详情含定义、claims、来源原文与相关概念。' },
-    { title: 'claims', href: '/claims', body: '已入库草稿的全部判断句与来源，用来抽查"知识到底沉淀了什么"、追溯每句话的原文出处。' },
-    { title: '搜索', href: '/search', body: '站内检索知识库（节点名 / 别名 / 正文），结果可直接打开节点。' },
-    { title: '异常', href: '/exceptions', body: '集中查看 failed / blocked / rolled_back / quarantined 等异常原文，按分组筛选，便于排查或重跑。' },
-    { title: '运维中心', href: '/operations', body: '系统运行态：今日进度、worker 心跳/阶段、暂停与继续、立即扫描/同步/备份、待审背压配置、吞吐图、最近事件与 worker 日志；以及三个 GitHub 仓库（代码/vault/raw）的地址、HEAD、落后状态与一键更新/切换远端。' },
-    { title: '用量', href: '/usage', body: '模型调用账本：每日调用数、输入/输出 tokens、估算成本、按 profile 汇总、cache 命中与速率/ETA。' },
-    { title: '使用说明', href: '/guide', body: '产出怎么用：Obsidian 阅读、检索、审核追溯、JSON API、git 回滚。' },
+  const features: readonly { title: string; href: string; group: string; body: string }[] = [
+    { title: '工作台', href: '/', group: '工作台', body: '今日进度、队列与待办、快捷操作（扫描 / 起草）、最近动态。回答"今天该做什么"。' },
+    { title: '素材库', href: '/articles', group: '内容', body: '全部原文（含 4k+ 条 legacy）：6 个分组、来源/时间/triage 筛选、排序、分页；详情含 triage 理由、草稿 claims、来源与事件时间线。' },
+    { title: '审核中心', href: '/review', group: '内容', body: 'AI 草稿在这里过人审：逐篇预览 claims/节点/finding，键盘 j/k/a/r 操作，支持勾选批量通过（服务端逐篇校验、二次确认、结果回显）。' },
+    { title: '主编台', href: '/compose', group: '写作', body: '把知识节点写成文章：选节点 → AI 大纲 → 大纲可编辑 → 生成正文 → 改稿指令生成 vN+1 → 行级 diff → 恢复旧版 → 定稿 → 导出 Markdown。版本只增不改。' },
+    { title: '去 AI 味', href: '/deai', group: '写作', body: '独立能力：先用规则做 AI 味体检（框架词/黑话/对仗/宏大叙事/句长均匀/标点痕迹，加权评分），再由模型按命中清单改写；保留事实、数字与引用，主编台正文可一键生成新版本。' },
+    { title: '知识节点', href: '/nodes', group: '知识', body: '已入库知识的结构化视图：Top N 枢纽气泡图（面积 ∝ claims 数）、类型筛选、搜索；节点详情含定义、claims、来源原文与相关概念。' },
+    { title: 'claims', href: '/claims', group: '知识', body: '已入库草稿的全部判断句与来源，用来抽查"知识到底沉淀了什么"、追溯每句话的原文出处。' },
+    { title: '搜索', href: '/search', group: '知识', body: '站内检索知识库（节点名 / 别名 / 正文），结果可直接打开节点。' },
+    { title: '异常', href: '/exceptions', group: '内容', body: '集中查看 failed / blocked / rolled_back / quarantined 等异常原文，按分组筛选，便于排查或重跑。' },
+    { title: '运维中心', href: '/operations', group: '运维', body: '系统运行态：今日进度、worker 心跳/阶段、暂停与继续、立即扫描/同步/备份、待审背压配置、吞吐图、最近事件与 worker 日志；以及三个 GitHub 仓库（代码/vault/raw）的地址、HEAD、落后状态与一键更新/切换远端。' },
+    { title: '用量', href: '/usage', group: '运维', body: '模型调用账本：每日调用数、输入/输出 tokens、估算成本、按 profile 汇总、cache 命中与速率/ETA。' },
+    { title: '使用说明', href: '/guide', group: '帮助', body: '产出怎么用：Obsidian 阅读、检索、审核追溯、JSON API、git 回滚。' },
   ];
   const featureCards = features.map((feature) => `<div class="feature">
-    <span class="chip">页面</span>
+    <span class="chip">${esc(feature.group)}</span>
     <h3>${esc(feature.title)}</h3>
     <p>${esc(feature.body)}</p>
     <p style="margin-top:8px"><a href="${feature.href}">打开 ${esc(feature.href)} →</a></p>
@@ -1216,7 +1292,7 @@ export function aboutPage(data: AboutPageData): string {
         : data.workerPhase === 'sleeping' ? '等待下一轮'
           : data.workerPhase;
 
-  return layout('关于本工作台', `${nav()}
+  return layout('关于本工作台', `${nav('/about')}
   <h1>关于本工作台</h1>
   <div class="muted" style="max-width:860px">secondBrain 是一个"把原文变成可复用知识，再把知识写成文章"的个人知识工作台。
   模型负责提炼与起草，人负责审核与定稿；知识以 Markdown + git 保存，文章在主编台里按版本迭代。本页汇总所有功能与当前数据概览。</div>
@@ -1336,7 +1412,7 @@ export function deAiPage(data: DeAiPageData): string {
     <td class="muted">${esc(rule.advice)}</td>
   </tr>`).join('');
 
-  return layout('去 AI 味', `${nav()}
+  return layout('去 AI 味', `${nav('/deai')}
   <h1>去 AI 味</h1>
   <div class="muted" style="max-width:860px">独立写作工具：先用确定性规则给文本做「AI 味体检」（框架路标词、互联网黑话、否定二分与排比、宏大叙事、套话结尾、句长均匀、标点格式痕迹），再由模型**按命中清单**逐项改写。
   改写硬约束：保留事实、数字、观点归属与 <code>（来源：[[raw/...]]）</code> 引用；不编造第一人称经历，不越改越长。方法参考
