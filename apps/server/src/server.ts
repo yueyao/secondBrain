@@ -73,7 +73,7 @@ import {
 import type { DeAiStyle } from '@sb/contracts';
 import { analyzeAiFlavor, parseDraftId, parseRawPath, type DraftId, type RawPath } from '@sb/domain';
 import type { Runtime } from './runtime';
-import { collectRepoStatus, isValidRemoteUrl, pullRepo, readRepoOverrides, repoDescriptors, setRepoRemote, writeRepoOverrides } from './repos';
+import { collectRepoStatus, isValidRemoteUrl, pullRepo, pushRepo, readRepoOverrides, repoDescriptors, setRepoRemote, writeRepoOverrides } from './repos';
 import { aboutPage, adminPage, deAiPage, articlePage, articlesPage, claimsPage, composeArticlePage, composeDiffPage, composePage, dashboard, errorPage, guidePage, nodePage, nodesPage, reviewListPage, reviewPage, searchPage, usagePage } from './views';
 
 function redirect(res: http.ServerResponse, location: string): void {
@@ -425,6 +425,18 @@ export function createServer(runtime: Runtime): http.Server {
         if (!repo) return sendHtml(res, errorPage(`未知仓库：${key}`), 404);
         await runLogged(runtime.dataDir, `更新仓库：${repo.label}`, async () => {
           const result = await pullRepo(repo);
+          if (!result.ok) throw new Error(result.detail);
+          return result.detail;
+        });
+        return redirect(res, '/operations');
+      }
+      if (req.method === 'POST' && path === '/actions/ops/repo/push') {
+        const form = await readForm(req);
+        const key = form.key ?? '';
+        const repo = repoDescriptors({ dataDir: runtime.dataDir, vaultRoot: runtime.vaultRoot }).find((entry) => entry.key === key);
+        if (!repo) return sendHtml(res, errorPage(`未知仓库：${key}`), 404);
+        await runLogged(runtime.dataDir, `推送仓库：${repo.label}`, async () => {
+          const result = await pushRepo(repo);
           if (!result.ok) throw new Error(result.detail);
           return result.detail;
         });

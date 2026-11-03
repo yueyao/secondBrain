@@ -107,7 +107,7 @@ describe('素材库与管理后台', () => {
     const response = await fetch(`${base}/operations`);
     const html = await response.text();
     expect(response.status).toBe(200);
-    for (const keyword of ['GitHub 仓库与维护', '代码仓库', '知识库 vault', '原文 raw', '更新此仓库', '修改远端', '全部更新', '检查远端']) {
+    for (const keyword of ['GitHub 仓库与维护', '代码仓库', '知识库 vault', '原文 raw', '更新此仓库', '推送此仓库', '修改远端', '全部更新', '检查远端']) {
       expect(html).toContain(keyword);
     }
   });
@@ -118,6 +118,9 @@ describe('素材库与管理后台', () => {
 
     const unknown = await post('/actions/ops/repo/pull', { key: 'not-a-repo' });
     expect(unknown.status).toBe(404);
+
+    const unknownPush = await post('/actions/ops/repo/push', { key: 'not-a-repo' });
+    expect(unknownPush.status).toBe(404);
   });
 
   it('运维中心可打开，/admin 301 过去', async () => {

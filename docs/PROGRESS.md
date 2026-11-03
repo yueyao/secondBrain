@@ -1712,3 +1712,36 @@ pnpm run check
 - 代码仓库更新后自动重启服务（当前受 systemd 权限限制，页面提示手动 restart；后续可加 sudoers 白名单或部署 hook）；
 - 仓库凭据轮换 UI（当前 deploy key 仍走 SSH 手动配置）；
 - 定时 fetch + 落后告警（现在按需 fetch）。
+
+
+---
+
+## 五十八、vault 推送备份：发现「服务器领先 39 个提交未备份」并修复（2026-11-04）
+
+### 58.1 问题（真实发现）
+
+运维页上线仓库状态后立刻暴露：**知识库 vault 本地领先 39 个提交、落后 0**。
+原因：服务器是 wiki 的唯一写者，但 vault 的 deploy key 是**只读**的，`sync.sh` 只做 pull，没有 push——39 次审核入库只存在服务器磁盘上，GitHub 备份是旧的。这正是"可维护、不依赖任何人"里最危险的单点。
+
+### 58.2 修正
+
+- 运维页仓库卡片增加「**推送此仓库**」（`git push origin HEAD`，动作写 `last-ops.json` 审计）；领先未推送时徽标明确提示；
+- `deploy/sync.sh`：拉取完成后把 vault 本地提交推回 origin（失败不阻断 pull，提示检查 deploy key 写权限）；
+- 服务器新增**写权限** deploy key：`~dsh/.ssh/sb_push` + `Host github-push` 别名，vault 的 origin 改为 `git@github-push:yueyao/secondBrain-vault.git`（该 key 在 GitHub 仓库 Deploy keys 里勾选 "Allow write access"）；
+- 文档：MAINTAINERS 增补推送备份与写权限 key 的配置/轮换步骤；ADR 0007 补充第 4 条。
+
+### 58.3 决策
+
+| 编号 | 决策 | 理由 |
+|---|---|---|
+| D73 | 服务器写 vault 后必须 push 回 GitHub 备份（运维页一键 + sync timer 自动），并用写权限 deploy key | 单机磁盘不是备份；不加 push 时知识只存在于服务器，换机/故障即丢失。写 key 仅授予 vault 仓库，raw 保持只读 |
+
+### 58.4 验证
+
+```
+pnpm run check
+ Test Files  35 passed (35)
+      Tests  324 passed (324)
+```
+
+部署后：服务器推送 39 个提交到 `secondBrain-vault`，运维页 vault 显示「已同步」；`gh api`/`git ls-remote` 核对远端 HEAD 一致；sync timer 每 15 分钟自动推送后续提交。

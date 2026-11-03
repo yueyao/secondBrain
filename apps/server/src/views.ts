@@ -603,7 +603,9 @@ export function adminPage(data: AdminPageData): string {
       ? '<span class="badge">同步状态未知（点「检查远端」）</span>'
       : repo.ahead === 0 && repo.behind === 0
         ? '<span class="badge b-ok">已同步</span>'
-        : `<span class="badge b-warn">领先 ${repo.ahead} / 落后 ${repo.behind}</span>`;
+        : repo.ahead !== null && repo.ahead > 0 && repo.behind === 0
+          ? `<span class="badge b-warn">领先 ${repo.ahead} 未推送（点「推送此仓库」备份）</span>`
+          : `<span class="badge b-warn">领先 ${repo.ahead} / 落后 ${repo.behind}</span>`;
     const stateBadge = repo.error !== null
       ? `<span class="badge b-block">${esc(repo.error)}</span>`
       : repo.dirtyCount > 0
@@ -626,6 +628,7 @@ export function adminPage(data: AdminPageData): string {
       ${fetchNote}
       <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
         <form method="post" action="/actions/ops/repo/pull"><input type="hidden" name="key" value="${esc(repo.key)}"><button class="btn" type="submit"${repo.error !== null ? ' disabled' : ''}>更新此仓库</button></form>
+        <form method="post" action="/actions/ops/repo/push" onsubmit="return confirm('把本地提交推送到 GitHub 备份？')"><input type="hidden" name="key" value="${esc(repo.key)}"><button class="btn" type="submit"${repo.error !== null ? ' disabled' : ''}>推送此仓库</button></form>
         <form method="post" action="/actions/ops/repo/remote" class="row" style="gap:6px;align-items:center;flex:1;min-width:280px">
           <input type="hidden" name="key" value="${esc(repo.key)}">
           <input name="remote" value="${esc(repo.remote ?? '')}" placeholder="https://github.com/<owner>/<repo>.git" style="flex:1;min-width:220px">
@@ -734,7 +737,7 @@ export function adminPage(data: AdminPageData): string {
     <div class="muted" style="line-height:1.8">
       <b>可维护性说明</b>：项目运行只依赖「这台服务器 + GitHub 仓库」，不依赖任何个人电脑或账号在线；
       代码、知识库、原文分别由上面的仓库托管，服务器是唯一写者。<br>
-      vault/raw 由 sync timer 每 15 分钟自动 fast-forward；代码仓库更新后需要重启服务（<code>systemctl restart secondbrain-server secondbrain-worker</code>）。
+      vault/raw 由 sync timer 每 15 分钟自动 fast-forward，vault 的本地提交（审核入库）同时会推回 GitHub 备份；代码仓库更新后需要重启服务（<code>systemctl restart secondbrain-server secondbrain-worker</code>）。
       每日 03:17 自动快照 <code>state.db</code>（备份目录见「环境」）。<br>
       换机器、换 GitHub 账号/组织、轮换密钥、恢复数据：见 ${maintainerDocUrl !== null ? `<a href="${esc(maintainerDocUrl)}" target="_blank" rel="noreferrer">维护与所有权手册（docs/MAINTAINERS.md）</a>` : '<code>docs/MAINTAINERS.md</code>（代码仓库内）'}。
     </div>

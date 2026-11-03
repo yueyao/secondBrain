@@ -106,7 +106,7 @@ pnpm demo
 | `secondBrain-raw`（私有） | `raw/` 原文语料 |
 
 - 运维中心 `/operations` 的「GitHub 仓库与维护」列出三个仓库的远端、分支、HEAD、领先/落后，可逐仓库或全部更新、检查远端、修改远端（换账号/迁移用）；
-- 代码仓库更新后需要重启 `secondbrain-server` / `secondbrain-worker`；vault/raw 由 sync timer 每 15 分钟自动 fast-forward；
+- 代码仓库更新后需要重启 `secondbrain-server` / `secondbrain-worker`；vault/raw 由 sync timer 每 15 分钟自动 fast-forward，vault 的本地提交会自动推回 GitHub 备份（也可在运维页手动「推送此仓库」）；
 - 换机器、换 GitHub owner、轮换密钥、备份恢复的完整步骤见 [docs/MAINTAINERS.md](docs/MAINTAINERS.md)。
 
 ## 工程校验

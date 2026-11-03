@@ -249,6 +249,21 @@ export async function pullRepo(descriptor: RepoDescriptor): Promise<{ readonly o
   }
 }
 
+/** 把本地提交推送到 origin（服务器写 vault 后必须做，否则知识只存在本机磁盘）。 */
+export async function pushRepo(descriptor: RepoDescriptor): Promise<{ readonly ok: boolean; readonly detail: string }> {
+  if (!fs.existsSync(descriptor.path)) return { ok: false, detail: '目录不存在' };
+  try {
+    const { stdout, stderr } = await execFileAsync('git', ['-C', descriptor.path, 'push', 'origin', 'HEAD'], {
+      timeout: PULL_TIMEOUT_MS,
+      maxBuffer: 4 * 1024 * 1024,
+    });
+    const text = `${stdout}\n${stderr}`.trim().split('\n').filter((line) => line.trim() !== '').slice(-3).join(' / ');
+    return { ok: true, detail: text.slice(0, 300) || '已推送' };
+  } catch (error) {
+    return { ok: false, detail: errorMessage(error) };
+  }
+}
+
 /** 修改仓库 origin 地址（换 GitHub 账号 / 迁移到自建 Git 服务时使用）。 */
 export async function setRepoRemote(descriptor: RepoDescriptor, remote: string): Promise<{ readonly ok: boolean; readonly detail: string }> {
   const trimmed = remote.trim();

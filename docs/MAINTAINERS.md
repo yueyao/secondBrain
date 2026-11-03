@@ -9,10 +9,10 @@
 | 仓库 | 用途 | GitHub | 服务器路径 | 鉴权方式 |
 |---|---|---|---|---|
 | **secondBrain**（代码） | server + worker + 全部源码/文档 | `https://github.com/yueyao/secondBrain` | `/srv/secondbrain/repo` | HTTPS（公开仓库，拉取无需凭据） |
-| **secondBrain-vault**（知识库） | `wiki/`：知识节点 Markdown + git 历史 | `git@github.com:yueyao/secondBrain-vault.git` | `/srv/secondbrain/vault` | SSH Deploy Key（只读）：`~dsh/.ssh/sb_deploy` |
+| **secondBrain-vault**（知识库） | `wiki/`：知识节点 Markdown + git 历史 | `git@github-push:yueyao/secondBrain-vault.git` | `/srv/secondbrain/vault` | SSH Deploy Key（**读写**，用于推送备份）：`~dsh/.ssh/sb_push` |
 | **secondBrain-raw**（原文） | `raw/`：剪藏/播客/课程原文 | `git@github-raw:yueyao/secondBrain-raw.git` | `/srv/secondbrain/vault/raw` | SSH Deploy Key（只读）：`~dsh/.ssh/sb_deploy_raw` |
 
-`~dsh/.ssh/config` 定义了 `github.com` 与 `github-raw` 两个 Host 别名，分别指向两把 deploy key。
+`~dsh/.ssh/config` 定义了 `github.com`（只读 key，历史兼容）、`github-push`（vault 读写 key）与 `github-raw`（raw 只读 key）三个 Host 别名。
 **服务器对 vault/raw 只读**：知识库与原文的写入发生在采集端（本地），服务器只做 fast-forward 拉取；唯一例外是审核通过后写 wiki（同一仓库）。
 
 > 运维页 `/operations` 的「GitHub 仓库与维护」区块会实时展示三个仓库的远端、分支、HEAD、工作区状态、领先/落后提交数，并提供「更新此仓库 / 全部更新 / 检查远端 / 修改远端」。
@@ -45,8 +45,10 @@
 ### 3.2 更新知识库 / 原文
 
 - 采集端 push 到 GitHub 后，`secondbrain-sync.timer` 每 15 分钟自动 `pull --ff-only`（vault 与 raw 各一次）；
+- **服务器写 wiki 后必须推送备份**：sync timer 在拉取后会对 vault 执行 `git push origin HEAD`（失败不阻断，提示检查写权限 key）；运维页也可手动「推送此仓库」，领先未推送时徽标会提示；
 - 也可以在运维页逐仓库点「更新此仓库」「全部更新」；
 - 运维页「检查远端」会执行 fetch，显示领先/落后；vault 落后时审核台的 accept 会因 `OUT_OF_SYNC` 被拒（安全设计）。
+- vault 的写权限 deploy key（`~dsh/.ssh/sb_push`）在 GitHub 仓库 Settings → Deploy keys 中必须勾选 **Allow write access**；轮换时替换公钥并更新 `~dsh/.ssh/config` 的 `github-push` 别名。
 
 ### 3.3 状态库备份与恢复
 
