@@ -79,12 +79,12 @@ describe('HTTP 审核台', () => {
   });
 });
 
-describe('文章库与管理后台', () => {
-  it('文章库可打开、可筛选', async () => {
+describe('素材库与管理后台', () => {
+  it('素材库可打开、可筛选', async () => {
     const response = await fetch(`${base}/articles`);
     const html = await response.text();
     expect(response.status).toBe(200);
-    expect(html).toContain('文章库');
+    expect(html).toContain('素材库');
 
     const filtered = await fetch(`${base}/articles?state=queued`);
     expect((await filtered.text())).toContain('待处理');
