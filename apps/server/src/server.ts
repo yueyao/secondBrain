@@ -206,6 +206,13 @@ export function createServer(runtime: Runtime): http.Server {
         void outcomes;
         return redirect(res, '/operations');
       }
+      if (req.method === 'POST' && path === '/actions/ops/config') {
+        const form = await readForm(req);
+        const pendingLimit = Number(form.pendingLimit ?? '300');
+        const configPath = join(runtime.dataDir, 'ops-config.json');
+        fs.writeFileSync(configPath, JSON.stringify({ pendingLimit: Number.isFinite(pendingLimit) && pendingLimit > 0 ? pendingLimit : 300 }));
+        return redirect(res, '/operations');
+      }
       if (req.method === 'POST' && path === '/actions/ops/backup') {
         await runLogged(runtime.dataDir, '备份', async () => {
           const backupDir = join(runtime.dataDir, 'backup');
@@ -266,7 +273,13 @@ export function createServer(runtime: Runtime): http.Server {
         return sendHtml(res, adminPage({
           ops: readOps(runtime.dataDir),
           logs,
-          pendingLimit: Number(process.env.WORKER_MAX_PENDING_DRAFTS ?? 300),
+          pendingLimit: (() => {
+            try {
+              const config = JSON.parse(fs.readFileSync(join(runtime.dataDir, 'ops-config.json'), 'utf8')) as { pendingLimit?: number };
+              if (typeof config.pendingLimit === 'number' && config.pendingLimit > 0) return config.pendingLimit;
+            } catch { /* ignore */ }
+            return Number(process.env.WORKER_MAX_PENDING_DRAFTS ?? 300);
+          })(),
           paused: fs.existsSync(join(runtime.dataDir, 'worker-pause.json')),
           counts: summary.counts,
           total: summary.total,

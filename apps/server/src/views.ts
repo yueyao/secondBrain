@@ -576,6 +576,13 @@ export function adminPage(data: AdminPageData): string {
   </div>
   <div class="card" style="padding:4px 0;margin-top:10px"><table><tr><th>状态</th><th>数量</th></tr>${stateRows}</table></div>
 
+  <h2>生产配置</h2>
+  <div class="card"><form method="post" action="/actions/ops/config" class="row" style="gap:8px;align-items:center">
+    待审上限：<input name="pendingLimit" type="number" min="1" value="${data.pendingLimit}" style="width:100px">
+    <button class="btn" type="submit">保存</button>
+    <span class="muted">达到该数量时 worker 自动停止起草（下一轮生效）</span>
+  </form></div>
+
   <h2>运维操作</h2>
   <div class="card"><div class="row" style="gap:8px;flex-wrap:wrap">
     <form method="post" action="/actions/ops/scan"><button class="btn" type="submit">立即扫描新原文</button></form>

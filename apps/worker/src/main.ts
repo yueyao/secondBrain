@@ -136,6 +136,14 @@ async function main(): Promise<void> {
   const isPaused = (): boolean => fs.existsSync(pauseFile);
   writeStatus({ phase: 'starting', updatedAt: new Date().toISOString() });
 
+  const readPendingLimit = (): number => {
+    try {
+      const config = JSON.parse(fs.readFileSync(path.join(dataDir, 'ops-config.json'), 'utf8')) as { pendingLimit?: number };
+      if (typeof config.pendingLimit === 'number' && config.pendingLimit > 0) return config.pendingLimit;
+    } catch { /* 忽略，用默认 */ }
+    return envNumber('WORKER_MAX_PENDING_DRAFTS', 300);
+  };
+
   let stopping = false;
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     process.on(signal, () => { stopping = true; });
@@ -148,7 +156,7 @@ async function main(): Promise<void> {
         await new Promise((resolve) => setTimeout(resolve, Math.min(intervalMs, 10_000)));
         continue;
       }
-      const result = await runTick(runtime.ctx, { maxJobsPerTick, onStatus: writeStatus, shouldPause: isPaused });
+      const result = await runTick(runtime.ctx, { maxJobsPerTick, onStatus: writeStatus, shouldPause: isPaused, maxPendingDrafts: readPendingLimit() });
       console.log(JSON.stringify({ level: 'info', event: 'tick', at: new Date().toISOString(), ...result }));
       if (once) break;
       await new Promise((resolve) => setTimeout(resolve, intervalMs));

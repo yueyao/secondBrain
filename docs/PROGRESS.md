@@ -1255,3 +1255,9 @@ sync: vault/raw 均 "Already up to date"
 - 心跳标记 `pausedReason: pending_limit`；运维页显示「已触发背压 X/300」并链接审核中心；
 - 防止审核跟不上时模型 API 过度消耗；
 - 测试 188 → 189 例。
+
+
+### 40.1 运维可配置（2026-11-03）
+
+- 运维页新增「生产配置」：待审上限输入框，保存到 `DATA_DIR/ops-config.json`；worker 每轮读取，无需重启；
+- 优先级：ops-config.json > WORKER_MAX_PENDING_DRAFTS 环境变量 > 默认 300。
