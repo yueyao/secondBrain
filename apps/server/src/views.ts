@@ -676,7 +676,7 @@ export function guidePage(): string {
 
 
 export function nodesPage(rows: readonly { name: string; file: string; nodeType: string; claimedCount?: never; claimCount: number; sourceCount: number; aliases: readonly string[] }[], type: string, query: string, counts: Record<string, number>): string {
-  const tabs = [['all', '全部'], ['concept', '概念'], ['topic', '主题'], ['person', '人物']]
+  const tabs = ([['all', '全部'], ['concept', '概念'], ['topic', '主题'], ['person', '人物']] as const)
     .map(([key, label]) => `<a class="btn" style="${key === type ? 'background:#1f6feb;color:#fff' : ''}" href="/nodes?type=${key}&q=${encodeURIComponent(query)}">${label} <span class="muted">${counts[key] ?? 0}</span></a>`).join('');
   const rowsHtml = rows.map((row) => `<tr>
     <td><a href="/nodes/${encodeURIComponent(row.file)}">${esc(row.name)}</a>${row.aliases.length > 0 ? ` <span class="muted">（${row.aliases.map((a) => esc(a)).join('、')}）</span>` : ''}</td>
