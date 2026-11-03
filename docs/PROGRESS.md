@@ -1071,3 +1071,27 @@ sync: vault/raw 均 "Already up to date"
 
 - 服务器上已生成的 3 篇草稿没有 `claimIndexes`（回退为全部 claims），建议 reject 后重新起草；
 - 全量跑之前先抽审新草稿，确认节点与 claims 的对应质量。
+
+
+---
+
+## 二十九、文章库与管理后台 UI（2026-11-03）
+
+### 29.1 交付
+
+| 页面/能力 | 说明 |
+|---|---|
+| `/articles` | 文章库：4,408 篇全量列表；按状态筛选（queued/committed/draft_ready/deferred…）、标题/路径搜索、分页（50/页） |
+| `/articles/<path>` | 文章详情：状态、来源、字数、triage（状态/分数/判断句/reasons）、提交 sha、草稿（tier/模型/prompt 版本/rationale/findings/claims/节点及 claimIndexes）、去审阅入口 |
+| `/admin` | 管理后台：状态分布、pending 草稿数、今日调用与成本、环境信息（mode/dataDir/vaultRoot）、最近事件、扫描入口与快捷链接 |
+| 导航 | 首页/文章库/管理/用量/搜索 |
+
+新增查询：`listArticles`、`articleDetail`、`adminSummary`（`packages/app/src/queries.ts`）。
+`Runtime` 增加 `dataDir` / `vaultRoot` 只读字段供后台展示。
+
+### 29.2 验证
+
+```
+ Test Files  26 passed (26)
+      Tests  187 passed (187)   # 新增 e2e 3 例（文章库/详情/管理后台）
+```

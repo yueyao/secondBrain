@@ -10,10 +10,13 @@ import {
   reviewView,
   searchWiki,
   usageSummary,
+  listArticles,
+  articleDetail,
+  adminSummary,
 } from '@sb/app';
 import { parseDraftId, parseRawPath, type DraftId, type RawPath } from '@sb/domain';
 import type { Runtime } from './runtime';
-import { dashboard, errorPage, reviewPage, searchPage, usagePage } from './views';
+import { adminPage, articlePage, articlesPage, dashboard, errorPage, reviewPage, searchPage, usagePage } from './views';
 
 function redirect(res: http.ServerResponse, location: string): void {
   res.writeHead(303, { location });
@@ -89,6 +92,43 @@ export function createServer(runtime: Runtime): http.Server {
 
       if (req.method === 'GET' && path === '/usage') {
         return sendHtml(res, usagePage(await usageSummary(runtime.ctx)));
+      }
+
+      if (req.method === 'GET' && path === '/articles') {
+        const data = await listArticles(runtime.ctx, {
+          state: url.searchParams.get('state') ?? 'all',
+          query: url.searchParams.get('q') ?? '',
+          page: Number(url.searchParams.get('page') ?? '1'),
+        });
+        return sendHtml(res, articlesPage(data));
+      }
+
+      if (req.method === 'GET' && path.startsWith('/articles/')) {
+        const rawPath = decodeURIComponent(path.slice('/articles/'.length));
+        const detail = await articleDetail(runtime.ctx, rawPath);
+        if (!detail) return sendHtml(res, errorPage('文章不存在'), 404);
+        return sendHtml(res, articlePage(detail));
+      }
+
+      if (req.method === 'GET' && path === '/admin') {
+        const summary = await adminSummary(runtime.ctx, {
+          mode: runtime.mode,
+          dataDir: runtime.dataDir,
+          vaultRoot: runtime.vaultRoot,
+        });
+        return sendHtml(res, adminPage({
+          counts: summary.counts,
+          total: summary.total,
+          drafts: summary.drafts,
+          usage: {
+            calls: summary.usage.totals.calls,
+            inputTokens: summary.usage.totals.inputTokens,
+            outputTokens: summary.usage.totals.outputTokens,
+            estimatedCost: summary.usage.totals.estimatedCost,
+          },
+          env: summary.env,
+          recentEvents: summary.recentEvents,
+        }));
       }
 
       if (req.method === 'GET' && path.startsWith('/review/')) {

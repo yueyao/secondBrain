@@ -78,3 +78,36 @@ describe('HTTP 审核台', () => {
     expect(hits[0]?.name).toBe('反脆弱');
   });
 });
+
+describe('文章库与管理后台', () => {
+  it('文章库可打开、可筛选', async () => {
+    const response = await fetch(`${base}/articles`);
+    const html = await response.text();
+    expect(response.status).toBe(200);
+    expect(html).toContain('文章库');
+
+    const filtered = await fetch(`${base}/articles?state=queued`);
+    expect((await filtered.text())).toContain('queued');
+  });
+
+  it('文章详情可打开', async () => {
+    const payload = (await (await fetch(`${base}/api/queue`)).json()) as
+      | { items: { rawPath: string; title: string }[] }
+      | { rawPath: string; title: string }[];
+    const items = Array.isArray(payload) ? payload : payload.items;
+    const first = items[0];
+    expect(first).toBeTruthy();
+    const response = await fetch(`${base}/articles/${encodeURIComponent(first!.rawPath)}`);
+    const html = await response.text();
+    expect(response.status).toBe(200);
+    expect(html).toContain(first!.title);
+  });
+
+  it('管理后台可打开', async () => {
+    const response = await fetch(`${base}/admin`);
+    const html = await response.text();
+    expect(response.status).toBe(200);
+    expect(html).toContain('管理后台');
+    expect(html).toContain('状态分布');
+  });
+});

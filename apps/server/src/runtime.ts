@@ -39,6 +39,8 @@ export interface Runtime {
   readonly store: SqliteStore;
   readonly search: MemorySearch;
   readonly mode: AgentMode;
+  readonly dataDir: string;
+  readonly vaultRoot: string;
   close(): Promise<void>;
 }
 
@@ -184,6 +186,8 @@ export async function createRuntime(options: RuntimeOptions): Promise<Runtime> {
     store,
     search,
     mode: built.mode,
+    dataDir,
+    vaultRoot,
     async close() {
       await store.close();
     },

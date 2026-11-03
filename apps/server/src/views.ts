@@ -260,3 +260,162 @@ export function usagePage(data: UsagePageData): string {
     <tr><th>profile</th><th>调用</th><th>输入</th><th>输出</th><th>估算成本</th></tr>${profileRows}
   </table></div>`);
 }
+
+// ---------------------------------------------------------------------------
+// 文章库 / 管理后台（2026-11-03）
+// ---------------------------------------------------------------------------
+
+function nav(): string {
+  return `<div class="nav">
+    <a href="/">首页</a><a href="/articles">文章库</a><a href="/admin">管理</a>
+    <a href="/usage">用量</a><a href="/search">搜索</a>
+  </div>`;
+}
+
+export interface ArticlesPageData {
+  readonly items: readonly { rawPath: string; title: string; sourceKey: string; state: string; charCount: number; updatedAt: string; triage: { status: string; score: number; judgments: number } | null }[];
+  readonly total: number;
+  readonly page: number;
+  readonly pages: number;
+  readonly states: readonly string[];
+  readonly state: string;
+  readonly query: string;
+}
+
+export function articlesPage(data: ArticlesPageData): string {
+  const stateOptions = ['all', ...data.states]
+    .map((value) => `<option value="${esc(value)}"${value === data.state ? ' selected' : ''}>${value === 'all' ? '全部状态' : esc(value)}</option>`)
+    .join('');
+
+  const rows = data.items.map((item) => `<tr>
+    <td><a href="/articles/${encodeURIComponent(item.rawPath)}">${esc(item.title)}</a></td>
+    <td>${esc(item.sourceKey)}</td>
+    <td><span class="badge">${esc(item.state)}</span></td>
+    <td>${item.triage ? `${item.triage.status} · ${item.triage.judgments} 句` : '—'}</td>
+    <td>${item.charCount.toLocaleString()}</td>
+    <td class="muted">${esc(item.updatedAt.slice(0, 10))}</td></tr>`).join('')
+    || '<tr><td colspan="6" class="muted">没有匹配的文章</td></tr>';
+
+  const prev = data.page > 1
+    ? `<a class="btn" href="/articles?state=${encodeURIComponent(data.state)}&q=${encodeURIComponent(data.query)}&page=${data.page - 1}">← 上一页</a>` : '';
+  const next = data.page < data.pages
+    ? `<a class="btn" href="/articles?state=${encodeURIComponent(data.state)}&q=${encodeURIComponent(data.query)}&page=${data.page + 1}">下一页 →</a>` : '';
+
+  return layout('文章库', `${nav()}
+  <div class="row" style="justify-content:space-between"><h1>文章库</h1><span class="muted">${data.total.toLocaleString()} 篇 · 第 ${data.page}/${data.pages} 页</span></div>
+  <form class="row" method="get" action="/articles" style="gap:8px;margin:12px 0">
+    <select name="state">${stateOptions}</select>
+    <input name="q" value="${esc(data.query)}" placeholder="搜索标题或路径">
+    <button class="btn" type="submit">筛选</button>
+    <a class="btn" href="/articles">重置</a>
+  </form>
+  <div class="card" style="padding:4px 0"><table>
+    <tr><th>标题</th><th>来源</th><th>状态</th><th>triage</th><th>字数</th><th>更新</th></tr>${rows}
+  </table></div>
+  <div class="row" style="justify-content:space-between;margin-top:12px">${prev}<span></span>${next}</div>`);
+}
+
+export interface ArticlePageData {
+  readonly rawPath: string;
+  readonly title: string;
+  readonly sourceKey: string;
+  readonly state: string;
+  readonly charCount: number;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly triage: { status: string; score: number; judgments: number; reasons: readonly string[] } | null;
+  readonly commitSha: string | null;
+  readonly draft: {
+    id: string; status: string; tier: string; rationale: string; provider: string; model: string; promptVersion: number;
+    claims: readonly { text: string; inference: boolean; source: string }[];
+    nodes: readonly { name: string; nodeType: string; action: string; claimIndexes: readonly number[] }[];
+    findings: readonly { code: string; severity: string; message: string }[];
+  } | null;
+}
+
+export function articlePage(data: ArticlePageData): string {
+  const claims = data.draft?.claims.map((claim) => `<li>${esc(claim.text)}${claim.inference ? ' <span class="badge b-warn">推断</span>' : ''}</li>`).join('') ?? '';
+  const nodes = data.draft?.nodes.map((node) => `<tr><td>${esc(node.name)}</td><td>${esc(node.nodeType)}</td><td>${esc(node.action)}</td><td class="muted">[${node.claimIndexes.join(', ')}]</td></tr>`).join('') ?? '';
+  const findings = data.draft?.findings.map((finding) => `<li>${findingBadge(finding.severity)} ${esc(finding.code)}：${esc(finding.message)}</li>`).join('') ?? '';
+  const draftLink = data.draft && data.draft.status === 'pending'
+    ? `<a class="btn" href="/review/${encodeURIComponent(data.draft.id)}">去审阅 →</a>` : '';
+
+  return layout('文章详情', `${nav()}
+  <div class="row" style="justify-content:space-between"><h1>${esc(data.title)}</h1><a class="btn" href="/articles">← 文章库</a></div>
+  <div class="muted">${esc(data.rawPath)}</div>
+  <div class="row" style="margin-top:12px">
+    <div class="stat"><b>${esc(data.state)}</b><span>状态</span></div>
+    <div class="stat"><b>${esc(data.sourceKey)}</b><span>来源</span></div>
+    <div class="stat"><b>${data.charCount.toLocaleString()}</b><span>字符</span></div>
+    <div class="stat"><b>${esc(data.updatedAt.slice(0, 10))}</b><span>更新时间</span></div>
+    ${data.commitSha ? `<div class="stat"><b>${esc(data.commitSha.slice(0, 7))}</b><span>commit</span></div>` : ''}
+  </div>
+
+  <h2>triage</h2>
+  <div class="card">${data.triage
+    ? `<div>${esc(data.triage.status)} · score ${data.triage.score} · ${data.triage.judgments} 条判断句</div>
+       <div class="muted">${data.triage.reasons.map((reason) => esc(reason)).join('、') || '无理由'}</div>`
+    : '<span class="muted">无 triage 结果</span>'}</div>
+
+  ${data.draft ? `
+  <h2>草稿 ${draftLink}</h2>
+  <div class="card">
+    <div>${esc(data.draft.tier)} · ${esc(data.draft.status)} · ${esc(data.draft.provider)}/${esc(data.draft.model)} · prompt v${data.draft.promptVersion}</div>
+    <div class="muted">${esc(data.draft.rationale)}</div>
+    ${findings ? `<ul>${findings}</ul>` : ''}
+  </div>
+  <h2>claims（${data.draft.claims.length}）</h2>
+  <div class="card"><ol>${claims}</ol></div>
+  <h2>节点</h2>
+  <div class="card" style="padding:4px 0"><table>
+    <tr><th>节点</th><th>类型</th><th>动作</th><th>支撑 claims</th></tr>${nodes || '<tr><td colspan="4" class="muted">无</td></tr>'}
+  </table></div>` : '<h2>草稿</h2><div class="card muted">还没有草稿</div>'}
+  `);
+}
+
+export interface AdminPageData {
+  readonly counts: Readonly<Record<string, number>>;
+  readonly total: number;
+  readonly drafts: Readonly<Record<string, number>>;
+  readonly usage: { calls: number; inputTokens: number; outputTokens: number; estimatedCost: number };
+  readonly env: { mode: string; dataDir: string; vaultRoot: string };
+  readonly recentEvents: readonly { at: string; type: string; aggregateId: string }[];
+}
+
+export function adminPage(data: AdminPageData): string {
+  const stateRows = Object.entries(data.counts).sort((a, b) => b[1] - a[1])
+    .map(([state, count]) => `<tr><td>${esc(state)}</td><td>${count.toLocaleString()}</td></tr>`).join('');
+  const events = data.recentEvents.map((event) => `<tr><td class="muted">${esc(event.at.slice(0, 19))}</td><td>${esc(event.type)}</td><td class="muted">${esc(event.aggregateId)}</td></tr>`).join('')
+    || '<tr><td colspan="3" class="muted">暂无事件</td></tr>';
+
+  return layout('管理后台', `${nav()}
+  <div class="row" style="justify-content:space-between"><h1>管理后台</h1><span class="muted">${esc(data.env.mode)} 模式</span></div>
+  <div class="row" style="margin-top:12px">
+    <div class="stat"><b>${data.total.toLocaleString()}</b><span>文章总数</span></div>
+    <div class="stat"><b>${(data.counts.queued ?? 0).toLocaleString()}</b><span>待处理</span></div>
+    <div class="stat"><b>${(data.counts.draft_ready ?? 0).toLocaleString()}</b><span>待审</span></div>
+    <div class="stat"><b>${(data.counts.committed ?? 0).toLocaleString()}</b><span>已入库</span></div>
+    <div class="stat"><b>${(data.drafts.pending ?? 0).toLocaleString()}</b><span>pending 草稿</span></div>
+    <div class="stat"><b>${data.usage.calls.toLocaleString()}</b><span>今日调用</span></div>
+    <div class="stat"><b>${data.usage.estimatedCost}</b><span>今日估算成本</span></div>
+  </div>
+
+  <h2>快速操作</h2>
+  <div class="card"><div class="row">
+    <form method="post" action="/actions/ingest"><button class="btn" type="submit">扫描 raw/ 并分档</button></form>
+    <a class="btn" href="/articles">文章库</a>
+    <a class="btn" href="/usage">用量明细</a>
+    <a class="btn" href="/api/health">健康检查</a>
+  </div></div>
+
+  <h2>状态分布</h2>
+  <div class="card" style="padding:4px 0"><table><tr><th>状态</th><th>数量</th></tr>${stateRows}</table></div>
+
+  <h2>环境</h2>
+  <div class="card"><pre>mode: ${esc(data.env.mode)}
+dataDir: ${esc(data.env.dataDir)}
+vaultRoot: ${esc(data.env.vaultRoot)}</pre></div>
+
+  <h2>最近事件</h2>
+  <div class="card" style="padding:4px 0"><table><tr><th>时间</th><th>事件</th><th>对象</th></tr>${events}</table></div>`);
+}

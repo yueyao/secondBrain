@@ -1,6 +1,6 @@
 /** 查询：给 CLI / UI 用的读模型（ReviewViewV1 / QueueItemV1）。 */
 import type { QueueItemV1, ReviewViewV1 } from '@sb/contracts';
-import { parseRawPath, type DraftId, type RawPath, type TriageResult } from '@sb/domain';
+import { parseDraftId, parseRawPath, type DraftId, type RawPath, type TriageResult } from '@sb/domain';
 import { AppError, type AppContext } from './context';
 
 function parseRawPathOk(value: string): RawPath {
@@ -177,4 +177,188 @@ export async function usageSummary(ctx: AppContext, options: { readonly day?: st
     byProfile: [...profiles.values()].sort((a, b) => b.calls - a.calls),
     totals,
   };
+}
+
+// ---------------------------------------------------------------------------
+// 文章库 / 管理后台（2026-11-03）
+// ---------------------------------------------------------------------------
+
+export interface ArticleRowV1 {
+  readonly schemaVersion: 1;
+  readonly rawPath: string;
+  readonly title: string;
+  readonly sourceKey: string;
+  readonly state: string;
+  readonly charCount: number;
+  readonly updatedAt: string;
+  readonly triage: { readonly status: string; readonly score: number; readonly judgments: number } | null;
+}
+
+export interface ArticleListOptions {
+  readonly state?: string;
+  readonly query?: string;
+  readonly page?: number;
+  readonly pageSize?: number;
+}
+
+export interface ArticleListV1 {
+  readonly items: readonly ArticleRowV1[];
+  readonly total: number;
+  readonly page: number;
+  readonly pages: number;
+  readonly pageSize: number;
+  readonly states: readonly string[];
+  readonly state: string;
+  readonly query: string;
+}
+
+function triageOfState(state: { readonly kind: string } & Record<string, unknown>): { status: string; score: number; judgments: number } | null {
+  const triage = (state as { triage?: { status?: string; score?: number; judgments?: number } }).triage;
+  if (!triage || typeof triage.status !== 'string') return null;
+  return { status: triage.status, score: triage.score ?? 0, judgments: triage.judgments ?? 0 };
+}
+
+export async function listArticles(ctx: AppContext, options: ArticleListOptions = {}): Promise<ArticleListV1> {
+  const all = await ctx.store.transaction(async (tx) => tx.rawItems.listAll());
+  const states = [...new Set(all.map((item) => item.state.kind))].sort();
+  const state = options.state && options.state !== '' ? options.state : 'all';
+  const query = (options.query ?? '').trim();
+
+  let filtered = all;
+  if (state !== 'all') filtered = filtered.filter((item) => item.state.kind === state);
+  if (query !== '') {
+    const needle = query.toLowerCase();
+    filtered = filtered.filter(
+      (item) => item.title.toLowerCase().includes(needle) || String(item.rawPath).toLowerCase().includes(needle),
+    );
+  }
+  filtered = [...filtered].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+
+  const pageSize = Math.min(200, Math.max(10, options.pageSize ?? 50));
+  const total = filtered.length;
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const page = Math.min(pages, Math.max(1, Math.trunc(options.page ?? 1)));
+
+  const items = filtered.slice((page - 1) * pageSize, page * pageSize).map((item): ArticleRowV1 => ({
+    schemaVersion: 1,
+    rawPath: String(item.rawPath),
+    title: item.title,
+    sourceKey: item.sourceKey,
+    state: item.state.kind,
+    charCount: item.charCount,
+    updatedAt: item.updatedAt,
+    triage: triageOfState(item.state as never),
+  }));
+
+  return { items, total, page, pages, pageSize, states, state, query };
+}
+
+export interface ArticleDetailV1 {
+  readonly schemaVersion: 1;
+  readonly rawPath: string;
+  readonly title: string;
+  readonly sourceKey: string;
+  readonly state: string;
+  readonly charCount: number;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly triage: { readonly status: string; readonly score: number; readonly judgments: number; readonly reasons: readonly string[] } | null;
+  readonly commitSha: string | null;
+  readonly draft: {
+    readonly id: string;
+    readonly status: string;
+    readonly tier: string;
+    readonly rationale: string;
+    readonly provider: string;
+    readonly model: string;
+    readonly promptVersion: number;
+    readonly claims: readonly { readonly text: string; readonly inference: boolean; readonly source: string }[];
+    readonly nodes: readonly { readonly name: string; readonly nodeType: string; readonly action: string; readonly claimIndexes: readonly number[] }[];
+    readonly findings: readonly { readonly code: string; readonly severity: string; readonly message: string }[];
+  } | null;
+}
+
+export async function articleDetail(ctx: AppContext, rawPathInput: string): Promise<ArticleDetailV1 | null> {
+  const parsed = parseRawPath(rawPathInput);
+  if (!parsed.ok) return null;
+  const item = await ctx.store.transaction(async (tx) => tx.rawItems.getByPath(parsed.value));
+  if (!item) return null;
+
+  const state = item.state as { kind: string; draftId?: string; commitSha?: string; triage?: never };
+  const triage = triageOfState(item.state as never);
+  const rawTriage = (item.state as { triage?: { reasons?: readonly string[] } }).triage;
+
+  let draft: ArticleDetailV1['draft'] = null;
+  if (typeof state.draftId === 'string') {
+    const record = await ctx.store.transaction(async (tx) => tx.drafts.get(mustDraftId(state.draftId as string)));
+    if (record) {
+      draft = {
+        id: record.id,
+        status: record.status,
+        tier: record.proposal.tier,
+        rationale: record.proposal.rationale,
+        provider: record.provider,
+        model: record.model,
+        promptVersion: record.promptVersion,
+        claims: record.proposal.claims.map((claim) => ({ text: claim.text, inference: claim.inference, source: claim.source })),
+        nodes: record.proposal.nodes.map((node) => ({
+          name: node.name, nodeType: node.nodeType, action: node.action, claimIndexes: node.claimIndexes,
+        })),
+        findings: record.findings.map((finding) => ({ code: finding.code, severity: finding.severity, message: finding.message })),
+      };
+    }
+  }
+
+  return {
+    schemaVersion: 1,
+    rawPath: String(item.rawPath),
+    title: item.title,
+    sourceKey: item.sourceKey,
+    state: item.state.kind,
+    charCount: item.charCount,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+    triage: triage
+      ? { ...triage, reasons: rawTriage?.reasons ?? [] }
+      : null,
+    commitSha: typeof state.commitSha === 'string' ? state.commitSha : null,
+    draft,
+  };
+}
+
+function mustDraftId(value: string): ReturnType<typeof parseDraftId> extends { ok: true; value: infer V } ? V : never {
+  const parsed = parseDraftId(value);
+  if (!parsed.ok) throw new AppError('NOT_FOUND', parsed.error.message);
+  return parsed.value as never;
+}
+
+export interface AdminSummaryV1 {
+  readonly counts: Readonly<Record<string, number>>;
+  readonly total: number;
+  readonly drafts: Readonly<Record<string, number>>;
+  readonly usage: UsageSummary;
+  readonly env: { readonly mode: string; readonly dataDir: string; readonly vaultRoot: string };
+  readonly recentEvents: readonly { readonly at: string; readonly type: string; readonly aggregateId: string }[];
+}
+
+export async function adminSummary(
+  ctx: AppContext,
+  env: { readonly mode: string; readonly dataDir: string; readonly vaultRoot: string },
+): Promise<AdminSummaryV1> {
+  const all = await ctx.store.transaction(async (tx) => tx.rawItems.listAll());
+  const counts: Record<string, number> = {};
+  for (const item of all) counts[item.state.kind] = (counts[item.state.kind] ?? 0) + 1;
+
+  const drafts: Record<string, number> = {};
+  for (const status of ['pending', 'approved', 'rejected'] as const) {
+    drafts[status] = (await ctx.store.transaction(async (tx) => tx.drafts.listByStatus(status))).length;
+  }
+
+  const usage = await usageSummary(ctx);
+  const events = await ctx.store.transaction(async (tx) => tx.events.listSince(0));
+  const recentEvents = events.slice(-10).reverse().map((event) => ({
+    at: event.at, type: event.type, aggregateId: String(event.aggregateId),
+  }));
+
+  return { counts, total: all.length, drafts, usage, env, recentEvents };
 }
