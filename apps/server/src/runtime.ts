@@ -156,6 +156,7 @@ const DEAI_SYSTEM = `你是中文写作编辑，任务是去除文本的“AI �
 1. 不新增原文没有的事实、数字、人名、日期、引语、出处；不得虚构第一人称经历；观点可以换表达，但立场和归属不能变。
 2. 所有“（来源：[[raw/...]]）”引用标记必须原样保留：不得删除、不得改写路径、不得新增来源。
 3. 保留原文全部信息点与论点；可以调整详略与段落划分，但不许删掉关键信息。
+3.5 禁止照抄：除引用标记外，任何一句都必须重新组织措辞，不得连续 20 个字与原文相同；整句照抄视为失败。
 4. 清除框架路标词（首先/其次/最后/总之/综上所述/值得注意的是/由此可见/不难发现 等），逻辑靠前后句自然承接。
 5. 拆掉“不是X，而是Y”“不仅…而且…”“一方面…另一方面…”式否定二分与排比堆砌，改成朴素、具体的陈述。
 6. 砍掉宏大开场与升华结尾（随着…的发展、未来可期、让我们拭目以待 等），直接说事。
@@ -191,7 +192,7 @@ function renderDeAiInput(request: DeAiRequest): string {
 export function deAiPrompt(): DeAiPromptSpec {
   return {
     id: 'deai',
-    version: 3,
+    version: 4,
     sha256: createHash('sha256').update(DEAI_SYSTEM).digest('hex'),
     system: DEAI_SYSTEM,
     render: renderDeAiInput,
