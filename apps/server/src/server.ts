@@ -267,7 +267,8 @@ export function createServer(runtime: Runtime): http.Server {
         const [pending, rawCounts, usage, nodeSummary, articles] = await Promise.all([
           listPendingDrafts(runtime.ctx),
           counts(runtime),
-          usageSummary(runtime.ctx),
+          // 数据概览里的调用/成本按"今天"统计，与工作台首页口径一致
+          usageSummary(runtime.ctx, { day: runtime.ctx.clock.now().slice(0, 10) }),
           nodeStats(runtime.ctx),
           listComposeArticles(runtime.ctx),
         ]);
