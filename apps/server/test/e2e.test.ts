@@ -110,6 +110,6 @@ describe('文章库与管理后台', () => {
     expect(html).toContain('管理后台');
     expect(html).toContain('今日进度');
     expect(html).toContain('运行状态');
-    expect(html).toContain('状态分布');
+    expect(html).toContain('队列与状态');
   });
 });
