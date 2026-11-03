@@ -135,6 +135,9 @@ export function createServer(runtime: Runtime): http.Server {
         return sendHtml(res, usagePage(await usageSummary(runtime.ctx)));
       }
 
+      if (req.method === 'GET' && path === '/exceptions') {
+        return redirect(res, '/articles?group=error');
+      }
       if (req.method === 'GET' && path === '/articles') {
         const data = await listArticles(runtime.ctx, {
           state: url.searchParams.get('state') ?? 'all',

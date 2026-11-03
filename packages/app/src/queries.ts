@@ -317,6 +317,7 @@ export interface ArticleDetailV1 {
   readonly updatedAt: string;
   readonly triage: { readonly status: string; readonly score: number; readonly judgments: number; readonly reasons: readonly string[] } | null;
   readonly commitSha: string | null;
+  readonly timeline: readonly { readonly at: string; readonly type: string }[];
   readonly draft: {
     readonly id: string;
     readonly status: string;
@@ -362,6 +363,12 @@ export async function articleDetail(ctx: AppContext, rawPathInput: string): Prom
     }
   }
 
+  const events = await ctx.store.transaction(async (tx) => tx.events.listSince(0));
+  const timeline = events
+    .filter((event) => String(event.aggregateId) === String(item.rawPath))
+    .slice(-20)
+    .map((event) => ({ at: event.at, type: event.type }));
+
   return {
     schemaVersion: 1,
     rawPath: String(item.rawPath),
@@ -375,6 +382,7 @@ export async function articleDetail(ctx: AppContext, rawPathInput: string): Prom
       ? { ...triage, reasons: rawTriage?.reasons ?? [] }
       : null,
     commitSha: typeof state.commitSha === 'string' ? state.commitSha : null,
+    timeline,
     draft,
   };
 }

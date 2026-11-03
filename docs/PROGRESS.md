@@ -1211,3 +1211,12 @@ sync: vault/raw 均 "Already up to date"
 - 每次执行写 `DATA_DIR/last-ops.json`（时间/动作/成功失败/详情），运维页显示最近 5 条；
 - 运维页展示 worker 日志最近 12 行（journalctl，权限不足时提示）；
 - 测试 188 例全绿。
+
+
+---
+
+## 三十七、P8.5 异常中心 + 详情时间线（2026-11-03）
+
+- 顶栏新增「异常」入口（`/exceptions` → `/articles?group=error`），集中查看 failed/blocked/rolled_back/quarantined 等；
+- 文章详情新增「时间线」：按 aggregateId 过滤 events，展示该文章最近 20 条事件；
+- 测试 188 例全绿。

@@ -320,7 +320,7 @@ function nav(): string {
   return `<div class="nav">
     <a href="/"><b>secondBrain</b></a>
     <a href="/">工作台</a><a href="/articles">文章库</a><a href="/review">审核</a>
-    <a href="/operations">运维</a><a href="/usage">用量</a><a href="/search">搜索</a>
+    <a href="/operations">运维</a><a href="/exceptions">异常</a><a href="/usage">用量</a><a href="/search">搜索</a>
     <span style="flex:1"></span>
     <span id="worker-light" class="muted">worker: --</span>
     <span id="pending-badge" class="badge b-warn">待审 0</span>
@@ -415,6 +415,7 @@ export interface ArticlePageData {
   readonly updatedAt: string;
   readonly triage: { status: string; score: number; judgments: number; reasons: readonly string[] } | null;
   readonly commitSha: string | null;
+  readonly timeline: readonly { at: string; type: string }[];
   readonly draft: {
     id: string; status: string; tier: string; rationale: string; provider: string; model: string; promptVersion: number;
     claims: readonly { text: string; inference: boolean; source: string }[];
@@ -446,6 +447,9 @@ export function articlePage(data: ArticlePageData): string {
     ? `<div>${esc(triageLabel(data.triage.status))} · 分数 ${data.triage.score} · ${data.triage.judgments} 条判断句</div>
        <div class="muted">${data.triage.reasons.map((reason) => esc(reasonLabel(reason))).join('、') || '无理由'}</div>`
     : '<span class="muted">无 triage 结果</span>'}</div>
+
+  <h2>时间线</h2>
+  <div class="card">${data.timeline.length === 0 ? '<span class="muted">暂无事件</span>' : `<table>${data.timeline.map((event) => `<tr><td class="muted">${esc(event.at.slice(0, 19))}</td><td>${esc(event.type)}</td></tr>`).join('')}</table>`}</div>
 
   ${data.draft ? `
   <h2>草稿 ${draftLink}</h2>
