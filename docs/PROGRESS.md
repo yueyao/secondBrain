@@ -1279,3 +1279,12 @@ sync: vault/raw 均 "Already up to date"
 - 「最近 7 天吞吐」：每天生成草稿数的柱状图（真数据，非装饰）；
 - 顶栏 worker 状态增加脉冲点（起草/扫描/等待/暂停/停止 用语义色）；
 - 纯 CSS/SVG 绘制，未引入图表库；测试 189 例。
+
+
+---
+
+## 四十三、Compose C1：文章与版本表（2026-11-03）
+
+- 迁移 v4：`article`（标题/主题/节点/大纲/状态/当前版本）+ `article_version`（版本链：versionNo、内容、引用、basedOn、source、instruction、模型/tokens/cost）；
+- 设计原则：版本只增不改、可回退（restore 生成新版本）、大纲存 article.outline 不进版本链；
+- 后续 C1 续：contracts 仓储 + app 用例 + `/compose` 选节点/大纲页；C2 改稿指令与 vN+1；C3 diff/恢复；C4 发布导出。

@@ -108,8 +108,43 @@ const DRAFT_TARGET_HASHES = `
 ALTER TABLE draft ADD COLUMN target_hashes TEXT NOT NULL DEFAULT '{}';
 `;
 
+const ARTICLES = `
+CREATE TABLE article (
+  id                 TEXT PRIMARY KEY,
+  title              TEXT NOT NULL,
+  theme              TEXT NOT NULL DEFAULT '',
+  node_ids           TEXT NOT NULL DEFAULT '[]',
+  outline            TEXT,
+  status             TEXT NOT NULL DEFAULT 'draft',
+  current_version_id TEXT,
+  created_at         TEXT NOT NULL,
+  updated_at         TEXT NOT NULL
+);
+CREATE TABLE article_version (
+  id                  TEXT PRIMARY KEY,
+  article_id          TEXT NOT NULL,
+  version_no          INTEGER NOT NULL,
+  content_md          TEXT NOT NULL,
+  citations           TEXT NOT NULL DEFAULT '[]',
+  based_on_version_id TEXT,
+  source              TEXT NOT NULL,
+  instruction         TEXT,
+  provider            TEXT,
+  model               TEXT,
+  prompt_version      INTEGER,
+  input_tokens        INTEGER,
+  output_tokens       INTEGER,
+  cost                REAL,
+  note                TEXT,
+  created_at          TEXT NOT NULL,
+  UNIQUE(article_id, version_no)
+);
+CREATE INDEX ix_article_version ON article_version(article_id, version_no);
+`;
+
 export const MIGRATIONS: readonly Migration[] = [
   { version: 1, name: 'init', up: INIT },
   { version: 2, name: 'usage', up: USAGE },
   { version: 3, name: 'draft-target-hashes', up: DRAFT_TARGET_HASHES },
+  { version: 4, name: 'articles', up: ARTICLES },
 ];

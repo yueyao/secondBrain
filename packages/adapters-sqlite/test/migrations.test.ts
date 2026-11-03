@@ -18,7 +18,7 @@ describe('迁移', () => {
     const db = new DatabaseSync(':memory:');
     const result = migrate(db, clock);
 
-    expect(result.applied).toEqual([1, 2, 3]);
+    expect(result.applied).toEqual([1, 2, 3, 4]);
     expect(result.skipped).toEqual([]);
     expect(tableNames(db)).toEqual(
       expect.arrayContaining([
@@ -31,7 +31,7 @@ describe('迁移', () => {
         'schema_migrations',
       ]),
     );
-    expect(schemaStatus(db)).toEqual({ version: 3, integrity: 'ok' });
+    expect(schemaStatus(db)).toEqual({ version: 4, integrity: 'ok' });
     db.close();
   });
 
@@ -41,7 +41,7 @@ describe('迁移', () => {
     const second = migrate(db, clock);
 
     expect(second.applied).toEqual([]);
-    expect(second.skipped).toEqual([1, 2, 3]);
+    expect(second.skipped).toEqual([1, 2, 3, 4]);
     const rows = db.prepare('SELECT COUNT(*) AS n FROM schema_migrations').all() as Array<{ n: number }>;
     expect(Number(rows[0]?.n)).toBe(MIGRATIONS.length);
     db.close();
@@ -54,7 +54,7 @@ describe('迁移', () => {
       .prepare('SELECT version, name, applied_at FROM schema_migrations ORDER BY version')
       .all() as Array<{ version: number; name: string; applied_at: string }>;
 
-    expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(4);
     expect(rows[0]).toMatchObject({ version: 1, name: 'init', applied_at: clock.now() });
     db.close();
   });
