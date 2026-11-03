@@ -2,12 +2,25 @@
  * 服务端 worker：定时 ingest + 为 queued 条目生成草稿。
  * 铁律：不自动入库（accept 只能由人在审核台点击）。
  */
+import fs from 'node:fs';
+import path from 'node:path';
 import { draftDigest, ingestAndTriage, listQueue, type AppContext } from '@sb/app';
 import { parseRawPath } from '@sb/domain';
 import { createRuntime } from '../../server/src/runtime';
 
 export interface TickOptions {
   readonly maxJobsPerTick: number;
+  readonly onStatus?: (status: WorkerStatus) => void;
+}
+
+export interface WorkerStatus {
+  readonly phase: 'starting' | 'ingesting' | 'drafting' | 'sleeping' | 'stopping';
+  readonly updatedAt: string;
+  readonly rawPath?: string;
+  readonly title?: string;
+  readonly startedAt?: string;
+  readonly lastTickAt?: string;
+  readonly lastTick?: TickResult;
 }
 
 export interface TickResult {
@@ -19,6 +32,7 @@ export interface TickResult {
 
 /** 单次 tick：ingest 全部新原文，再为最多 N 个 queued 条目起草。 */
 export async function runTick(ctx: AppContext, options: TickOptions): Promise<TickResult> {
+  options.onStatus?.({ phase: 'ingesting', updatedAt: new Date().toISOString() });
   const outcomes = await ingestAndTriage(ctx);
   const queue = await listQueue(ctx);
   const candidates = queue.filter((entry) => entry.state === 'queued').slice(0, options.maxJobsPerTick);
@@ -32,6 +46,13 @@ export async function runTick(ctx: AppContext, options: TickOptions): Promise<Ti
       console.error(JSON.stringify({ level: 'warn', event: 'invalid_raw_path', rawPath: entry.rawPath }));
       continue;
     }
+    options.onStatus?.({
+      phase: 'drafting',
+      updatedAt: new Date().toISOString(),
+      rawPath: entry.rawPath,
+      title: entry.title,
+      startedAt: new Date().toISOString(),
+    });
     try {
       await draftDigest(ctx, parsed.value);
       drafted += 1;
@@ -46,7 +67,14 @@ export async function runTick(ctx: AppContext, options: TickOptions): Promise<Ti
     }
   }
 
-  return { ingested: outcomes.length, drafted, failed, queueLength: queue.length };
+  const result: TickResult = { ingested: outcomes.length, drafted, failed, queueLength: queue.length };
+  options.onStatus?.({
+    phase: 'sleeping',
+    updatedAt: new Date().toISOString(),
+    lastTickAt: new Date().toISOString(),
+    lastTick: result,
+  });
+  return result;
 }
 
 function envNumber(name: string, fallback: number): number {
@@ -71,6 +99,18 @@ async function main(): Promise<void> {
     seedDemo: false,
   });
 
+  const statusFile = path.join(dataDir, 'worker-status.json');
+  const writeStatus = (status: WorkerStatus): void => {
+    const tmp = `${statusFile}.tmp`;
+    try {
+      fs.writeFileSync(tmp, JSON.stringify(status), 'utf8');
+      fs.renameSync(tmp, statusFile);
+    } catch {
+      // 状态文件写失败不影响主流程
+    }
+  };
+  writeStatus({ phase: 'starting', updatedAt: new Date().toISOString() });
+
   let stopping = false;
   for (const signal of ['SIGINT', 'SIGTERM'] as const) {
     process.on(signal, () => { stopping = true; });
@@ -78,12 +118,13 @@ async function main(): Promise<void> {
 
   try {
     while (!stopping) {
-      const result = await runTick(runtime.ctx, { maxJobsPerTick });
+      const result = await runTick(runtime.ctx, { maxJobsPerTick, onStatus: writeStatus });
       console.log(JSON.stringify({ level: 'info', event: 'tick', at: new Date().toISOString(), ...result }));
       if (once) break;
       await new Promise((resolve) => setTimeout(resolve, intervalMs));
     }
   } finally {
+    writeStatus({ phase: 'stopping', updatedAt: new Date().toISOString() });
     await runtime.close();
   }
 }

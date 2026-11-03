@@ -52,6 +52,38 @@ function findingBadge(severity: string): string {
   return `<span class="badge ${cls}">${LEVEL[severity] ?? esc(severity)}</span>`;
 }
 
+const STATE_LABEL: Record<string, string> = {
+  ingested: '已摄取', triaged: '已分档', quarantined: '已隔离', queued: '待处理', drafting: '起草中',
+  draft_ready: '待审核', in_review: '审阅中', approved: '已批准', committing: '提交中', committed: '已入库',
+  rejected: '已驳回', changes_requested: '需修改', deferred: '已延后', failed: '失败', blocked: '已阻塞',
+  rolled_back: '已回滚', expired: '已过期', abandoned: '已放弃',
+};
+const TRIAGE_LABEL: Record<string, string> = { high: '高', medium: '中', low: '低' };
+const REASON_LABEL: Record<string, string> = {
+  human_story: '人物故事', interesting: '有趣', novel_view: '新视角', useful: '实用',
+  durable_claim: '持久判断', reinforces_existing: '强化已有', personal_relevance: '个人相关', low_signal: '低信号',
+};
+const DRAFT_LABEL: Record<string, string> = { pending: '待审核', approved: '已批准', rejected: '已驳回' };
+const PHASE_LABEL: Record<string, string> = {
+  starting: '启动中', ingesting: '扫描原文', drafting: '起草中', sleeping: '等待下一轮', stopping: '停止中',
+};
+
+export function stateLabel(state: unknown): string {
+  return typeof state === 'string' ? STATE_LABEL[state] ?? state : String(state);
+}
+function triageLabel(status: unknown): string {
+  return typeof status === 'string' ? TRIAGE_LABEL[status] ?? status : String(status);
+}
+function reasonLabel(reason: string): string {
+  return REASON_LABEL[reason] ?? reason;
+}
+function draftLabel(status: unknown): string {
+  return typeof status === 'string' ? DRAFT_LABEL[status] ?? status : String(status);
+}
+function phaseLabel(phase: unknown): string {
+  return typeof phase === 'string' ? PHASE_LABEL[phase] ?? phase : String(phase);
+}
+
 export interface UsageTiles {
   readonly calls: number;
   readonly inputTokens: number;
@@ -284,14 +316,14 @@ export interface ArticlesPageData {
 
 export function articlesPage(data: ArticlesPageData): string {
   const stateOptions = ['all', ...data.states]
-    .map((value) => `<option value="${esc(value)}"${value === data.state ? ' selected' : ''}>${value === 'all' ? '全部状态' : esc(value)}</option>`)
+    .map((value) => `<option value="${esc(value)}"${value === data.state ? ' selected' : ''}>${value === 'all' ? '全部状态' : esc(stateLabel(value))}</option>`)
     .join('');
 
   const rows = data.items.map((item) => `<tr>
     <td><a href="/articles/${encodeURIComponent(item.rawPath)}">${esc(item.title)}</a></td>
     <td>${esc(item.sourceKey)}</td>
-    <td><span class="badge">${esc(item.state)}</span></td>
-    <td>${item.triage ? `${item.triage.status} · ${item.triage.judgments} 句` : '—'}</td>
+    <td><span class="badge">${esc(stateLabel(item.state))}</span></td>
+    <td>${item.triage ? `${esc(triageLabel(item.triage.status))} · ${item.triage.judgments} 句` : '—'}</td>
     <td>${item.charCount.toLocaleString()}</td>
     <td class="muted">${esc(item.updatedAt.slice(0, 10))}</td></tr>`).join('')
     || '<tr><td colspan="6" class="muted">没有匹配的文章</td></tr>';
@@ -344,7 +376,7 @@ export function articlePage(data: ArticlePageData): string {
   <div class="row" style="justify-content:space-between"><h1>${esc(data.title)}</h1><a class="btn" href="/articles">← 文章库</a></div>
   <div class="muted">${esc(data.rawPath)}</div>
   <div class="row" style="margin-top:12px">
-    <div class="stat"><b>${esc(data.state)}</b><span>状态</span></div>
+    <div class="stat"><b>${esc(stateLabel(data.state))}</b><span>状态</span></div>
     <div class="stat"><b>${esc(data.sourceKey)}</b><span>来源</span></div>
     <div class="stat"><b>${data.charCount.toLocaleString()}</b><span>字符</span></div>
     <div class="stat"><b>${esc(data.updatedAt.slice(0, 10))}</b><span>更新时间</span></div>
@@ -353,14 +385,14 @@ export function articlePage(data: ArticlePageData): string {
 
   <h2>triage</h2>
   <div class="card">${data.triage
-    ? `<div>${esc(data.triage.status)} · score ${data.triage.score} · ${data.triage.judgments} 条判断句</div>
-       <div class="muted">${data.triage.reasons.map((reason) => esc(reason)).join('、') || '无理由'}</div>`
+    ? `<div>${esc(triageLabel(data.triage.status))} · 分数 ${data.triage.score} · ${data.triage.judgments} 条判断句</div>
+       <div class="muted">${data.triage.reasons.map((reason) => esc(reasonLabel(reason))).join('、') || '无理由'}</div>`
     : '<span class="muted">无 triage 结果</span>'}</div>
 
   ${data.draft ? `
   <h2>草稿 ${draftLink}</h2>
   <div class="card">
-    <div>${esc(data.draft.tier)} · ${esc(data.draft.status)} · ${esc(data.draft.provider)}/${esc(data.draft.model)} · prompt v${data.draft.promptVersion}</div>
+    <div>${esc(data.draft.tier)} · ${esc(draftLabel(data.draft.status))} · ${esc(data.draft.provider)}/${esc(data.draft.model)} · prompt v${data.draft.promptVersion}</div>
     <div class="muted">${esc(data.draft.rationale)}</div>
     ${findings ? `<ul>${findings}</ul>` : ''}
   </div>
@@ -373,48 +405,112 @@ export function articlePage(data: ArticlePageData): string {
   `);
 }
 
+export interface WorkerStatusView {
+  readonly phase: string;
+  readonly updatedAt: string;
+  readonly rawPath?: string;
+  readonly title?: string;
+  readonly startedAt?: string;
+  readonly lastTickAt?: string;
+  readonly lastTick?: { readonly ingested: number; readonly drafted: number; readonly failed: number; readonly queueLength: number };
+  readonly stale: boolean;
+}
+
 export interface AdminPageData {
   readonly counts: Readonly<Record<string, number>>;
   readonly total: number;
   readonly drafts: Readonly<Record<string, number>>;
+  readonly queueRemaining: number;
+  readonly today: {
+    readonly day: string;
+    readonly drafted: number;
+    readonly committed: number;
+    readonly calls: number;
+    readonly inputTokens: number;
+    readonly outputTokens: number;
+    readonly estimatedCost: number;
+    readonly ratePerHour: number | null;
+    readonly etaHours: number | null;
+  };
   readonly usage: { calls: number; inputTokens: number; outputTokens: number; estimatedCost: number };
   readonly env: { mode: string; dataDir: string; vaultRoot: string };
   readonly recentEvents: readonly { at: string; type: string; aggregateId: string }[];
+  readonly worker: WorkerStatusView | null;
+}
+
+function fmtEta(hours: number | null): string {
+  if (hours === null || !Number.isFinite(hours)) return '待估算';
+  if (hours < 1) return `约 ${Math.round(hours * 60)} 分钟`;
+  return `约 ${hours.toFixed(1)} 小时`;
 }
 
 export function adminPage(data: AdminPageData): string {
   const stateRows = Object.entries(data.counts).sort((a, b) => b[1] - a[1])
-    .map(([state, count]) => `<tr><td>${esc(state)}</td><td>${count.toLocaleString()}</td></tr>`).join('');
+    .map(([state, count]) => `<tr><td>${esc(stateLabel(state))}</td><td>${count.toLocaleString()}</td></tr>`).join('');
   const events = data.recentEvents.map((event) => `<tr><td class="muted">${esc(event.at.slice(0, 19))}</td><td>${esc(event.type)}</td><td class="muted">${esc(event.aggregateId)}</td></tr>`).join('')
     || '<tr><td colspan="3" class="muted">暂无事件</td></tr>';
 
+  const worker = data.worker;
+  const elapsed = worker?.phase === 'drafting' && worker.startedAt
+    ? Math.max(0, Math.round((Date.parse(worker.updatedAt) - Date.parse(worker.startedAt)) / 1000))
+    : null;
+  const workerBlock = worker
+    ? `<div class="row">
+         <div class="stat"><b>${esc(phaseLabel(worker.phase))}</b><span>worker 状态</span></div>
+         <div class="stat"><b>${esc(worker.updatedAt.slice(11, 19))}</b><span>状态更新</span></div>
+         ${worker.lastTick ? `<div class="stat"><b>${worker.lastTick.drafted} / ${worker.lastTick.failed}</b><span>上轮 起草 / 失败</span></div>` : ''}
+         ${worker.lastTick ? `<div class="stat"><b>${worker.lastTick.queueLength.toLocaleString()}</b><span>上轮队列</span></div>` : ''}
+       </div>
+       ${worker.phase === 'drafting' && worker.title
+         ? `<div class="card" style="margin-top:10px"><div><b>正在起草：</b>${esc(worker.title)}${elapsed !== null ? `（已 ${elapsed} 秒）` : ''}</div>
+            <div class="muted">${esc(worker.rawPath ?? '')}</div></div>`
+         : '<div class="card muted" style="margin-top:10px">当前没有正在起草的文章</div>'}
+       ${worker.stale ? '<div class="card" style="margin-top:10px;border-color:#a33">⚠️ worker 状态超过 10 分钟未更新，可能未运行</div>' : ''}`
+    : '<div class="card muted">没有 worker 状态（worker 可能未启动）</div>';
+
   return layout('管理后台', `${nav()}
   <div class="row" style="justify-content:space-between"><h1>管理后台</h1><span class="muted">${esc(data.env.mode)} 模式</span></div>
-  <div class="row" style="margin-top:12px">
-    <div class="stat"><b>${data.total.toLocaleString()}</b><span>文章总数</span></div>
-    <div class="stat"><b>${(data.counts.queued ?? 0).toLocaleString()}</b><span>待处理</span></div>
-    <div class="stat"><b>${(data.counts.draft_ready ?? 0).toLocaleString()}</b><span>待审</span></div>
-    <div class="stat"><b>${(data.counts.committed ?? 0).toLocaleString()}</b><span>已入库</span></div>
-    <div class="stat"><b>${(data.drafts.pending ?? 0).toLocaleString()}</b><span>pending 草稿</span></div>
-    <div class="stat"><b>${data.usage.calls.toLocaleString()}</b><span>今日调用</span></div>
-    <div class="stat"><b>${data.usage.estimatedCost}</b><span>今日估算成本</span></div>
+
+  <h2>运行状态</h2>
+  ${workerBlock}
+
+  <h2>今日进度（${esc(data.today.day)}）</h2>
+  <div class="row">
+    <div class="stat"><b>${data.today.drafted.toLocaleString()}</b><span>今日起草</span></div>
+    <div class="stat"><b>${data.today.committed.toLocaleString()}</b><span>今日入库</span></div>
+    <div class="stat"><b>${data.today.calls.toLocaleString()}</b><span>今日调用</span></div>
+    <div class="stat"><b>${data.today.inputTokens.toLocaleString()}</b><span>输入 tokens</span></div>
+    <div class="stat"><b>${data.today.outputTokens.toLocaleString()}</b><span>输出 tokens</span></div>
+    <div class="stat"><b>${data.today.estimatedCost}</b><span>估算成本（美元）</span></div>
+    <div class="stat"><b>${data.today.ratePerHour ? data.today.ratePerHour.toFixed(1) : '—'}</b><span>速率（篇/小时）</span></div>
+    <div class="stat"><b>${fmtEta(data.today.etaHours)}</b><span>预计跑完剩余队列</span></div>
   </div>
 
-  <h2>快速操作</h2>
+  <h2>队列与状态</h2>
+  <div class="row">
+    <div class="stat"><b>${data.total.toLocaleString()}</b><span>文章总数</span></div>
+    <div class="stat"><b>${data.queueRemaining.toLocaleString()}</b><span>待处理</span></div>
+    <div class="stat"><b>${(data.counts.draft_ready ?? 0).toLocaleString()}</b><span>待审核</span></div>
+    <div class="stat"><b>${(data.counts.committed ?? 0).toLocaleString()}</b><span>已入库</span></div>
+    <div class="stat"><b>${(data.drafts.pending ?? 0).toLocaleString()}</b><span>pending 草稿</span></div>
+    <div class="stat"><b>${(data.drafts.rejected ?? 0).toLocaleString()}</b><span>已驳回草稿</span></div>
+  </div>
+  <div class="card" style="padding:4px 0;margin-top:10px"><table><tr><th>状态</th><th>数量</th></tr>${stateRows}</table></div>
+
+  <h2>快捷操作</h2>
   <div class="card"><div class="row">
     <form method="post" action="/actions/ingest"><button class="btn" type="submit">扫描 raw/ 并分档</button></form>
-    <a class="btn" href="/articles">文章库</a>
+    <a class="btn" href="/articles?state=queued">看待处理</a>
+    <a class="btn" href="/articles?state=draft_ready">看待审核</a>
     <a class="btn" href="/usage">用量明细</a>
     <a class="btn" href="/api/health">健康检查</a>
   </div></div>
 
-  <h2>状态分布</h2>
-  <div class="card" style="padding:4px 0"><table><tr><th>状态</th><th>数量</th></tr>${stateRows}</table></div>
-
   <h2>环境</h2>
-  <div class="card"><pre>mode: ${esc(data.env.mode)}
-dataDir: ${esc(data.env.dataDir)}
-vaultRoot: ${esc(data.env.vaultRoot)}</pre></div>
+  <div class="card"><pre>模式: ${esc(data.env.mode)}
+数据目录: ${esc(data.env.dataDir)}
+vault: ${esc(data.env.vaultRoot)}
+今日累计调用: ${data.usage.calls.toLocaleString()}（总成本 $${data.usage.estimatedCost}）</pre></div>
 
   <h2>最近事件</h2>
   <div class="card" style="padding:4px 0"><table><tr><th>时间</th><th>事件</th><th>对象</th></tr>${events}</table></div>`);

@@ -1,6 +1,8 @@
 /** HTTP 层：服务端渲染审核台 + JSON API（无依赖，node:http）。 */
 import http from 'node:http';
 import { URL } from 'node:url';
+import fs from 'node:fs';
+import { join } from 'node:path';
 import {
   decideReview,
   draftDigest,
@@ -116,10 +118,39 @@ export function createServer(runtime: Runtime): http.Server {
           dataDir: runtime.dataDir,
           vaultRoot: runtime.vaultRoot,
         });
+        let worker: Parameters<typeof adminPage>[0]['worker'] = null;
+        try {
+          const statusPath = join(runtime.dataDir, 'worker-status.json');
+          const parsed = JSON.parse(fs.readFileSync(statusPath, 'utf8')) as Record<string, unknown>;
+          const lastTick = parsed.lastTick as Record<string, number> | undefined;
+          worker = {
+            phase: String(parsed.phase ?? 'unknown'),
+            updatedAt: String(parsed.updatedAt ?? ''),
+            ...(parsed.rawPath ? { rawPath: String(parsed.rawPath) } : {}),
+            ...(parsed.title ? { title: String(parsed.title) } : {}),
+            ...(parsed.startedAt ? { startedAt: String(parsed.startedAt) } : {}),
+            ...(parsed.lastTickAt ? { lastTickAt: String(parsed.lastTickAt) } : {}),
+            ...(lastTick ? {
+              lastTick: {
+                ingested: Number(lastTick.ingested ?? 0),
+                drafted: Number(lastTick.drafted ?? 0),
+                failed: Number(lastTick.failed ?? 0),
+                queueLength: Number(lastTick.queueLength ?? 0),
+              },
+            } : {}),
+            stale: Date.now() - Date.parse(String(parsed.updatedAt ?? '')) > 10 * 60 * 1000,
+          };
+        } catch {
+          worker = null;
+        }
+
         return sendHtml(res, adminPage({
           counts: summary.counts,
           total: summary.total,
           drafts: summary.drafts,
+          queueRemaining: summary.queueRemaining,
+          today: summary.today,
+          worker,
           usage: {
             calls: summary.usage.totals.calls,
             inputTokens: summary.usage.totals.inputTokens,

@@ -99,6 +99,8 @@ export interface UsageDaySummary {
   readonly inputTokens: number;
   readonly outputTokens: number;
   readonly estimatedCost: number;
+  readonly firstAt: string;
+  readonly lastAt: string;
 }
 
 export interface UsageProfileSummary {
@@ -139,7 +141,7 @@ export async function usageSummary(ctx: AppContext, options: { readonly day?: st
   for (const record of records) {
     const day = record.at.slice(0, 10);
     const cost = costOfUsage(record.inputTokens, record.outputTokens, record.profileId, ctx.pricing);
-    const dayEntry = days.get(day) ?? { day, calls: 0, cacheHits: 0, inputTokens: 0, outputTokens: 0, estimatedCost: 0 };
+    const dayEntry = days.get(day) ?? { day, calls: 0, cacheHits: 0, inputTokens: 0, outputTokens: 0, estimatedCost: 0, firstAt: record.at, lastAt: record.at };
     days.set(day, {
       day,
       calls: dayEntry.calls + 1,
@@ -147,6 +149,8 @@ export async function usageSummary(ctx: AppContext, options: { readonly day?: st
       inputTokens: dayEntry.inputTokens + record.inputTokens,
       outputTokens: dayEntry.outputTokens + record.outputTokens,
       estimatedCost: Math.round((dayEntry.estimatedCost + cost) * 1_000_000) / 1_000_000,
+      firstAt: record.at < dayEntry.firstAt ? record.at : dayEntry.firstAt,
+      lastAt: record.at > dayEntry.lastAt ? record.at : dayEntry.lastAt,
     });
 
     const profileEntry = profiles.get(record.profileId) ?? {
@@ -168,8 +172,10 @@ export async function usageSummary(ctx: AppContext, options: { readonly day?: st
       inputTokens: acc.inputTokens + entry.inputTokens,
       outputTokens: acc.outputTokens + entry.outputTokens,
       estimatedCost: Math.round((acc.estimatedCost + entry.estimatedCost) * 1_000_000) / 1_000_000,
+      firstAt: acc.firstAt === '' || entry.firstAt < acc.firstAt ? entry.firstAt : acc.firstAt,
+      lastAt: entry.lastAt > acc.lastAt ? entry.lastAt : acc.lastAt,
     }),
-    { calls: 0, cacheHits: 0, inputTokens: 0, outputTokens: 0, estimatedCost: 0 },
+    { calls: 0, cacheHits: 0, inputTokens: 0, outputTokens: 0, estimatedCost: 0, firstAt: '', lastAt: '' },
   );
 
   return {
@@ -332,10 +338,24 @@ function mustDraftId(value: string): ReturnType<typeof parseDraftId> extends { o
   return parsed.value as never;
 }
 
+export interface AdminTodayV1 {
+  readonly day: string;
+  readonly drafted: number;
+  readonly committed: number;
+  readonly calls: number;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly estimatedCost: number;
+  readonly ratePerHour: number | null;
+  readonly etaHours: number | null;
+}
+
 export interface AdminSummaryV1 {
   readonly counts: Readonly<Record<string, number>>;
   readonly total: number;
   readonly drafts: Readonly<Record<string, number>>;
+  readonly queueRemaining: number;
+  readonly today: AdminTodayV1;
   readonly usage: UsageSummary;
   readonly env: { readonly mode: string; readonly dataDir: string; readonly vaultRoot: string };
   readonly recentEvents: readonly { readonly at: string; readonly type: string; readonly aggregateId: string }[];
@@ -360,5 +380,42 @@ export async function adminSummary(
     at: event.at, type: event.type, aggregateId: String(event.aggregateId),
   }));
 
-  return { counts, total: all.length, drafts, usage, env, recentEvents };
+  const today = ctx.clock.now().slice(0, 10);
+  const draftRecords = (await Promise.all(
+    (['pending', 'approved', 'rejected'] as const).map(async (status) =>
+      ctx.store.transaction(async (tx) => tx.drafts.listByStatus(status))),
+  )).flat();
+  const draftedToday = draftRecords.filter((draft) => draft.createdAt.slice(0, 10) === today).length;
+  const committedToday = all.filter(
+    (item) => item.state.kind === 'committed' && item.updatedAt.slice(0, 10) === today,
+  ).length;
+  const dayEntry = usage.days.find((entry) => entry.day === today);
+  const firstAt = usage.totals.firstAt;
+  const lastAt = usage.totals.lastAt;
+  const hours = firstAt !== '' && lastAt !== ''
+    ? Math.max((Date.parse(lastAt) - Date.parse(firstAt)) / 3_600_000, 1 / 60)
+    : 0;
+  const ratePerHour = hours > 0 ? usage.totals.calls / hours : null;
+  const queueRemaining = counts.queued ?? 0;
+
+  return {
+    counts,
+    total: all.length,
+    drafts,
+    queueRemaining,
+    today: {
+      day: today,
+      drafted: draftedToday,
+      committed: committedToday,
+      calls: dayEntry?.calls ?? 0,
+      inputTokens: dayEntry?.inputTokens ?? 0,
+      outputTokens: dayEntry?.outputTokens ?? 0,
+      estimatedCost: dayEntry?.estimatedCost ?? 0,
+      ratePerHour,
+      etaHours: ratePerHour && ratePerHour > 0 ? queueRemaining / ratePerHour : null,
+    },
+    usage,
+    env,
+    recentEvents,
+  };
 }
