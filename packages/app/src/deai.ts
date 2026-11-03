@@ -48,6 +48,20 @@ function charCount(text: string): number {
   return [...text].length;
 }
 
+/**
+ * 改写目标长度：AI 味越重、可压缩空间越大。
+ *
+ * 只删套话的文章会显著变短（业界 humanizer 也承认"信息优先于形状"），
+ * 因此下限按体检分数自适应：重度 0.45x、中度 0.6x、轻度 0.75x；上限统一 1.4x。
+ */
+export function deAiLengthTarget(textLength: number, score: number): { readonly minChars: number; readonly maxChars: number } {
+  const minRatio = score >= 60 ? 0.45 : score >= 30 ? 0.6 : 0.75;
+  return {
+    minChars: Math.max(1, Math.floor(textLength * minRatio)),
+    maxChars: Math.max(1, Math.ceil(textLength * 1.4)),
+  };
+}
+
 /** 可选字符串归一化：空串与未传都视为「没有」。 */
 function optionalText(value: string | null | undefined): string | null {
   const trimmed = (value ?? '').trim();
@@ -84,8 +98,8 @@ export async function deAiText(ctx: AppContext, input: DeAiTextInput): Promise<D
     examples: finding.examples,
   }));
   const keepCitations = extractCitationSources(text);
-  // 目标长度按原文比例给定：短了容易丢信息，长了会稀释表达。
-  const target = { minChars: Math.floor(length * 0.7), maxChars: Math.ceil(length * 1.4) };
+  // 目标长度按原文比例 + AI 味分数自适应：套话越多，允许压缩越多；但不得明显变长。
+  const target = deAiLengthTarget(length, before.score);
 
   const result = await port.humanize({
     text,
@@ -100,10 +114,10 @@ export async function deAiText(ctx: AppContext, input: DeAiTextInput): Promise<D
   const rewritten = result.text.trim();
   const rewrittenLength = charCount(rewritten);
   if (rewrittenLength === 0) throw new AppError('INVALID_STATE', '改写结果为空');
-  if (rewrittenLength < Math.floor(length * 0.5) || rewrittenLength > Math.ceil(length * 2)) {
+  if (rewrittenLength < target.minChars || rewrittenLength > target.maxChars) {
     throw new AppError(
       'INVALID_STATE',
-      `改写结果长度异常（${rewrittenLength} 字，原文 ${length} 字）`,
+      `改写结果长度超出目标区间（${rewrittenLength} 字，目标 ${target.minChars}-${target.maxChars} 字）`,
     );
   }
 

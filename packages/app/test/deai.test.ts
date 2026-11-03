@@ -11,7 +11,7 @@ import { extractCitationSources } from '@sb/domain';
 import { createHarness, FIXED_NOW, hashPort, MockDeAi, type TestHarness } from '@sb/testing';
 import type { AppContext } from '../src/context';
 import { createArticle } from '../src/compose';
-import { deAiArticleVersion, deAiText } from '../src/deai';
+import { deAiArticleVersion, deAiLengthTarget, deAiText } from '../src/deai';
 
 const CITATION_A = 'raw/knowledge/cubox/a.md';
 const CITATION_B = 'raw/knowledge/cubox/b.md';
@@ -245,5 +245,18 @@ describe('deAiArticleVersion：文章去 AI 味版本', () => {
 
     const stored = await ctx.store.transaction(async (tx) => tx.articles.get(id));
     expect(stored?.status).toBe('review');
+  });
+});
+
+describe('改写目标长度策略（按 AI 味分数自适应）', () => {
+  it('重度 AI 味允许更深压缩，轻/中度逐级收紧', () => {
+    expect(deAiLengthTarget(139, 68)).toEqual({ minChars: 62, maxChars: 195 });
+    expect(deAiLengthTarget(139, 45)).toEqual({ minChars: 83, maxChars: 195 });
+    expect(deAiLengthTarget(139, 10)).toEqual({ minChars: 104, maxChars: 195 });
+  });
+
+  it('短文本也给出合理区间（至少 1 字）', () => {
+    expect(deAiLengthTarget(2, 90).minChars).toBe(1);
+    expect(deAiLengthTarget(2, 90).maxChars).toBe(3);
   });
 });

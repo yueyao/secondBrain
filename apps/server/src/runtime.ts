@@ -161,7 +161,7 @@ const DEAI_SYSTEM = `你是中文写作编辑，任务是去除文本的“AI �
 6. 砍掉宏大开场与升华结尾（随着…的发展、未来可期、让我们拭目以待 等），直接说事。
 7. 减少形容词、副词、宣传腔与万能动词（进行/作出/赋能/抓手/闭环 等），把空泛表达换成具体对象、动作与场景（细节只能来自原文）。
 8. 句长要有变化：重要处写长，次要处写短，长短句交替；不要每段结构一模一样。
-9. 与原文篇幅相当（±30%），不许越改越长。
+9. 篇幅与原文相当（±30%）；如果原文 AI 套话很多、删完后明显变短，这是正常的，但不得删掉具体信息点（数字、人名、引语、引用、事件）。
 10. 只输出改写后的全文：不要解释、不要标题前缀、不要代码块标记，不要输出“修改说明”。
 文风按输入指定的目标文体处理；公文、学术、新闻通稿的规范用语不必强行口语化。`;
 
@@ -191,7 +191,7 @@ function renderDeAiInput(request: DeAiRequest): string {
 export function deAiPrompt(): DeAiPromptSpec {
   return {
     id: 'deai',
-    version: 1,
+    version: 2,
     sha256: createHash('sha256').update(DEAI_SYSTEM).digest('hex'),
     system: DEAI_SYSTEM,
     render: renderDeAiInput,
