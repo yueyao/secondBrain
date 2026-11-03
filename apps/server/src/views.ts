@@ -736,15 +736,37 @@ export function guidePage(): string {
 }
 
 
-export function nodesPage(rows: readonly { name: string; file: string; nodeType: string; claimedCount?: never; claimCount: number; sourceCount: number; aliases: readonly string[] }[], type: string, query: string, counts: Record<string, number>): string {
+export function nodesPage(rows: readonly { name: string; file: string; nodeType: string; claimedCount?: never; claimCount: number; sourceCount: number; aliases: readonly string[] }[], type: string, query: string, counts: Record<string, number>, stats: { total: number; totalClaims: number; bins: readonly { label: string; count: number }[]; byType: readonly { type: string; count: number; claims: number }[] }): string {
   const tabs = ([['all', '全部'], ['concept', '概念'], ['topic', '主题'], ['person', '人物']] as const)
     .map(([key, label]) => `<a class="btn" style="${key === type ? 'background:#1f6feb;color:#fff' : ''}" href="/nodes?type=${key}&q=${encodeURIComponent(query)}">${label} <span class="muted">${counts[key] ?? 0}</span></a>`).join('');
   const rowsHtml = rows.map((row) => `<tr>
     <td><a href="/nodes/${encodeURIComponent(row.file)}">${esc(row.name)}</a>${row.aliases.length > 0 ? ` <span class="muted">（${row.aliases.map((a) => esc(a)).join('、')}）</span>` : ''}</td>
     <td>${esc(row.nodeType)}</td><td>${row.claimCount}</td><td>${row.sourceCount}</td></tr>`).join('')
     || '<tr><td colspan="4" class="muted">没有匹配的节点</td></tr>';
+  const W = 880; const H = 180; const PAD = 28;
+  const max = Math.max(1, ...stats.bins.map((bin) => bin.count));
+  const step = stats.bins.length > 1 ? (W - PAD * 2) / (stats.bins.length - 1) : 0;
+  const points = stats.bins.map((bin, index) => {
+    const x = PAD + step * index;
+    const y = H - PAD - (bin.count / max) * (H - PAD * 2);
+    return { x, y, bin };
+  });
+  const line = points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ');
+  const area = `${line} L${points[points.length - 1]?.x ?? PAD} ${H - PAD} L${PAD} ${H - PAD} Z`;
+  const chart = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" role="img" aria-label="节点按 claims 数分布">
+    <path d="${area}" fill="rgba(94,234,212,.12)"></path>
+    <path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2"></path>
+    ${points.map((point) => `<circle cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="3" fill="var(--accent)"></circle>`).join('')}
+    ${points.map((point) => `<text x="${point.x.toFixed(1)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--dim)">${esc(point.bin.label)}</text>`).join('')}
+    ${points.map((point) => `<text x="${point.x.toFixed(1)}" y="${(point.y - 9).toFixed(1)}" text-anchor="middle" font-size="11" fill="var(--ink)">${point.bin.count}</text>`).join('')}
+  </svg>`;
+
   return layout('知识节点', `${nav()}
-  <h1>知识节点（${rows.length}）</h1>
+  <h1>知识节点（${stats.total}）</h1>
+  <div class="muted">共 ${stats.totalClaims.toLocaleString()} 条 claims · 横轴为每个节点的 claims 数，纵轴为节点数量</div>
+  <div class="card" style="margin-top:12px">${chart}
+    <div class="row" style="gap:18px;margin-top:12px">${stats.byType.map((entry) => `<span class="muted">${esc(entry.type)}：${entry.count} 节点 · ${entry.claims} claims</span>`).join('')}</div>
+  </div>
   <div class="row" style="gap:6px;margin:12px 0">${tabs}</div>
   <form class="row" method="get" action="/nodes" style="gap:8px;margin-bottom:12px">
     <input type="hidden" name="type" value="${esc(type)}"><input name="q" value="${esc(query)}" placeholder="搜索节点名">

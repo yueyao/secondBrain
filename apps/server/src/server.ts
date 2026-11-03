@@ -54,6 +54,7 @@ import {
   wikiClaims,
   listWikiNodes,
   wikiNodeDetail,
+  nodeStats,
 } from '@sb/app';
 import { parseDraftId, parseRawPath, type DraftId, type RawPath } from '@sb/domain';
 import type { Runtime } from './runtime';
@@ -148,7 +149,7 @@ export function createServer(runtime: Runtime): http.Server {
         const allDocs = runtime.ctx.search.allDocs();
         const counts: Record<string, number> = { all: allDocs.length, concept: 0, topic: 0, person: 0 };
         for (const doc of allDocs) counts[doc.nodeType] = (counts[doc.nodeType] ?? 0) + 1;
-        return sendHtml(res, nodesPage(await listWikiNodes(runtime.ctx, { type, q }), type, q, counts));
+        return sendHtml(res, nodesPage(await listWikiNodes(runtime.ctx, { type, q }), type, q, counts, await nodeStats(runtime.ctx)));
       }
       if (req.method === 'GET' && path.startsWith('/nodes/')) {
         const file = decodeURIComponent(path.slice('/nodes/'.length));

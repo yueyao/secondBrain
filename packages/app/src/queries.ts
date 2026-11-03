@@ -652,3 +652,37 @@ export async function wikiNodeDetail(ctx: AppContext, fileInput: string): Promis
     related,
   };
 }
+
+
+export interface NodeStatsV1 {
+  readonly total: number;
+  readonly totalClaims: number;
+  readonly bins: readonly { readonly label: string; readonly count: number }[];
+  readonly byType: readonly { readonly type: string; readonly count: number; readonly claims: number }[];
+}
+
+/** 节点分布统计：按 claims 数分箱（面积图数据）。 */
+export async function nodeStats(ctx: AppContext): Promise<NodeStatsV1> {
+  const docs = ctx.search.allDocs();
+  const withClaims = docs.map((doc) => ({ doc, claims: claimLines(doc.body).length }));
+  const defs: Array<[string, (n: number) => boolean]> = [
+    ['0', (n) => n === 0],
+    ['1', (n) => n === 1],
+    ['2–3', (n) => n >= 2 && n <= 3],
+    ['4–9', (n) => n >= 4 && n <= 9],
+    ['10–19', (n) => n >= 10 && n <= 19],
+    ['20+', (n) => n >= 20],
+  ];
+  const bins = defs.map(([label, test]) => ({ label, count: withClaims.filter((entry) => test(entry.claims)).length }));
+  const types = new Map<string, { count: number; claims: number }>();
+  for (const entry of withClaims) {
+    const current = types.get(entry.doc.nodeType) ?? { count: 0, claims: 0 };
+    types.set(entry.doc.nodeType, { count: current.count + 1, claims: current.claims + entry.claims });
+  }
+  return {
+    total: docs.length,
+    totalClaims: withClaims.reduce((sum, entry) => sum + entry.claims, 0),
+    bins,
+    byType: [...types.entries()].map(([type, stat]) => ({ type, ...stat })),
+  };
+}

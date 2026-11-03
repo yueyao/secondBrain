@@ -1288,3 +1288,12 @@ sync: vault/raw 均 "Already up to date"
 - 迁移 v4：`article`（标题/主题/节点/大纲/状态/当前版本）+ `article_version`（版本链：versionNo、内容、引用、basedOn、source、instruction、模型/tokens/cost）；
 - 设计原则：版本只增不改、可回退（restore 生成新版本）、大纲存 article.outline 不进版本链；
 - 后续 C1 续：contracts 仓储 + app 用例 + `/compose` 选节点/大纲页；C2 改稿指令与 vN+1；C3 diff/恢复；C4 发布导出。
+
+
+---
+
+## 四十四、知识节点页改为面积图（2026-11-03）
+
+- `/nodes` 顶部新增面积图：横轴为节点 claims 数分箱（0/1/2–3/4–9/10–19/20+），纵轴为节点数量；
+- 图表下方显示各类型节点数与 claims 总数；列表保留在下方供检索；
+- 纯内联 SVG（无图表库），真数据；测试 189 例。
