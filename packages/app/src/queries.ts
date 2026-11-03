@@ -447,10 +447,7 @@ export async function adminSummary(
     (item) => item.state.kind === 'committed' && item.updatedAt.slice(0, 10) === today,
   ).length;
   const dayEntry = usage.days.find((entry) => entry.day === today);
-  const dayKeys: string[] = [];
-  for (let offset = 6; offset >= 0; offset -= 1) {
-    dayKeys.push(new Date(Date.parse(`${today}T00:00:00Z`) - offset * 86_400_000).toISOString().slice(0, 10));
-  }
+  const dayKeys = [...new Set(draftRecords.map((draft) => draft.createdAt.slice(0, 10)))].sort().slice(-7);
   const throughput = dayKeys.map((day) => ({
     day,
     count: draftRecords.filter((draft) => draft.createdAt.slice(0, 10) === day).length,
