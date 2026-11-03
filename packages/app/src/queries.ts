@@ -411,6 +411,8 @@ export interface AdminSummaryV1 {
   readonly drafts: Readonly<Record<string, number>>;
   readonly queueRemaining: number;
   readonly today: AdminTodayV1;
+  readonly progress: { readonly done: number; readonly total: number };
+  readonly throughput: readonly { readonly day: string; readonly count: number }[];
   readonly usage: UsageSummary;
   readonly env: { readonly mode: string; readonly dataDir: string; readonly vaultRoot: string };
   readonly recentEvents: readonly { readonly at: string; readonly type: string; readonly aggregateId: string }[];
@@ -445,6 +447,15 @@ export async function adminSummary(
     (item) => item.state.kind === 'committed' && item.updatedAt.slice(0, 10) === today,
   ).length;
   const dayEntry = usage.days.find((entry) => entry.day === today);
+  const dayKeys: string[] = [];
+  for (let offset = 6; offset >= 0; offset -= 1) {
+    dayKeys.push(new Date(Date.parse(`${today}T00:00:00Z`) - offset * 86_400_000).toISOString().slice(0, 10));
+  }
+  const throughput = dayKeys.map((day) => ({
+    day,
+    count: draftRecords.filter((draft) => draft.createdAt.slice(0, 10) === day).length,
+  }));
+
   const firstAt = usage.totals.firstAt;
   const lastAt = usage.totals.lastAt;
   const hours = firstAt !== '' && lastAt !== ''
@@ -469,6 +480,8 @@ export async function adminSummary(
       ratePerHour,
       etaHours: ratePerHour && ratePerHour > 0 ? queueRemaining / ratePerHour : null,
     },
+    progress: { done: counts.committed ?? 0, total: all.length },
+    throughput,
     usage,
     env,
     recentEvents,

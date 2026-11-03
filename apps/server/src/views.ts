@@ -40,6 +40,13 @@ th{font-size:12.5px;color:var(--dim);font-weight:500;text-align:left;padding:10p
 td{padding:11px 12px;font-size:14.5px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:top}
 tr:last-child td{border-bottom:0}
 th:nth-child(n+3),td:nth-child(n+3){text-align:right}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--dim);margin-right:7px;vertical-align:middle}
+.bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden;margin:8px 0}
+.bar>i{display:block;height:100%;background:var(--accent)}
+.throughput{display:flex;gap:6px;align-items:flex-end;height:72px;margin-top:10px}
+.throughput .col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px}
+.throughput .v{background:var(--accent);width:100%;border-radius:2px 2px 0 0;min-height:2px}
+.throughput .d{font-size:11.5px;color:var(--dim)}
 .badge{display:inline-block;font-size:12px;padding:2px 8px;border-radius:3px;border:1px solid var(--line);color:#b7c0cc;background:var(--paper);white-space:nowrap}
 .b-ok{color:var(--ok);border-color:rgba(63,185,80,.35)}
 .b-warn{color:var(--warn);border-color:rgba(227,179,65,.35)}
@@ -74,7 +81,7 @@ function layout(title: string, body: string): string {
   function show(text){var bar=document.getElementById('refresh-bar');if(!bar)return;bar.textContent=text;bar.style.display='block';bar.onclick=function(){location.reload();};}
   function render(d){
     var light=document.getElementById('worker-light');
-    if(light&&d.workerPhase){var m={drafting:'起草中',ingesting:'扫描中',sleeping:'等待中',paused:'已暂停',starting:'启动中',stopping:'停止中'};light.textContent='worker: '+(m[d.workerPhase]||d.workerPhase);}
+    if(light&&d.workerPhase){var m={drafting:'起草中',ingesting:'扫描中',sleeping:'等待中',paused:'已暂停',starting:'启动中',stopping:'停止中'};var dot={'drafting':'#5eead4','ingesting':'#e3b341','sleeping':'#6b7280','paused':'#e3b341','stopping':'#ef5f6b'}[d.workerPhase]||'#6b7280';light.innerHTML='<span class="dot" style="background:'+dot+'"></span>worker: '+(m[d.workerPhase]||d.workerPhase);}
     var badge=document.getElementById('pending-badge');
     if(badge&&typeof d.pendingDrafts==='number'){badge.textContent='待审 '+d.pendingDrafts;}
   }
@@ -532,6 +539,8 @@ export interface AdminPageData {
   readonly env: { mode: string; dataDir: string; vaultRoot: string };
   readonly recentEvents: readonly { at: string; type: string; aggregateId: string }[];
   readonly worker: WorkerStatusView | null;
+  readonly progress: { readonly done: number; readonly total: number };
+  readonly throughput: readonly { readonly day: string; readonly count: number }[];
 }
 
 function fmtEta(hours: number | null): string {
@@ -575,6 +584,17 @@ export function adminPage(data: AdminPageData): string {
     : `<div class="card" style="margin-bottom:10px">自动处理中。
          <form method="post" action="/actions/worker/pause" style="display:inline;margin-left:8px"><button class="btn" type="submit">暂停（完成当前任务后）</button></form></div>`}
   ${workerBlock}
+
+  <h2>整体进度</h2>
+  <div class="card">
+    <div class="muted">已入库 ${data.progress.done.toLocaleString()} / 全部 ${data.progress.total.toLocaleString()}（${data.progress.total > 0 ? Math.round((data.progress.done / data.progress.total) * 100) : 0}%）</div>
+    <div class="bar"><i style="width:${data.progress.total > 0 ? (data.progress.done / data.progress.total) * 100 : 0}%"></i></div>
+    <div class="throughput">${data.throughput.map((entry) => {
+      const max = Math.max(1, ...data.throughput.map((item) => item.count));
+      return `<div class="col"><span class="d">${entry.count}</span><div class="v" style="height:${Math.max(3, (entry.count / max) * 48)}px"></div><span class="d">${entry.day.slice(5)}</span></div>`;
+    }).join('')}</div>
+    <div class="muted" style="margin-top:6px">最近 7 天每天生成的草稿数（吞吐）</div>
+  </div>
 
   <h2>今日进度（${esc(data.today.day)}）</h2>
   <div class="row">
