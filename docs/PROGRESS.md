@@ -1744,4 +1744,8 @@ pnpm run check
       Tests  324 passed (324)
 ```
 
-部署后：服务器推送 39 个提交到 `secondBrain-vault`，运维页 vault 显示「已同步」；`gh api`/`git ls-remote` 核对远端 HEAD 一致；sync timer 每 15 分钟自动推送后续提交。
+部署后真实核验：
+- 服务器把 vault 从 `ba2e0a0` 推到 `2ef2c3a`（39 个提交），GitHub `commits/main` 与服务器 HEAD 一致；
+- 运维页三个仓库均显示「已同步 / 工作区干净」；「推送此仓库」「更新此仓库」动作在 `last-ops.json` 有成功审计；
+- `deploy/sync.sh` 已包含 push 步骤（测试输出 `[sync] ... push /srv/secondbrain/vault` → Everything up-to-date）；
+- GitHub Deploy keys 现在是「只读（历史）+ 读写（sb_push, 2026-11-04）」两把。
