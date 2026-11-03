@@ -808,9 +808,9 @@ export function nodePage(node: { name: string; file: string; nodeType: string; a
 export function composePage(data: { articles: readonly { id: string; title: string; theme: string; nodeIds: readonly string[]; status: string; outline: string | null; updatedAt: string }[]; nodes: readonly { name: string; claimCount: number }[] }): string {
   const list = data.articles.map((article) => `<tr><td><a href="/compose/${encodeURIComponent(article.id)}">${esc(article.title)}</a></td><td>${esc(article.theme || '—')}</td><td>${article.nodeIds.length}</td><td>${esc(article.status)}</td><td class="muted">${article.outline ? '有大纲' : '未生成'}</td><td class="muted">${esc(article.updatedAt.slice(0, 10))}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">还没有文章，先创建一篇</td></tr>';
   const nodeOptions = data.nodes.map((node) => `<label class="muted" style="display:inline-flex;gap:6px;align-items:center;margin:2px 10px 2px 0"><input type="checkbox" name="node" value="${esc(node.name)}">${esc(node.name)} <span style="opacity:.6">${node.claimCount}</span></label>`).join('');
-  return layout('创作', `${nav()}
-  <h1>创作</h1>
-  <div class="muted">选择知识节点，创建文章并生成大纲（生成正文在 C2 接入模型）</div>
+  return layout('主编台', `${nav()}
+  <h1>主编台</h1>
+  <div class="muted">主编台：选择知识节点，组织大纲，把 wiki 里的判断写成文章（正文生成 C2 接入模型）</div>
   <div class="card" style="margin-top:12px"><form method="post" action="/actions/compose/create">
     标题：<input name="title" placeholder="文章标题" style="width:280px">
     主题：<input name="theme" placeholder="主题（可选）" style="width:200px">
