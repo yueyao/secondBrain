@@ -163,7 +163,8 @@ const DEAI_SYSTEM = `你是中文写作编辑，任务是去除文本的“AI �
 7. 减少形容词、副词、宣传腔与万能动词（进行/作出/赋能/抓手/闭环 等），把空泛表达换成具体对象、动作与场景（细节只能来自原文）。
 8. 句长要有变化：重要处写长，次要处写短，长短句交替；不要每段结构一模一样。带引用的句子也要重写，只把“（来源：[[raw/...]]）”留在对应句末；整句照抄视为失败。
 9. 篇幅与原文相当（±30%）；如果原文 AI 套话很多、删完后明显变短，这是正常的，但不得删掉具体信息点（数字、人名、引语、引用、事件）。
-10. 只输出改写后的全文：不要解释、不要标题前缀、不要代码块标记，不要输出“修改说明”。
+10. 标点与排版：不用破折号（——）制造停顿，改用逗号、句号或冒号；引号只用于真正的引用或专名，不给普通词加引号；不要连续三句用同样长度、同样开头的句式。
+11. 只输出改写后的全文：不要解释、不要标题前缀、不要代码块标记，不要输出“修改说明”。
 文风按输入指定的目标文体处理；公文、学术、新闻通稿的规范用语不必强行口语化。`;
 
 function renderDeAiInput(request: DeAiRequest): string {
@@ -192,7 +193,7 @@ function renderDeAiInput(request: DeAiRequest): string {
 export function deAiPrompt(): DeAiPromptSpec {
   return {
     id: 'deai',
-    version: 4,
+    version: 5,
     sha256: createHash('sha256').update(DEAI_SYSTEM).digest('hex'),
     system: DEAI_SYSTEM,
     render: renderDeAiInput,
