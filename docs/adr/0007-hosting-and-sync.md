@@ -105,3 +105,15 @@
 2. ✅ P7.2：systemd 单元、sync/backup 脚本与 timer——已交付（`deploy/`、`docs/DEPLOY.md`）；
 3. 服务器访问控制（HTTPS、Basic Auth 或 Tailscale）；
 4. 本地仓库"只读"的强制手段（文件权限或 pre-push hook），当前靠约定。
+
+---
+
+## 维护与所有权（2026-11-04）
+
+为落实「不依赖任何个人」的可维护性目标，补充三条落地（决策细节见 `docs/MAINTAINERS.md` 与 PROGRESS D70-D72）：
+
+1. 三个仓库（代码 / vault / raw）的地址、鉴权方式、服务器路径统一记录在 `docs/MAINTAINERS.md`；vault/raw 使用服务器上的只读 deploy key；
+2. 运维页 `/operations` 的「GitHub 仓库与维护」提供状态查看、逐仓库/全部 `git pull --ff-only`、远端地址修改（持久化到 `DATA_DIR/repos.json`）；
+3. 完整恢复的最小依赖是「服务器 + 三个 GitHub 仓库 + `MODEL_API_KEY`」；个人电脑不在运行时链路上，换机器/换 owner 按 MAINTAINERS 的迁移清单执行。
+
+以上不改变 ADR 0007 的核心决策：服务端唯一写者、raw/wiki 单向、状态库仅服务器。

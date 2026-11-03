@@ -73,6 +73,7 @@ import {
 import type { DeAiStyle } from '@sb/contracts';
 import { analyzeAiFlavor, parseDraftId, parseRawPath, type DraftId, type RawPath } from '@sb/domain';
 import type { Runtime } from './runtime';
+import { collectRepoStatus, isValidRemoteUrl, pullRepo, readRepoOverrides, repoDescriptors, setRepoRemote, writeRepoOverrides } from './repos';
 import { aboutPage, adminPage, deAiPage, articlePage, articlesPage, claimsPage, composeArticlePage, composeDiffPage, composePage, dashboard, errorPage, guidePage, nodePage, nodesPage, reviewListPage, reviewPage, searchPage, usagePage } from './views';
 
 function redirect(res: http.ServerResponse, location: string): void {
@@ -417,6 +418,46 @@ export function createServer(runtime: Runtime): http.Server {
         });
         return redirect(res, '/operations');
       }
+      if (req.method === 'POST' && path === '/actions/ops/repo/pull') {
+        const form = await readForm(req);
+        const key = form.key ?? '';
+        const repo = repoDescriptors({ dataDir: runtime.dataDir, vaultRoot: runtime.vaultRoot }).find((entry) => entry.key === key);
+        if (!repo) return sendHtml(res, errorPage(`未知仓库：${key}`), 404);
+        await runLogged(runtime.dataDir, `更新仓库：${repo.label}`, async () => {
+          const result = await pullRepo(repo);
+          if (!result.ok) throw new Error(result.detail);
+          return result.detail;
+        });
+        return redirect(res, '/operations');
+      }
+      if (req.method === 'POST' && path === '/actions/ops/repo/all') {
+        for (const repo of repoDescriptors({ dataDir: runtime.dataDir, vaultRoot: runtime.vaultRoot })) {
+          await runLogged(runtime.dataDir, `更新仓库：${repo.label}`, async () => {
+            const result = await pullRepo(repo);
+            if (!result.ok) throw new Error(result.detail);
+            return result.detail;
+          });
+        }
+        return redirect(res, '/operations');
+      }
+      if (req.method === 'POST' && path === '/actions/ops/repo/remote') {
+        const form = await readForm(req);
+        const key = form.key ?? '';
+        const remote = (form.remote ?? '').trim();
+        const repo = repoDescriptors({ dataDir: runtime.dataDir, vaultRoot: runtime.vaultRoot }).find((entry) => entry.key === key);
+        if (!repo) return sendHtml(res, errorPage(`未知仓库：${key}`), 404);
+        if (!isValidRemoteUrl(remote)) {
+          return sendHtml(res, errorPage('远端地址不合法：只支持 https://、ssh:// 或 git@ 形式（不含空白）'), 400);
+        }
+        await runLogged(runtime.dataDir, `切换仓库远端：${repo.label}`, async () => {
+          const result = await setRepoRemote(repo, remote);
+          if (!result.ok) throw new Error(result.detail);
+          const overrides = readRepoOverrides(runtime.dataDir);
+          writeRepoOverrides(runtime.dataDir, { ...overrides, [key]: { ...(overrides[key] ?? {}), remote } });
+          return result.detail;
+        });
+        return redirect(res, '/operations');
+      }
       if (req.method === 'POST' && path === '/actions/worker/resume') {
         fs.rmSync(join(runtime.dataDir, 'worker-pause.json'), { force: true });
         return redirect(res, '/admin');
@@ -464,8 +505,13 @@ export function createServer(runtime: Runtime): http.Server {
         } catch {
           logs = [];
         }
+        const fetchRepos = url.searchParams.get('fetch') === '1';
+        const repoList = repoDescriptors({ dataDir: runtime.dataDir, vaultRoot: runtime.vaultRoot });
+        const repos = await Promise.all(repoList.map((repo) => collectRepoStatus(repo, { fetch: fetchRepos })));
         return sendHtml(res, adminPage({
           ops: readOps(runtime.dataDir),
+          repos,
+          reposFetched: fetchRepos,
           logs,
           pendingLimit: (() => {
             try {

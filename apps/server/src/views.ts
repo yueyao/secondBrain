@@ -1,6 +1,7 @@
 /** 服务端渲染的审核台（无前端框架，手机可用）。 */
 import type { DeAiStyle, QueueItemV1, ReviewViewV1, ScoredHit } from '@sb/contracts';
 import { AI_FLAVOR_RULES, type AiFlavorReport } from '@sb/domain';
+import { webRepoUrl, type RepoStatus } from './repos';
 
 const esc = (value: unknown): string =>
   String(value ?? '')
@@ -576,6 +577,10 @@ export interface AdminPageData {
   readonly worker: WorkerStatusView | null;
   readonly progress: { readonly done: number; readonly total: number };
   readonly throughput: readonly { readonly day: string; readonly count: number }[];
+  /** 项目依赖的 GitHub 仓库（代码 / vault / raw）及其实时同步状态。 */
+  readonly repos: readonly RepoStatus[];
+  /** 本次加载是否执行了 git fetch（页面会显示"远端状态为刚检查"）。 */
+  readonly reposFetched: boolean;
 }
 
 function fmtEta(hours: number | null): string {
@@ -585,6 +590,53 @@ function fmtEta(hours: number | null): string {
 }
 
 export function adminPage(data: AdminPageData): string {
+  const codeRepo = data.repos.find((repo) => repo.key === 'code');
+  const codeWebUrl = codeRepo?.remote ? webRepoUrl(codeRepo.remote) : null;
+  const maintainerDocUrl = codeWebUrl ? `${codeWebUrl}/blob/main/docs/MAINTAINERS.md` : null;
+  const repoCards = data.repos.map((repo) => {
+    const remoteLine = repo.remote
+      ? (/^(https?:|ssh:)/.test(repo.remote)
+        ? `<a href="${esc(repo.remote.replace(/\.git$/, ''))}" target="_blank" rel="noreferrer">${esc(repo.remote)}</a>`
+        : `<code>${esc(repo.remote)}</code>`)
+      : '<span class="muted">未配置远端</span>';
+    const syncBadge = repo.ahead === null
+      ? '<span class="badge">同步状态未知（点「检查远端」）</span>'
+      : repo.ahead === 0 && repo.behind === 0
+        ? '<span class="badge b-ok">已同步</span>'
+        : `<span class="badge b-warn">领先 ${repo.ahead} / 落后 ${repo.behind}</span>`;
+    const stateBadge = repo.error !== null
+      ? `<span class="badge b-block">${esc(repo.error)}</span>`
+      : repo.dirtyCount > 0
+        ? `<span class="badge b-warn">${repo.dirtyCount} 处未提交</span>`
+        : '<span class="badge b-ok">工作区干净</span>';
+    const headLine = repo.head
+      ? `<code>${esc(repo.head.sha)}</code> ${esc(cut(repo.head.subject, 44))}
+         <div class="muted">${esc(repo.head.date.slice(0, 16).replace('T', ' '))} · ${esc(repo.head.author)}</div>`
+      : '<span class="muted">—</span>';
+    const fetchNote = repo.fetchError !== null
+      ? `<div class="muted" style="color:#f0a6ac">fetch 失败：${esc(repo.fetchError)}</div>`
+      : '';
+    return `<div class="card" style="margin:8px 0">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <div><b>${esc(repo.label)}</b> ${syncBadge} ${stateBadge}</div>
+        <div class="muted" style="font-size:12.5px"><code>${esc(repo.path)}</code></div>
+      </div>
+      <div style="margin:8px 0 6px">远端：${remoteLine}</div>
+      <div style="margin-bottom:6px">分支：<code>${esc(repo.branch ?? '—')}</code> · HEAD：${headLine}</div>
+      ${fetchNote}
+      <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
+        <form method="post" action="/actions/ops/repo/pull"><input type="hidden" name="key" value="${esc(repo.key)}"><button class="btn" type="submit"${repo.error !== null ? ' disabled' : ''}>更新此仓库</button></form>
+        <form method="post" action="/actions/ops/repo/remote" class="row" style="gap:6px;align-items:center;flex:1;min-width:280px">
+          <input type="hidden" name="key" value="${esc(repo.key)}">
+          <input name="remote" value="${esc(repo.remote ?? '')}" placeholder="https://github.com/<owner>/<repo>.git" style="flex:1;min-width:220px">
+          <button class="btn" type="submit">修改远端</button>
+        </form>
+      </div>
+    </div>`;
+  }).join('');
+  const repoRefreshLine = data.reposFetched
+    ? '<span class="muted">远端状态：已在本页加载时 fetch</span>'
+    : '<span class="muted">远端状态以最近一次 fetch 为准；点「检查远端」可强制刷新</span>';
   const stateRows = Object.entries(data.counts).sort((a, b) => b[1] - a[1])
     .map(([state, count]) => `<tr><td>${esc(stateLabel(state))}</td><td>${count.toLocaleString()}</td></tr>`).join('');
   const events = data.recentEvents.map((event) => `<tr><td class="muted">${esc(event.at.slice(0, 19))}</td><td>${esc(event.type)}</td><td class="muted">${esc(event.aggregateId)}</td></tr>`).join('')
@@ -670,6 +722,23 @@ export function adminPage(data: AdminPageData): string {
   <table style="margin-top:10px"><tr><th>时间</th><th>动作</th><th>结果</th><th>详情</th></tr>
   ${data.ops.length === 0 ? '<tr><td colspan="4" class="muted">还没有执行记录</td></tr>' : data.ops.map((op) => `<tr><td class="muted">${esc(op.at.slice(0, 19))}</td><td>${esc(op.action)}</td><td>${op.ok ? '✅ 成功' : '❌ 失败'}</td><td class="muted">${esc(op.detail)}</td></tr>`).join('')}
   </table></div>
+
+  <h2>GitHub 仓库与维护</h2>
+  <div class="row" style="gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0">
+    <form method="post" action="/actions/ops/repo/all"><button class="btn" type="submit">全部更新</button></form>
+    <a class="btn" href="/operations?fetch=1">检查远端</a>
+    ${repoRefreshLine}
+  </div>
+  ${repoCards}
+  <div class="card" style="margin-top:10px">
+    <div class="muted" style="line-height:1.8">
+      <b>可维护性说明</b>：项目运行只依赖「这台服务器 + GitHub 仓库」，不依赖任何个人电脑或账号在线；
+      代码、知识库、原文分别由上面的仓库托管，服务器是唯一写者。<br>
+      vault/raw 由 sync timer 每 15 分钟自动 fast-forward；代码仓库更新后需要重启服务（<code>systemctl restart secondbrain-server secondbrain-worker</code>）。
+      每日 03:17 自动快照 <code>state.db</code>（备份目录见「环境」）。<br>
+      换机器、换 GitHub 账号/组织、轮换密钥、恢复数据：见 ${maintainerDocUrl !== null ? `<a href="${esc(maintainerDocUrl)}" target="_blank" rel="noreferrer">维护与所有权手册（docs/MAINTAINERS.md）</a>` : '<code>docs/MAINTAINERS.md</code>（代码仓库内）'}。
+    </div>
+  </div>
 
   <h2>worker 日志（最近 12 行）</h2>
   <div class="card"><pre>${data.logs.length === 0 ? '（无法读取日志，可能权限不足）' : data.logs.map((line) => esc(line)).join('\n')}</pre></div>
@@ -1097,7 +1166,7 @@ export function aboutPage(data: AboutPageData): string {
     { title: 'claims', href: '/claims', body: '已入库草稿的全部判断句与来源，用来抽查"知识到底沉淀了什么"、追溯每句话的原文出处。' },
     { title: '搜索', href: '/search', body: '站内检索知识库（节点名 / 别名 / 正文），结果可直接打开节点。' },
     { title: '异常', href: '/exceptions', body: '集中查看 failed / blocked / rolled_back / quarantined 等异常原文，按分组筛选，便于排查或重跑。' },
-    { title: '运维中心', href: '/operations', body: '系统运行态：今日进度、worker 心跳/阶段、暂停与继续、立即扫描/同步/备份、待审背压配置、吞吐图、最近事件与 worker 日志。' },
+    { title: '运维中心', href: '/operations', body: '系统运行态：今日进度、worker 心跳/阶段、暂停与继续、立即扫描/同步/备份、待审背压配置、吞吐图、最近事件与 worker 日志；以及三个 GitHub 仓库（代码/vault/raw）的地址、HEAD、落后状态与一键更新/切换远端。' },
     { title: '用量', href: '/usage', body: '模型调用账本：每日调用数、输入/输出 tokens、估算成本、按 profile 汇总、cache 命中与速率/ETA。' },
     { title: '使用说明', href: '/guide', body: '产出怎么用：Obsidian 阅读、检索、审核追溯、JSON API、git 回滚。' },
   ];

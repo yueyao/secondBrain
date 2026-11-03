@@ -95,6 +95,20 @@ pnpm demo
 - key 缺失会启动即失败，不会静默降级；
 - 每次调用的 tokens / 成本（按 pricing 估算）在 `/usage` 与 `/api/usage` 可查。
 
+## 维护与所有权
+
+项目运行只依赖「服务器 + GitHub 仓库」，不依赖任何个人电脑在线：
+
+| 仓库 | 用途 |
+|---|---|
+| `secondBrain`（代码） | server / worker / 全部源码与文档 |
+| `secondBrain-vault`（私有） | `wiki/` 知识节点与 git 历史 |
+| `secondBrain-raw`（私有） | `raw/` 原文语料 |
+
+- 运维中心 `/operations` 的「GitHub 仓库与维护」列出三个仓库的远端、分支、HEAD、领先/落后，可逐仓库或全部更新、检查远端、修改远端（换账号/迁移用）；
+- 代码仓库更新后需要重启 `secondbrain-server` / `secondbrain-worker`；vault/raw 由 sync timer 每 15 分钟自动 fast-forward；
+- 换机器、换 GitHub owner、轮换密钥、备份恢复的完整步骤见 [docs/MAINTAINERS.md](docs/MAINTAINERS.md)。
+
 ## 工程校验
 
 ```bash
@@ -108,7 +122,7 @@ pnpm run check     # boundaries → typecheck → depcruise → test
 pnpm run boundaries   # 包边界、深引、纯度（无 node: / 无第三方 / 无 throw / 无时钟）
 pnpm run typecheck    # tsc --noEmit（strict + exactOptionalPropertyTypes）
 pnpm run depcruise    # 依赖方向、环形依赖
-pnpm test             # vitest：35 个文件 / 322 例
+pnpm test             # vitest：35 个文件 / 324 例
 ```
 
 ## 能证明什么

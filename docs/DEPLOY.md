@@ -2,6 +2,7 @@
 
 > 目标：一台 Linux 机器上无人值守运行。对应 ADR 0007 / ADR 0008。
 > 前置：Node 22+、pnpm 10+、git、sqlite3；创建一个专用用户 `secondbrain`。
+> 日常更新与迁移：部署完成后，仓库状态与更新可在运维页 `/operations` 完成；换机器/换 owner/恢复数据的清单见 `docs/MAINTAINERS.md`。
 
 ## 1. 目录布局
 

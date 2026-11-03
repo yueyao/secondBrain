@@ -103,6 +103,23 @@ describe('素材库与管理后台', () => {
     expect(html).toContain(first!.title);
   });
 
+  it('运维页展示 GitHub 仓库状态与维护入口', async () => {
+    const response = await fetch(`${base}/operations`);
+    const html = await response.text();
+    expect(response.status).toBe(200);
+    for (const keyword of ['GitHub 仓库与维护', '代码仓库', '知识库 vault', '原文 raw', '更新此仓库', '修改远端', '全部更新', '检查远端']) {
+      expect(html).toContain(keyword);
+    }
+  });
+
+  it('切换仓库远端有校验，未知仓库返回 404', async () => {
+    const bad = await post('/actions/ops/repo/remote', { key: 'vault', remote: 'javascript:alert(1)' });
+    expect(bad.status).toBe(400);
+
+    const unknown = await post('/actions/ops/repo/pull', { key: 'not-a-repo' });
+    expect(unknown.status).toBe(404);
+  });
+
   it('运维中心可打开，/admin 301 过去', async () => {
     const redirect = await fetch(`${base}/admin`, { redirect: 'manual' });
     expect(redirect.status).toBe(301);

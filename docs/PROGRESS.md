@@ -1673,3 +1673,42 @@ pnpm run check
 ```
 
 真实样例（短文本）：68 → 13；文章集成：生成 v5/v6 两个 `source='deai'` 版本，引用全部保留（51 处标记/19 个来源），成本约 $0.008/次。
+
+
+---
+
+## 五十七、运维中心：GitHub 仓库状态与更新 + 维护手册（2026-11-04）
+
+### 57.1 交付
+
+| 层 | 改动 |
+|---|---|
+| server | 新增 `apps/server/src/repos.ts`：三个仓库（代码 / vault / raw）状态采集（远端、分支、HEAD、工作区、领先/落后、fetch 错误）、`git pull --ff-only`、远端 URL 校验与切换；覆盖配置持久化到 `<DATA_DIR>/repos.json` |
+| server | `/operations` 新增「GitHub 仓库与维护」区块：逐仓库卡片 + 全部更新 + 检查远端（`?fetch=1` 执行 fetch）+ 修改远端；所有动作复用 `runLogged` 写入运维审计 |
+| views | 仓库卡片展示远端可点击地址、分支、HEAD（短 sha/标题/时间/作者）、工作区干净/未提交、领先落后徽标；维护说明与「维护与所有权手册」链接（由代码仓库远端推导 web 地址）；`/about` 运维卡片同步 |
+| docs | 新增 [docs/MAINTAINERS.md](docs/MAINTAINERS.md)：仓库清单与鉴权、单人依赖清单、日常维护、迁移/换 owner 步骤、备份恢复、故障速查、关键文件位置；INDEX 登记；DEPLOY/SYNC/ADR 0007 增加指引 |
+| tests | e2e +2：仓库区块渲染；非法远端 400、未知仓库 404 |
+
+### 57.2 决策（D70-D72）
+
+| 编号 | 决策 | 理由 |
+|---|---|---|
+| D70 | 运维页作为仓库维护的唯一界面：状态 + 更新 + 修改远端，不再依赖记忆服务器命令 | 换人维护时可发现、可操作、有审计（`last-ops.json`） |
+| D71 | 远端地址允许在 UI 修改：写 `git remote set-url` 并持久化到 `DATA_DIR/repos.json` | 换 GitHub 账号 / 组织 / 自建 Git 服务不需要改代码或重装；仓库路径仍由部署布局决定 |
+| D72 | 「服务器 + 三个 GitHub 仓库 + API key」是完整恢复的最小依赖，个人电脑只用于采集/阅读 | 交接这三样即可延续项目，不依赖任何个人电脑或账号在线 |
+
+### 57.3 验证
+
+```
+pnpm run check
+ Test Files  35 passed (35)
+      Tests  324 passed (324)
+```
+
+部署后真实核验：运维页展示代码/vault/raw 三仓库（远端地址、分支、HEAD、同步状态），逐仓库更新与「检查远端」可用；非法远端被拒。
+
+### 57.4 后续
+
+- 代码仓库更新后自动重启服务（当前受 systemd 权限限制，页面提示手动 restart；后续可加 sudoers 白名单或部署 hook）；
+- 仓库凭据轮换 UI（当前 deploy key 仍走 SSH 手动配置）；
+- 定时 fetch + 落后告警（现在按需 fetch）。
