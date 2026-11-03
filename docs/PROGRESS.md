@@ -1261,3 +1261,11 @@ sync: vault/raw 均 "Already up to date"
 
 - 运维页新增「生产配置」：待审上限输入框，保存到 `DATA_DIR/ops-config.json`；worker 每轮读取，无需重启；
 - 优先级：ops-config.json > WORKER_MAX_PENDING_DRAFTS 环境变量 > 默认 300。
+
+
+---
+
+## 四十一、批量通过优化（2026-11-03）
+
+- fetch 节流：`git fetch` 5 秒内只执行一次（批量 accept 从 N 次降为 1 次）；
+- 批量 accept 改为后台任务：POST 立即返回 jobId，审核页每秒轮询 `/api/jobs/<id>` 显示"已处理 X/Y（成功/失败）"，完成后自动刷新。

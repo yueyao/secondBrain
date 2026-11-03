@@ -620,6 +620,7 @@ export interface ReviewListPageData {
   readonly items: readonly { draftId: string; title: string; rawPath: string; tier: string; rationale: string; hasBlock: boolean; createdAt: string }[];
   readonly accepted: number;
   readonly failed: number;
+  readonly jobId: string;
 }
 
 export function reviewListPage(data: ReviewListPageData): string {
@@ -637,6 +638,7 @@ export function reviewListPage(data: ReviewListPageData): string {
   return layout('审核中心', `${nav()}
   <div class="row" style="justify-content:space-between"><h1>审核中心</h1><span class="muted">${data.items.length} 篇待审</span></div>
   ${flash}
+  ${data.jobId ? `<div class="card" id="job-progress">批量处理中… <span id="job-text"></span></div><script>(function(){var id=${JSON.stringify(data.jobId)};var t=setInterval(function(){fetch("/api/jobs/"+id).then(function(r){return r.json()}).then(function(d){document.getElementById("job-text").textContent=d.done+"/"+d.total+"（成功 "+d.ok+"，失败 "+d.failed+"）";if(d.status==="done"){clearInterval(t);document.getElementById("job-progress").textContent="完成："+d.ok+" 成功 / "+d.failed+" 失败，刷新中…";setTimeout(function(){location.href="/review";},800);}});},1000);})();</script>` : ""}
   <form method="post" action="/actions/review/bulk-accept" id="bulk-form">
     <div class="row" style="gap:8px;margin:12px 0">
       <button class="btn" type="button" onclick="document.querySelectorAll('input[name=draftId]').forEach(function(c){c.checked=true;})">全选本页</button>

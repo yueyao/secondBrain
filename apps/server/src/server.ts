@@ -8,6 +8,9 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
+interface BulkJob { total: number; done: number; ok: number; failed: number; status: 'running' | 'done'; }
+const bulkJobs = new Map<string, BulkJob>();
+
 interface OpsRecord { readonly action: string; readonly at: string; readonly ok: boolean; readonly detail: string; }
 
 function readOps(dataDir: string): OpsRecord[] {
@@ -304,19 +307,30 @@ export function createServer(runtime: Runtime): http.Server {
           items: await pendingReviewList(runtime.ctx),
           accepted: Number(url2.searchParams.get('ok') ?? '0'),
           failed: Number(url2.searchParams.get('failed') ?? '0'),
+          jobId: url2.searchParams.get('job') ?? '',
         }));
       }
       if (req.method === 'POST' && path === '/actions/review/bulk-accept') {
         const params = await readFormParams(req);
         const draftIds = params.getAll('draftId');
-        let ok = 0; let failed = 0;
-        for (const rawId of draftIds) {
-          const parsed = parseDraftId(rawId);
-          if (!parsed.ok) { failed += 1; continue; }
-          try { await decideReview(runtime.ctx, parsed.value, 'accept', { actor: 'owner', note: '批量通过' }); ok += 1; }
-          catch { failed += 1; }
-        }
-        return redirect(res, `/review?ok=${ok}&failed=${failed}`);
+        const jobId = Math.random().toString(36).slice(2, 10);
+        const job: BulkJob = { total: draftIds.length, done: 0, ok: 0, failed: 0, status: 'running' };
+        bulkJobs.set(jobId, job);
+        void (async () => {
+          for (const rawId of draftIds) {
+            const parsed = parseDraftId(rawId);
+            if (parsed.ok) {
+              try { await decideReview(runtime.ctx, parsed.value, 'accept', { actor: 'owner', note: '批量通过' }); job.ok += 1; }
+              catch { job.failed += 1; }
+            } else { job.failed += 1; }
+            job.done += 1;
+          }
+          job.status = 'done';
+        })();
+        return redirect(res, `/review?job=${jobId}`);
+      }
+      if (req.method === 'GET' && path.startsWith('/api/jobs/')) {
+        return sendJson(res, bulkJobs.get(path.slice('/api/jobs/'.length)) ?? { total: 0, done: 0, ok: 0, failed: 0, status: 'done' });
       }
       if (req.method === 'GET' && path.startsWith('/review/')) {
         const view = await reviewView(runtime.ctx, draftIdOf(path.slice('/review/'.length)));

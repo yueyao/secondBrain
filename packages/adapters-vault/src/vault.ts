@@ -89,7 +89,12 @@ export class FsVault implements VaultPort {
     }
   }
 
+  private lastFetchAt = 0;
+
   async fetch(): Promise<void> {
+    const now = Date.now();
+    if (now - this.lastFetchAt < 5000) return; // 5 秒内不重复 fetch（批量 accept 提速）
+    this.lastFetchAt = now;
     try {
       this.git(['fetch', '--prune', '--quiet']);
     } catch {
