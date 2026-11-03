@@ -6,13 +6,15 @@ import { createServer } from './server';
 const port = Number(process.env.PORT ?? 8787);
 const host = process.env.HOST ?? '127.0.0.1';
 const dataDir = process.env.DATA_DIR ?? path.resolve(process.cwd(), '.sb-demo');
+const vaultRoot = process.env.VAULT_ROOT;
 
-const runtime = await createRuntime({ dataDir });
+const runtime = await createRuntime({ dataDir, ...(vaultRoot ? { vaultRoot } : {}) });
 const server = createServer(runtime);
 
 server.listen(port, host, () => {
   console.log(`secondBrain 审核台 → http://${host}:${port}`);
   console.log(`数据目录: ${dataDir}`);
+  console.log(`vault: ${vaultRoot ?? path.join(dataDir, 'vault')}`);
 });
 
 const shutdown = async (): Promise<void> => {
