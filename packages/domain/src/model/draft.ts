@@ -17,6 +17,8 @@ export interface NodeChange {
   readonly nodeType: NodeType;
   readonly action: NodeAction;
   readonly definition: string | null;
+  /** 该节点由哪些 claim 支撑（claims 数组下标）；空数组 = 未提供，渲染时回退为全部 claims */
+  readonly claimIndexes: readonly number[];
 }
 
 export interface DraftProposal {

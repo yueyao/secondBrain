@@ -29,7 +29,7 @@ function parseClaim(raw: unknown, index: number): Result<Claim, DomainError> {
   return ok({ text, inference, source });
 }
 
-function parseNode(raw: unknown, index: number): Result<NodeChange, DomainError> {
+function parseNode(raw: unknown, index: number, claimCount: number): Result<NodeChange, DomainError> {
   if (!isRecord(raw)) return err(domainError('INVALID_NODE', `nodes[${index}] 不是对象`));
   const { name, nodeType, action, definition } = raw;
   if (typeof name !== 'string' || name.trim().length === 0) {
@@ -44,11 +44,30 @@ function parseNode(raw: unknown, index: number): Result<NodeChange, DomainError>
   if (definition !== null && definition !== undefined && typeof definition !== 'string') {
     return err(domainError('INVALID_NODE', `nodes[${index}].definition 必须是字符串或 null`));
   }
+
+  const rawIndexes = raw.claimIndexes;
+  if (rawIndexes !== undefined && rawIndexes !== null) {
+    if (!Array.isArray(rawIndexes) || rawIndexes.length === 0) {
+      return err(domainError('INVALID_NODE', `nodes[${index}].claimIndexes 必须是非空数组`));
+    }
+    const seen = new Set<number>();
+    for (const value of rawIndexes) {
+      if (typeof value !== 'number' || !Number.isInteger(value) || value < 0 || value >= claimCount) {
+        return err(domainError('INVALID_NODE', `nodes[${index}].claimIndexes 含非法下标：${String(value)}`));
+      }
+      if (seen.has(value)) {
+        return err(domainError('INVALID_NODE', `nodes[${index}].claimIndexes 含重复下标：${value}`));
+      }
+      seen.add(value);
+    }
+  }
+
   return ok({
     name,
     nodeType: nodeType as NodeType,
     action: action as NodeAction,
     definition: typeof definition === 'string' ? definition : null,
+    claimIndexes: Array.isArray(rawIndexes) ? (rawIndexes as number[]) : [],
   });
 }
 
@@ -78,7 +97,7 @@ export function validateDraftProposal(raw: unknown): Result<DraftProposal, Domai
 
   const nodes: NodeChange[] = [];
   for (const [index, item] of raw.nodes.entries()) {
-    const parsed = parseNode(item, index);
+    const parsed = parseNode(item, index, claims.length);
     if (!parsed.ok) return parsed;
     nodes.push(parsed.value);
   }

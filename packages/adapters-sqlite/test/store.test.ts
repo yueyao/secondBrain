@@ -50,7 +50,7 @@ function draftRecord(): DraftRecord {
       tier: 'patch',
       rationale: '命中已有节点',
       claims: [{ text: '一条判断', inference: false, source: RAW }],
-      nodes: [{ name: '反脆弱', nodeType: 'concept', action: 'patch', definition: null }],
+      nodes: [{ name: '反脆弱', nodeType: 'concept', action: 'patch', definition: null, claimIndexes: [] }],
     },
     findings: [{ ruleId: 'r-inferred-claims', severity: 'warn', code: 'INFERRED_CLAIMS', message: 'x', detail: {} }],
     targetHashes: {},

@@ -50,12 +50,13 @@ const DIGEST_SYSTEM = `你是知识助产士。把用户提供的原文提炼成
   "tier": "patch" | "standard" | "accelerated" | "full",
   "rationale": "为什么这样判档",
   "claims": [{ "text": "判断句（>=8 字，写成可长期召回的自然语言）", "inference": false, "source": "raw/..." }],
-  "nodes": [{ "name": "节点名", "nodeType": "concept" | "topic" | "person", "action": "patch" | "new", "definition": "完整定义或 null" }]
+  "nodes": [{ "name": "节点名", "nodeType": "concept" | "topic" | "person", "action": "patch" | "new", "definition": "完整定义或 null", "claimIndexes": [0, 2] }]
 }
 规则：
 - 每条 claim 的 source 必须是输入原文的路径；
 - 原文没直接说、由你推断的内容必须标 inference: true；
 - 优先 patch 已有节点（见"检索命中"），没有合适节点才新建；
+- claimIndexes 是"这个节点由哪几条 claims 支撑"的下标（从 0 开始，至少 1 个，不要把所有下标都塞给每个节点）；
 - 不要写时效性数据、价格、榜单和行动建议。`;
 
 const PROMPT_SHA = createHash('sha256').update(DIGEST_SYSTEM).digest('hex');
@@ -63,7 +64,7 @@ const PROMPT_SHA = createHash('sha256').update(DIGEST_SYSTEM).digest('hex');
 export function digestPrompt(): PromptSpec {
   return {
     id: 'digest',
-    version: 1,
+    version: 2,
     sha256: PROMPT_SHA,
     system: DIGEST_SYSTEM,
     render: (request: DigestRequest) => {

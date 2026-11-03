@@ -132,7 +132,7 @@ export function claim(text: string, source = 'raw/knowledge/cubox/a.md', inferen
 }
 
 export function node(name: string, action: 'patch' | 'new' = 'new', nodeType: 'concept' | 'topic' | 'person' = 'concept'): NodeChange {
-  return { name, action, nodeType, definition: action === 'new' ? `${name}的定义` : null };
+  return { name, action, nodeType, definition: action === 'new' ? `${name}的定义` : null, claimIndexes: [] };
 }
 
 export function existingNode(name: string, aliases: readonly string[] = [], file = `wiki/concepts/${name}.md`): ExistingNode {

@@ -352,9 +352,10 @@ export async function commitApproved(ctx: AppContext, draftId: DraftId): Promise
     for (const node of draft.proposal.nodes) {
       const file = node.action === 'new' ? nodeFile(node) : targetFile(ctx, node.name);
       const existing = await readNodeOrNull(ctx, file);
+      const nodeClaims = claimsForNode(node, draft.proposal.claims);
       const content = node.action === 'new'
-        ? renderNewNode(node, draft.proposal.claims, sourcePath, today)
-        : renderPatchedNode(existing ?? '', draft.proposal.claims, sourcePath, today);
+        ? renderNewNode(node, nodeClaims, sourcePath, today)
+        : renderPatchedNode(existing ?? '', nodeClaims, sourcePath, today);
 
       if (existing === content) continue; // 已写完
       // 崩溃重放：上一次已经把这些 claim 写进去了，跳过硬性重渲染（避免重复追加）
@@ -477,6 +478,12 @@ async function markRolledBack(ctx: AppContext, draft: DraftRecord, now: string, 
 function claimsApplied(existing: string | null, claims: readonly { text: string }[]): boolean {
   if (!existing || claims.length === 0) return false;
   return claims.every((claim) => existing.includes(claim.text));
+}
+
+function claimsForNode(node: { readonly claimIndexes: readonly number[] }, claims: DraftProposal['claims']): DraftProposal['claims'] {
+  if (node.claimIndexes.length === 0) return claims;
+  const picked = node.claimIndexes.flatMap((index) => (claims[index] ? [claims[index]] : []));
+  return picked.length > 0 ? picked : claims;
 }
 
 function targetFile(ctx: AppContext, name: string): string {

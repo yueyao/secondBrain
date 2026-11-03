@@ -8,7 +8,7 @@ export const VALID_PROPOSAL: DraftProposal = {
   tier: 'standard',
   rationale: '测试用草稿',
   claims: [{ text: '这是一条足够长的测试判断。', inference: false, source: 'raw/knowledge/cubox/a.md' }],
-  nodes: [{ name: '幂律分布', nodeType: 'concept', action: 'new', definition: '测试定义' }],
+  nodes: [{ name: '幂律分布', nodeType: 'concept', action: 'new', definition: '测试定义', claimIndexes: [0] }],
 };
 
 export class FakeProvider implements CompletionProvider {

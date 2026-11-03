@@ -34,13 +34,14 @@ export class MockAgent implements AgentPort {
       .map((text) => ({ text, inference: /推测|可能|大概/.test(text), source: String(request.rawPath) }));
 
     const nodes: NodeChange[] = target
-      ? [{ name: target.name, nodeType: 'concept', action: 'patch', definition: null }]
+      ? [{ name: target.name, nodeType: 'concept', action: 'patch', definition: null, claimIndexes: claims.map((_, index) => index) }]
       : [
           {
             name: hint ?? title,
             nodeType: 'concept',
             action: 'new',
             definition: deriveDefinition(body, hint ?? title),
+            claimIndexes: claims.map((_, index) => index),
           },
         ];
 

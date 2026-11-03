@@ -123,7 +123,7 @@ const agent: AgentPort = {
       tier: 'patch',
       rationale: '命中已有节点',
       claims: [{ text: '一条判断', inference: false, source: request.rawPath }],
-      nodes: [{ name: '反脆弱', nodeType: 'concept', action: 'patch', definition: null }],
+      nodes: [{ name: '反脆弱', nodeType: 'concept', action: 'patch', definition: null, claimIndexes: [] }],
     };
     return {
       proposal,
@@ -201,7 +201,7 @@ describe('契约：跨端 DTO 形状', () => {
       state: 'in_review',
       findings: [makeFinding('r-inferred-claims', 'warn', 'INFERRED_CLAIMS', '1 条推断')],
       claims: [{ text: '判断', inference: false, source: RAW_A }],
-      nodes: [{ name: '幂律分布', nodeType: 'concept', action: 'new', definition: '定义' }],
+      nodes: [{ name: '幂律分布', nodeType: 'concept', action: 'new', definition: '定义', claimIndexes: [] }],
       actions: { accept: true, blockedBy: [] },
       provenance: { provider: 'mock', model: 'none', promptVersion: 1, inputTokens: null, latencyMs: null },
       createdAt: '2026-10-30T22:00:00+08:00',

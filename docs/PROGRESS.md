@@ -1040,3 +1040,34 @@ sync: vault/raw 均 "Already up to date"
 2. 启动 worker，观察首批真实起草；
 3. UI 通过 SSH 隧道访问；后续可加 Caddy + 认证；
 4. 内存余量约 600M，worker 启动后需观察。
+
+
+---
+
+## 二十八、P6.1 节点 ↔ claims 映射（2026-11-03）
+
+### 28.1 问题
+
+基线发现：同一篇草稿的每个节点都会写入**全部 claims**（5 节点 × 15 claims = 75 行，其中 60 行重复）。原因是 `NodeChange` 没有"节点由哪些 claim 支撑"的结构。
+
+### 28.2 交付
+
+| 层 | 改动 |
+|---|---|
+| domain | `NodeChange.claimIndexes: number[]`；`validateDraftProposal` 校验下标（非空、整数、不重复、在范围内）；未提供时回退 `[]`（渲染用全部，兼容旧草稿） |
+| app | `claimsForNode`：按 `claimIndexes` 选 claims；`renderNew/PatchedNode` 只写对应 claims |
+| prompt | schema 增加 `claimIndexes`，规则要求"每个节点至少 1 个、不要把所有下标塞给每个节点"；prompt version 1 → 2（缓存 key 随之变化） |
+| testing | MockAgent 输出全部下标（保持测试行为） |
+| tests | 新增 `draft-validation.test.ts` 5 例（合法/缺省/越界/重复/空数组） |
+
+### 28.3 验证
+
+```
+ Test Files  26 passed (26)
+      Tests  184 passed (184)
+```
+
+### 28.4 遗留
+
+- 服务器上已生成的 3 篇草稿没有 `claimIndexes`（回退为全部 claims），建议 reject 后重新起草；
+- 全量跑之前先抽审新草稿，确认节点与 claims 的对应质量。
