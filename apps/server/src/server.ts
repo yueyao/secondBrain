@@ -288,6 +288,8 @@ export function createServer(runtime: Runtime): http.Server {
           total: summary.total,
           drafts: summary.drafts,
           queueRemaining: summary.queueRemaining,
+          progress: summary.progress,
+          throughput: summary.throughput,
           today: summary.today,
           worker,
           usage: {
