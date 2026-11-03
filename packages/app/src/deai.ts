@@ -101,7 +101,7 @@ export async function deAiText(ctx: AppContext, input: DeAiTextInput): Promise<D
   // 目标长度按原文比例 + AI 味分数自适应：套话越多，允许压缩越多；但不得明显变长。
   const target = deAiLengthTarget(length, before.score);
 
-  const result = await port.humanize({
+  const baseRequest = {
     text,
     title: optionalText(input.title),
     style: input.style ?? 'auto',
@@ -109,28 +109,56 @@ export async function deAiText(ctx: AppContext, input: DeAiTextInput): Promise<D
     keepCitations,
     target,
     instruction: optionalText(input.instruction),
-  });
+  };
 
-  const rewritten = result.text.trim();
-  const rewrittenLength = charCount(rewritten);
-  if (rewrittenLength === 0) throw new AppError('INVALID_STATE', '改写结果为空');
-  if (rewrittenLength < target.minChars || rewrittenLength > target.maxChars) {
-    throw new AppError(
-      'INVALID_STATE',
-      `改写结果长度超出目标区间（${rewrittenLength} 字，目标 ${target.minChars}-${target.maxChars} 字）`,
-    );
-  }
+  /** 校验单次改写结果；失败抛 AppError（重试时会被捕获并忽略这一次）。 */
+  const validate = (candidate: string): string => {
+    const rewritten = candidate.trim();
+    if (rewritten.length === 0) throw new AppError('INVALID_STATE', '改写结果为空');
+    const rewrittenLength = charCount(rewritten);
+    if (rewrittenLength < target.minChars || rewrittenLength > target.maxChars) {
+      throw new AppError(
+        'INVALID_STATE',
+        `改写结果长度超出目标区间（${rewrittenLength} 字，目标 ${target.minChars}-${target.maxChars} 字）`,
+      );
+    }
+    if (keepCitations.length > 0) {
+      const rewrittenSources = new Set(extractCitationSources(rewritten));
+      const missing = keepCitations.filter((source) => !rewrittenSources.has(source));
+      if (missing.length > 0) throw new AppError('INVALID_STATE', '改写结果丢失了引用来源', { missing });
+    }
+    return rewritten;
+  };
 
-  if (keepCitations.length > 0) {
-    const rewrittenSources = new Set(extractCitationSources(rewritten));
-    const missing = keepCitations.filter((source) => !rewrittenSources.has(source));
-    if (missing.length > 0) {
-      throw new AppError('INVALID_STATE', '改写结果丢失了引用来源', { missing });
+  const result = await port.humanize(baseRequest);
+  const rewritten = validate(result.text);
+  let after = analyzeAiFlavor(rewritten);
+  let finalResult = result;
+
+  // 质量门：改写后分数没有明显下降（尤其是带大量引用、模型偏保守时）→ 更彻底地重写一次。
+  // 只重试一次；若第二次更差，保留第一次。
+  if (before.score >= 30 && after.score > before.score - 5) {
+    try {
+      const retry = await port.humanize({
+        ...baseRequest,
+        instruction: [
+          optionalText(input.instruction) ?? '',
+          '【第二次改写】上一版几乎没有降低 AI 味。请逐句重写，不得整句照抄原文；带引用的句子也要改写，只把“（来源：[[raw/...]]）”留在对应句末。目标是让 AI 味复检分数明显下降。',
+        ].filter((part) => part !== '').join('\n'),
+      });
+      const retryText = validate(retry.text);
+      const retryAfter = analyzeAiFlavor(retryText);
+      if (retryAfter.score < after.score) {
+        after = retryAfter;
+        finalResult = retry;
+        return { original: text, rewritten: retryText, before, after, provenance: retry.provenance, cost: result.cost + retry.cost };
+      }
+    } catch {
+      // 第二次不合规（长度/引用/模型错误）→ 保留第一次结果
     }
   }
 
-  const after = analyzeAiFlavor(rewritten);
-  return { original: text, rewritten, before, after, provenance: result.provenance, cost: result.cost };
+  return { original: text, rewritten, before, after, provenance: finalResult.provenance, cost: finalResult.cost };
 }
 
 /**

@@ -260,3 +260,51 @@ describe('改写目标长度策略（按 AI 味分数自适应）', () => {
     expect(deAiLengthTarget(2, 90).maxChars).toBe(3);
   });
 });
+
+/** 第一次原样返回（分数不降），第二次才真正清洗：用于验证应用层质量重试。 */
+class RetryingDeAi implements DeAiPort {
+  private readonly inner = new MockDeAi();
+  calls = 0;
+
+  async humanize(request: DeAiRequest): Promise<DeAiResult> {
+    this.calls += 1;
+    const base = await this.inner.humanize(request);
+    if (this.calls === 1) return { ...base, text: request.text };
+    const text = request.text
+      .replace(/首先|其次|此外|最后|综上所述|值得注意的是|与此同时|换句话说|众所周知|不可否认|再者|归根结底/gu, '')
+      .replace(/打造|赋能|抓手|闭环|底层逻辑|助力|极致|深入探讨|不可或缺/g, '');
+    return { ...base, text };
+  }
+}
+
+/** 两次都原样返回：验证"重试一次仍不改善时保留第一次结果、不无限重试"。 */
+class AlwaysSameDeAi implements DeAiPort {
+  private readonly inner = new MockDeAi();
+  calls = 0;
+
+  async humanize(request: DeAiRequest): Promise<DeAiResult> {
+    this.calls += 1;
+    const base = await this.inner.humanize(request);
+    return { ...base, text: request.text };
+  }
+}
+
+describe('改写质量门（未降低 AI 味时自动重试一次）', () => {
+  it('第一版分数不降 → 更彻底地重写一次并采用更低分结果', async () => {
+    const port = new RetryingDeAi();
+    const result = await deAiText(ctxOf(harness, port), { text: AI_TEXT, style: 'auto' });
+
+    expect(port.calls).toBe(2);
+    expect(result.after.score).toBeLessThan(result.before.score);
+    expect(result.rewritten).not.toBe(result.original);
+  });
+
+  it('重试仍不改善 → 最多调用两次并保留第一次结果', async () => {
+    const port = new AlwaysSameDeAi();
+    const result = await deAiText(ctxOf(harness, port), { text: AI_TEXT, style: 'auto' });
+
+    expect(port.calls).toBe(2);
+    expect(result.rewritten).toBe(result.original);
+    expect(result.after.score).toBe(result.before.score);
+  });
+});
