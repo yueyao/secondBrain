@@ -48,10 +48,11 @@ import {
   adminSummary,
   overview,
   pendingReviewList,
+  committedClaims,
 } from '@sb/app';
 import { parseDraftId, parseRawPath, type DraftId, type RawPath } from '@sb/domain';
 import type { Runtime } from './runtime';
-import { adminPage, articlePage, articlesPage, dashboard, errorPage, reviewListPage, reviewPage, searchPage, usagePage } from './views';
+import { adminPage, articlePage, articlesPage, claimsPage, dashboard, errorPage, guidePage, reviewListPage, reviewPage, searchPage, usagePage } from './views';
 
 function redirect(res: http.ServerResponse, location: string): void {
   res.writeHead(303, { location });
@@ -135,6 +136,12 @@ export function createServer(runtime: Runtime): http.Server {
         return sendHtml(res, usagePage(await usageSummary(runtime.ctx)));
       }
 
+      if (req.method === 'GET' && path === '/claims') {
+        return sendHtml(res, claimsPage(await committedClaims(runtime.ctx)));
+      }
+      if (req.method === 'GET' && path === '/guide') {
+        return sendHtml(res, guidePage());
+      }
       if (req.method === 'GET' && path === '/exceptions') {
         return redirect(res, '/articles?group=error');
       }

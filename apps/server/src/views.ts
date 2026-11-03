@@ -320,7 +320,7 @@ function nav(): string {
   return `<div class="nav">
     <a href="/"><b>secondBrain</b></a>
     <a href="/">工作台</a><a href="/articles">文章库</a><a href="/review">审核</a>
-    <a href="/operations">运维</a><a href="/exceptions">异常</a><a href="/usage">用量</a><a href="/search">搜索</a>
+    <a href="/claims">claims</a><a href="/operations">运维</a><a href="/exceptions">异常</a><a href="/usage">用量</a><a href="/search">搜索</a>
     <span style="flex:1"></span>
     <span id="worker-light" class="muted">worker: --</span>
     <span id="pending-badge" class="badge b-warn">待审 0</span>
@@ -644,4 +644,32 @@ export function reviewListPage(data: ReviewListPageData): string {
     });
   })();
   </script>`);
+}
+
+
+export function claimsPage(rows: readonly { draftId: string; text: string; inference: boolean; source: string }[]): string {
+  const items = rows.map((row) => `<li>${esc(row.text)}${row.inference ? ' <span class="badge b-warn">推断</span>' : ''}
+    <div class="muted">来源：${esc(row.source)} · 草稿 ${esc(row.draftId)}</div></li>`).join('')
+    || '<li class="muted">还没有已入库的 claims</li>';
+  return layout('claims', `${nav()}
+  <h1>已入库 claims（${rows.length}）</h1>
+  <div class="muted">来自已通过审核并入库的草稿。每个 claim 都带来源原文与所属草稿。</div>
+  <div class="card"><ol>${items}</ol></div>`);
+}
+
+export function guidePage(): string {
+  return layout('使用说明', `${nav()}
+  <h1>产出如何使用</h1>
+  <div class="card">
+  <h2>1. 阅读（Obsidian / 文件）</h2>
+  <p>所有知识都是 <code>vault/wiki/</code> 下的 Markdown 文件，直接用 Obsidian 打开即可；本地通过 <code>git pull</code> 获取服务器最新提交。</p>
+  <h2>2. 检索</h2>
+  <p>站内「搜索」走 wiki 索引；本地可用 Obsidian 搜索或 <code>grep</code>。每个节点内的「来源：[[raw/…]]」可追溯到原文。</p>
+  <h2>3. 审核产出的来源</h2>
+  <p>文章库（<a href="/articles">/articles</a>）按状态查看全部原文；文章详情可见 triage、草稿 claims 与节点；「claims」页可看已入库判断。</p>
+  <h2>4. 接入其他工具</h2>
+  <p>服务端 JSON API：<code>/api/health</code>、<code>/api/queue</code>、<code>/api/usage</code>、<code>/api/overview</code>、<code>/api/search?q=</code>。上游可直接读 <code>vault/wiki/</code> 文件或 git 历史。</p>
+  <h2>5. 版本与回滚</h2>
+  <p>每次 accept 一次 git commit；用 <code>git log</code> / <code>git revert</code> 回滚，服务器与本地通过私有仓库同步。</p>
+  </div>`);
 }

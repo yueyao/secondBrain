@@ -1220,3 +1220,12 @@ sync: vault/raw 均 "Already up to date"
 - 顶栏新增「异常」入口（`/exceptions` → `/articles?group=error`），集中查看 failed/blocked/rolled_back/quarantined 等；
 - 文章详情新增「时间线」：按 aggregateId 过滤 events，展示该文章最近 20 条事件；
 - 测试 188 例全绿。
+
+
+---
+
+## 三十八、claims 页 + 使用说明页（2026-11-03）
+
+- `/claims`：已入库草稿的全部 claims（判断句、是否推断、来源原文、所属草稿）；
+- `/guide`：产出如何使用（Obsidian 阅读、检索、审核追溯、JSON API、git 回滚）；
+- 测试 188 例全绿。

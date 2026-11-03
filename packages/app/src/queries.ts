@@ -524,3 +524,24 @@ export async function pendingReviewList(ctx: AppContext): Promise<readonly Revie
     };
   }).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
+
+
+export interface ClaimRowV1 {
+  readonly draftId: string;
+  readonly text: string;
+  readonly inference: boolean;
+  readonly source: string;
+}
+
+/** 已入库草稿的 claims（用于全局查看） */
+export async function committedClaims(ctx: AppContext, limit = 500): Promise<readonly ClaimRowV1[]> {
+  const drafts = await ctx.store.transaction(async (tx) => tx.drafts.listByStatus('approved'));
+  const rows: ClaimRowV1[] = [];
+  for (const draft of drafts) {
+    for (const claim of draft.proposal.claims) {
+      rows.push({ draftId: draft.id, text: claim.text, inference: claim.inference, source: claim.source });
+      if (rows.length >= limit) return rows;
+    }
+  }
+  return rows;
+}
