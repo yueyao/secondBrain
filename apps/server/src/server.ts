@@ -151,10 +151,10 @@ export function createServer(runtime: Runtime): http.Server {
         }));
       }
       if (req.method === 'POST' && path === '/actions/compose/create') {
-        const form = await readForm(req);
-        const nodes = typeof form.node === 'string' ? [form.node] : [];
+        const params = await readFormParams(req);
+        const nodes = params.getAll('node');
         const id = `article-${Date.now().toString(36)}`;
-        await createArticle(runtime.ctx, id, { title: form.title ?? '', theme: form.theme ?? '', nodeIds: nodes });
+        await createArticle(runtime.ctx, id, { title: params.get('title') ?? '', theme: params.get('theme') ?? '', nodeIds: nodes });
         return redirect(res, '/compose');
       }
       if (req.method === 'GET' && path === '/nodes') {
