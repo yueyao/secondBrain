@@ -419,3 +419,24 @@ export async function adminSummary(
     recentEvents,
   };
 }
+
+
+export interface OverviewV1 {
+  readonly pendingDrafts: number;
+  readonly queued: number;
+  readonly draftReady: number;
+  readonly committed: number;
+  readonly version: string;
+}
+
+/** 轻量轮询接口：给前端 5 秒一次，版本变化才提示刷新。 */
+export async function overview(ctx: AppContext): Promise<OverviewV1> {
+  const all = await ctx.store.transaction(async (tx) => tx.rawItems.listAll());
+  const counts: Record<string, number> = {};
+  for (const item of all) counts[item.state.kind] = (counts[item.state.kind] ?? 0) + 1;
+  const pending = (await ctx.store.transaction(async (tx) => tx.drafts.listByStatus('pending'))).length;
+  const queued = counts.queued ?? 0;
+  const draftReady = counts.draft_ready ?? 0;
+  const committed = counts.committed ?? 0;
+  return { pendingDrafts: pending, queued, draftReady, committed, version: `${pending}/${queued}/${draftReady}/${committed}` };
+}

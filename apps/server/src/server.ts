@@ -15,6 +15,7 @@ import {
   listArticles,
   articleDetail,
   adminSummary,
+  overview,
 } from '@sb/app';
 import { parseDraftId, parseRawPath, type DraftId, type RawPath } from '@sb/domain';
 import type { Runtime } from './runtime';
@@ -219,6 +220,9 @@ export function createServer(runtime: Runtime): http.Server {
       }
       if (req.method === 'GET' && path.startsWith('/api/reviews/')) {
         return sendJson(res, await reviewView(runtime.ctx, draftIdOf(path.slice('/api/reviews/'.length))));
+      }
+      if (req.method === 'GET' && path === '/api/overview') {
+        return sendJson(res, await overview(runtime.ctx));
       }
       if (req.method === 'GET' && path === '/api/usage') {
         const day = url.searchParams.get('day') ?? undefined;

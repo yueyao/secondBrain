@@ -44,7 +44,19 @@ function layout(title: string, body: string): string {
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} · secondBrain</title><style>${CSS}</style></head>
-<body><div class="wrap">${body}</div></body></html>`;
+<body><div id="refresh-bar" class="refresh-bar"></div><div class="wrap">${body}</div>
+<script>
+(function(){
+  var version=null;
+  function show(text){var bar=document.getElementById('refresh-bar');if(!bar)return;bar.textContent=text;bar.style.display='block';bar.onclick=function(){location.reload();};}
+  function poll(){fetch('/api/overview',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
+    if(version===null){version=d.version;return;}
+    if(d.version!==version&&document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){show('有更新（当前有输入，未自动刷新）· 点击刷新');return;}
+    if(d.version!==version){version=d.version;show('有更新 · 点击刷新');}
+  }).catch(function(){});}
+  poll();setInterval(poll,5000);
+})();
+</script></body></html>`;
 }
 
 function findingBadge(severity: string): string {
