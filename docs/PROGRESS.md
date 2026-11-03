@@ -996,3 +996,47 @@ worker 测试断言：tick 后草稿数 = 队列数、**committed 为 0**（绝�
 
 worker 启动时若未配置 `MODEL_BASE_URL` 且未显式设置 `WORKER_ALLOW_MOCK=1`，**直接拒绝启动**。
 原因：生产环境误用 MockAgent 会给真实文章写入假草稿；该护栏保证"要么真实模型，要么显式承认在演示"。
+
+
+---
+
+## 二十七、服务器部署（2026-11-03，腾讯云 Lighthouse）
+
+### 27.1 环境
+
+| 项 | 值 |
+|---|---|
+| 实例 | Lighthouse `lhins-iux3d3gt`（ap-singapore） |
+| 系统 | OpenCloudOS 9.4，2C / 1.9G（swap 2G），磁盘 50G |
+| 运行时 | Node v24.22.2（node:sqlite 可用）、pnpm 10.34.5、git 2.43、sqlite3 3.42、systemd 255 |
+| 网络 | GitHub 直连可用（无需代理） |
+
+### 27.2 部署内容
+
+| 项 | 位置/状态 |
+|---|---|
+| 代码 | `/srv/secondbrain/repo`（GitHub public，已同步 `72297c7`） |
+| vault | `/srv/secondbrain/vault`（私有仓库，Deploy Key 只读） |
+| raw | `/srv/secondbrain/vault/raw`（独立私有仓库，第二把只读 Deploy Key） |
+| 状态库 | `/srv/secondbrain/state/state.db`（已导入 4,408 条） |
+| env | `/etc/secondbrain/secondbrain.env`（600） |
+| 服务 | `secondbrain-server.service`（运行中，127.0.0.1:8787） |
+| 定时 | `secondbrain-sync.timer`（15min）、`secondbrain-backup.timer`（每日 03:17） |
+| 备份 | `/srv/secondbrain/backup/state-2026-11-03.db`（3.5M，integrity ok） |
+
+### 27.3 验证
+
+```
+/health → {"ok": true, "head": "ba2e0a0..."}
+state: committed 1,253 / queued 2,302 / deferred 853
+UI <title>审核台 · secondBrain
+worker: 未配置模型时启动被拒绝（mock 护栏生效）
+sync: vault/raw 均 "Already up to date"
+```
+
+### 27.4 待办
+
+1. DeepSeek key 写入 `/etc/secondbrain/secondbrain.env`（用户 SSH 操作），并设置 `MODEL_BASE_URL`；
+2. 启动 worker，观察首批真实起草；
+3. UI 通过 SSH 隧道访问；后续可加 Caddy + 认证；
+4. 内存余量约 600M，worker 启动后需观察。

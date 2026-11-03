@@ -105,11 +105,16 @@ sudo -u secondbrain sqlite3 /srv/secondbrain/state/state.db \
   "SELECT state, COUNT(*) FROM raw_item GROUP BY state;"
 ```
 
-审核台：浏览器访问 `http://<server>:8787/`，accept 只能在这里点。
+审核台默认只绑 `127.0.0.1:8787`（无登录，不暴露公网）。本地通过 SSH 隧道访问：
+
+```bash
+ssh -N -L 8787:127.0.0.1:8787 root@<server-ip>
+# 然后浏览器打开 http://127.0.0.1:8787/
+```
 
 ## 7. 备份与恢复
 
-- 每日 03:17：`state-YYYY-MM-DD.db` + mirror push；
+- 每日 03:17：`state-YYYY-MM-DD.db` 快照 + integrity check；git 本身已在 GitHub，无需再 mirror（需要额外镜像时设置 `MIRROR_*_REMOTE`）；
 - 恢复状态库：停两个服务 → 用快照覆盖 `state.db` → 启动（自动迁移）；
 - 状态库彻底丢失：重新执行第 5 步（从 wiki + 缓存重建）。
 
