@@ -139,7 +139,7 @@ export function dashboard(data: DashboardData): string {
              <button class="btn" type="submit">生成草稿</button></form>`}</td></tr>`).join('')
     || '<tr><td colspan="4" class="muted">队列为空。</td></tr>';
 
-  return layout('审核台', `
+  return layout('审核台', `${nav()}
   <h1>secondBrain 审核台</h1>
   <div class="muted">${data.mode === 'cloud' ? '云模型模式' : 'mock 模型模式'} · 真实状态机 · 每次入库一次 git commit</div>
 
@@ -317,13 +317,20 @@ export function usagePage(data: UsagePageData): string {
 // ---------------------------------------------------------------------------
 
 function nav(): string {
-  return `<div class="nav">
-    <a href="/"><b>secondBrain</b></a>
-    <a href="/">工作台</a><a href="/articles">文章库</a><a href="/review">审核</a>
-    <a href="/nodes">节点</a><a href="/claims">claims</a><a href="/operations">运维</a><a href="/exceptions">异常</a><a href="/usage">用量</a><a href="/search">搜索</a>
-    <span style="flex:1"></span>
-    <span id="worker-light" class="muted">worker: --</span>
-    <span id="pending-badge" class="badge b-warn">待审 0</span>
+  const links = [
+    ['/', '工作台'], ['/articles', '文章库'], ['/nodes', '节点'], ['/review', '审核'],
+    ['/claims', 'claims'], ['/operations', '运维'], ['/exceptions', '异常'],
+    ['/usage', '用量'], ['/search', '搜索'],
+  ];
+  const items = links.map(([href, label]) =>
+    `<a href="${href}" style="padding:5px 9px;border-radius:6px;color:#9fb4ff;text-decoration:none;white-space:nowrap">${label}</a>`,
+  ).join('');
+  return `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:2px;padding:10px 0;border-bottom:1px solid #262b36;margin-bottom:18px">
+    <a href="/" style="font-weight:700;color:#e7e9ee;text-decoration:none;padding:5px 9px;white-space:nowrap">secondBrain</a>
+    ${items}
+    <span style="flex:1;min-width:12px"></span>
+    <span id="worker-light" style="color:#9aa3b2;font-size:12.5px;white-space:nowrap">worker: --</span>
+    <span id="pending-badge" class="badge b-warn" style="margin-left:8px">待审 0</span>
   </div>`;
 }
 
