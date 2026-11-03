@@ -743,17 +743,41 @@ export function nodesPage(rows: readonly { name: string; file: string; nodeType:
     <td><a href="/nodes/${encodeURIComponent(row.file)}">${esc(row.name)}</a>${row.aliases.length > 0 ? ` <span class="muted">（${row.aliases.map((a) => esc(a)).join('、')}）</span>` : ''}</td>
     <td>${esc(row.nodeType)}</td><td>${row.claimCount}</td><td>${row.sourceCount}</td></tr>`).join('')
     || '<tr><td colspan="4" class="muted">没有匹配的节点</td></tr>';
-  const treemap = buildTreemap(rows.map((row) => ({ label: row.name, value: Math.max(1, row.claimCount), type: row.nodeType })), 880, 460);
+  const hubCount = 60;
+  const hubs = rows.slice(0, hubCount);
+  const tail = rows.length - hubs.length;
+  const W = 880; const H = 430;
+  const maxClaims = Math.max(1, ...hubs.map((row) => row.claimCount));
+  const radiusOf = (claims: number): number => 6 + Math.sqrt(Math.max(1, claims) / maxClaims) * 52;
+  const placed: Array<{ x: number; y: number; r: number; row: typeof hubs[number] }> = [];
+  let cx = W / 2; let cy = H / 2;
+  for (const [index, row] of hubs.entries()) {
+    const r = radiusOf(row.claimCount);
+    let angle = index * 2.399963;
+    let distance = 0;
+    let x = cx; let y = cy; let ok = false;
+    for (let attempt = 0; attempt < 400; attempt += 1) {
+      x = cx + Math.cos(angle) * distance;
+      y = cy + Math.sin(angle) * distance * 0.72;
+      if (x - r < 4 || x + r > W - 4 || y - r < 4 || y + r > H - 4) { angle += 0.35; distance += 1.5; continue; }
+      ok = placed.every((other) => Math.hypot(other.x - x, other.y - y) > other.r + r + 4);
+      if (ok) break;
+      angle += 0.35;
+      distance += 1.9;
+    }
+    if (ok) placed.push({ x, y, r, row });
+  }
   const COLORS: Record<string, string> = { concept: '#5eead4', topic: '#e3b341', person: '#8f9bb3' };
-  const rects = treemap.map((rect) => {
-    const color = COLORS[rect.item.type] ?? '#8b939e';
-    const showLabel = rect.w > 92 && rect.h > 26;
-    return `<g><title>${esc(rect.item.label)} · ${rect.item.value} claims</title>
-      <rect x="${rect.x.toFixed(1)}" y="${rect.y.toFixed(1)}" width="${Math.max(0, rect.w - 2).toFixed(1)}" height="${Math.max(0, rect.h - 2).toFixed(1)}" rx="2" fill="${color}" fill-opacity="${rect.w * rect.h > 4000 ? 0.32 : 0.18}" stroke="${color}" stroke-opacity="0.5" stroke-width="1"></rect>
-      ${showLabel ? `<text x="${(rect.x + 7).toFixed(1)}" y="${(rect.y + 17).toFixed(1)}" font-size="11.5" fill="var(--ink)">${esc(rect.item.label.slice(0, Math.floor(rect.w / 12)))}</text>` : ''}
-    </g>`;
+  const bubbles = placed.map((bubble, index) => {
+    const color = COLORS[bubble.row.nodeType] ?? '#8b939e';
+    const label = index < 14;
+    return `<a href="/nodes/${encodeURIComponent(bubble.row.file)}"><title>${esc(bubble.row.name)} · ${bubble.row.claimCount} claims</title>
+      <circle cx="${bubble.x.toFixed(1)}" cy="${bubble.y.toFixed(1)}" r="${bubble.r.toFixed(1)}" fill="${color}" fill-opacity="0.22" stroke="${color}" stroke-opacity="0.7"></circle>
+      ${label ? `<text x="${bubble.x.toFixed(1)}" y="${(bubble.y + 4).toFixed(1)}" text-anchor="middle" font-size="11" fill="var(--ink)">${esc(bubble.row.name.slice(0, Math.floor(bubble.r / 6)))}</text>` : ''}
+    </a>`;
   }).join('');
-  const chart = `<svg viewBox="0 0 880 460" style="width:100%;height:auto;display:block" role="img" aria-label="节点矩形树图">${rects}</svg>`;
+  const chart = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" role="img" aria-label="知识枢纽气泡图">${bubbles}</svg>
+    <div class="muted" style="margin-top:8px">气泡直径 ∝ claims 数；仅展示 Top ${hubs.length} 个枢纽（其余 ${tail.toLocaleString()} 个节点已隐藏，可按类型/搜索查看）。</div>`;
 
   return layout('知识节点', `${nav()}
   <h1>知识节点（${stats.total}）</h1>
