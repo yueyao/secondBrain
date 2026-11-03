@@ -48,7 +48,6 @@ import {
   adminSummary,
   overview,
   pendingReviewList,
-  committedClaims,
   wikiClaims,
 } from '@sb/app';
 import { parseDraftId, parseRawPath, type DraftId, type RawPath } from '@sb/domain';
