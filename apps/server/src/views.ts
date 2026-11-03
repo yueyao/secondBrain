@@ -747,14 +747,15 @@ export function nodesPage(rows: readonly { name: string; file: string; nodeType:
     <span style="display:flex;align-items:center;gap:8px"><span style="flex:1;height:5px;background:var(--line);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:${(row.claimCount / maxListClaims) * 100}%;background:var(--accent)"></i></span></span>
     <span style="text-align:right;font-variant-numeric:tabular-nums">${row.claimCount}</span>
   </div>`).join('') || '<div class="muted">没有匹配的节点</div>';
-  const hubCount = top;
-  const hubs = rows.slice(0, hubCount);
+  const maxBubbles = Math.min(200, rows.length);
+  const hubs = rows.slice(0, maxBubbles);
+  const visibleTop = Math.min(top, hubs.length);
   const tail = rows.length - hubs.length;
   const W = 880; const H = 430;
   const maxClaims = Math.max(1, ...hubs.map((row) => row.claimCount));
-  const radiusOf = (claims: number): number => 6 + Math.sqrt(Math.max(1, claims) / maxClaims) * 52;
-  const placed: Array<{ x: number; y: number; r: number; row: typeof hubs[number] }> = [];
-  let cx = W / 2; let cy = H / 2;
+  const radiusOf = (claims: number): number => 5 + Math.sqrt(Math.max(1, claims) / maxClaims) * 50;
+  const placed: Array<{ x: number; y: number; r: number; row: typeof hubs[number]; index: number }> = [];
+  const cx = W / 2; const cy = H / 2;
   for (const [index, row] of hubs.entries()) {
     const r = radiusOf(row.claimCount);
     let angle = index * 2.399963;
@@ -764,29 +765,45 @@ export function nodesPage(rows: readonly { name: string; file: string; nodeType:
       x = cx + Math.cos(angle) * distance;
       y = cy + Math.sin(angle) * distance * 0.72;
       if (x - r < 4 || x + r > W - 4 || y - r < 4 || y + r > H - 4) { angle += 0.35; distance += 1.5; continue; }
-      ok = placed.every((other) => Math.hypot(other.x - x, other.y - y) > other.r + r + 4);
+      ok = placed.every((other) => Math.hypot(other.x - x, other.y - y) > other.r + r + 3);
       if (ok) break;
       angle += 0.35;
       distance += 1.9;
     }
-    if (ok) placed.push({ x, y, r, row });
+    if (ok) placed.push({ x, y, r, row, index });
   }
   const COLORS: Record<string, string> = { concept: '#5eead4', topic: '#e3b341', person: '#8f9bb3' };
-  const bubbles = placed.map((bubble, index) => {
+  const bubbles = placed.map((bubble) => {
     const color = COLORS[bubble.row.nodeType] ?? '#8b939e';
-    const label = index < 14;
-    return `<a href="/nodes/${encodeURIComponent(bubble.row.file)}"><title>${esc(bubble.row.name)} · ${bubble.row.claimCount} claims</title>
+    const fontSize = bubble.r >= 16 ? 11 : bubble.r >= 10 ? 9 : 8;
+    const maxChars = Math.max(1, Math.floor((bubble.r * 1.5) / fontSize));
+    const label = bubble.row.name.slice(0, maxChars);
+    return `<a href="/nodes/${encodeURIComponent(bubble.row.file)}" class="node-bubble" data-index="${bubble.index}" style="${bubble.index >= visibleTop ? 'display:none' : ''}"><title>${esc(bubble.row.name)} · ${bubble.row.claimCount} claims</title>
       <circle cx="${bubble.x.toFixed(1)}" cy="${bubble.y.toFixed(1)}" r="${bubble.r.toFixed(1)}" fill="${color}" fill-opacity="0.22" stroke="${color}" stroke-opacity="0.7"></circle>
-      ${label ? `<text x="${bubble.x.toFixed(1)}" y="${(bubble.y + 4).toFixed(1)}" text-anchor="middle" font-size="11" fill="var(--ink)">${esc(bubble.row.name.slice(0, Math.floor(bubble.r / 6)))}</text>` : ''}
+      <text x="${bubble.x.toFixed(1)}" y="${(bubble.y + fontSize * 0.36).toFixed(1)}" text-anchor="middle" font-size="${fontSize}" fill="var(--ink)">${esc(label)}</text>
     </a>`;
   }).join('');
   const chart = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" role="img" aria-label="知识枢纽气泡图">${bubbles}</svg>
     <div class="row" style="align-items:center;gap:12px;margin-top:10px">
-      <span class="muted">Top ${hubs.length}</span>
-      <input type="range" min="20" max="200" step="10" value="${top}" style="flex:1;max-width:420px" oninput="document.getElementById('top-label').textContent=this.value" onchange="location.href='/nodes?type=${encodeURIComponent(type)}&q=${encodeURIComponent(query)}&top='+this.value">
-      <span class="muted" id="top-label">${top}</span>
-      <span class="muted">拖动调整展示的枢纽数量（其余 ${tail.toLocaleString()} 个节点隐藏）</span>
-    </div>`;
+      <span class="muted">Top <b id="top-count" style="color:var(--ink)">${visibleTop}</b></span>
+      <input id="top-range" type="range" min="20" max="${maxBubbles}" step="10" value="${visibleTop}" style="flex:1;max-width:420px">
+      <span class="muted">拖动即时调整（不刷新页面）；其余 ${tail.toLocaleString()} 个节点隐藏</span>
+    </div>
+    <script>
+    (function(){
+      var range=document.getElementById('top-range');
+      var label=document.getElementById('top-count');
+      if(!range)return;
+      range.addEventListener('input',function(){
+        var n=Number(range.value);
+        label.textContent=String(n);
+        document.querySelectorAll('.node-bubble').forEach(function(el){
+          var index=Number(el.getAttribute('data-index'));
+          el.style.display=index<n?'inline':'none';
+        });
+      });
+    })();
+    </script>`;
 
   return layout('知识节点', `${nav()}
   <h1>知识节点（${stats.total}）</h1>
