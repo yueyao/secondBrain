@@ -87,7 +87,7 @@ describe('文章库与管理后台', () => {
     expect(html).toContain('文章库');
 
     const filtered = await fetch(`${base}/articles?state=queued`);
-    expect((await filtered.text())).toContain('queued');
+    expect((await filtered.text())).toContain('待处理');
   });
 
   it('文章详情可打开', async () => {
