@@ -861,6 +861,8 @@ export function composeArticlePage(data: { id: string; title: string; theme: str
   <div class="muted">${esc(data.theme || '未设主题')} · ${esc(data.status)} · 更新 ${esc(data.updatedAt.slice(0, 16))}</div>
   <h2>节点与 claims（${data.nodes.length} 个节点）</h2>${nodes}
   <h2>大纲</h2>
+  <div class="card"><form method="post" action="/actions/compose/outline/generate"><input type="hidden" name="id" value="${esc(data.id)}">
+    <button class="btn" type="submit">AI 生成大纲</button><span class="muted" style="margin-left:10px">基于 ${data.nodes.length} 个节点与 claims，生成后可在下方编辑</span></form></div>
   <div class="card"><form method="post" action="/actions/compose/outline">
     <input type="hidden" name="id" value="${esc(data.id)}">
     <textarea name="outline" rows="12" style="width:100%;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:10px;font:inherit">${esc(data.outline ?? '')}</textarea>
