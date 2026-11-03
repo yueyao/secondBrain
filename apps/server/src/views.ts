@@ -736,14 +736,18 @@ export function guidePage(): string {
 }
 
 
-export function nodesPage(rows: readonly { name: string; file: string; nodeType: string; claimedCount?: never; claimCount: number; sourceCount: number; aliases: readonly string[] }[], type: string, query: string, counts: Record<string, number>, stats: { total: number; totalClaims: number; bins: readonly { label: string; count: number }[]; byType: readonly { type: string; count: number; claims: number }[] }): string {
+export function nodesPage(rows: readonly { name: string; file: string; nodeType: string; claimedCount?: never; claimCount: number; sourceCount: number; aliases: readonly string[] }[], type: string, query: string, counts: Record<string, number>, stats: { total: number; totalClaims: number; bins: readonly { label: string; count: number }[]; byType: readonly { type: string; count: number; claims: number }[] }, top: number): string {
   const tabs = ([['all', '全部'], ['concept', '概念'], ['topic', '主题'], ['person', '人物']] as const)
     .map(([key, label]) => `<a class="btn" style="${key === type ? 'background:#1f6feb;color:#fff' : ''}" href="/nodes?type=${key}&q=${encodeURIComponent(query)}">${label} <span class="muted">${counts[key] ?? 0}</span></a>`).join('');
-  const rowsHtml = rows.map((row) => `<tr>
-    <td><a href="/nodes/${encodeURIComponent(row.file)}">${esc(row.name)}</a>${row.aliases.length > 0 ? ` <span class="muted">（${row.aliases.map((a) => esc(a)).join('、')}）</span>` : ''}</td>
-    <td>${esc(row.nodeType)}</td><td>${row.claimCount}</td><td>${row.sourceCount}</td></tr>`).join('')
-    || '<tr><td colspan="4" class="muted">没有匹配的节点</td></tr>';
-  const hubCount = 60;
+  const listRows = rows.slice(0, 60);
+  const maxListClaims = Math.max(1, ...listRows.map((row) => row.claimCount));
+  const rowsHtml = listRows.map((row, index) => `<div style="display:grid;grid-template-columns:28px minmax(0,1fr) 90px 56px;gap:10px;align-items:center;padding:7px 4px;border-bottom:1px solid rgba(255,255,255,.045)">
+    <span class="muted" style="text-align:right">${index + 1}</span>
+    <span style="min-width:0"><a href="/nodes/${encodeURIComponent(row.file)}">${esc(row.name)}</a>${row.aliases.length > 0 ? ` <span class="muted">（${row.aliases.map((a) => esc(a)).join('、')}）</span>` : ''}</span>
+    <span style="display:flex;align-items:center;gap:8px"><span style="flex:1;height:5px;background:var(--line);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:${(row.claimCount / maxListClaims) * 100}%;background:var(--accent)"></i></span></span>
+    <span style="text-align:right;font-variant-numeric:tabular-nums">${row.claimCount}</span>
+  </div>`).join('') || '<div class="muted">没有匹配的节点</div>';
+  const hubCount = top;
   const hubs = rows.slice(0, hubCount);
   const tail = rows.length - hubs.length;
   const W = 880; const H = 430;
@@ -777,7 +781,12 @@ export function nodesPage(rows: readonly { name: string; file: string; nodeType:
     </a>`;
   }).join('');
   const chart = `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" role="img" aria-label="知识枢纽气泡图">${bubbles}</svg>
-    <div class="muted" style="margin-top:8px">气泡直径 ∝ claims 数；仅展示 Top ${hubs.length} 个枢纽（其余 ${tail.toLocaleString()} 个节点已隐藏，可按类型/搜索查看）。</div>`;
+    <div class="row" style="align-items:center;gap:12px;margin-top:10px">
+      <span class="muted">Top ${hubs.length}</span>
+      <input type="range" min="20" max="200" step="10" value="${top}" style="flex:1;max-width:420px" oninput="document.getElementById('top-label').textContent=this.value" onchange="location.href='/nodes?type=${encodeURIComponent(type)}&q=${encodeURIComponent(query)}&top='+this.value">
+      <span class="muted" id="top-label">${top}</span>
+      <span class="muted">拖动调整展示的枢纽数量（其余 ${tail.toLocaleString()} 个节点隐藏）</span>
+    </div>`;
 
   return layout('知识节点', `${nav()}
   <h1>知识节点（${stats.total}）</h1>
@@ -789,7 +798,8 @@ export function nodesPage(rows: readonly { name: string; file: string; nodeType:
   <form class="row" method="get" action="/nodes" style="gap:8px;margin-bottom:12px">
     <input type="hidden" name="type" value="${esc(type)}"><input name="q" value="${esc(query)}" placeholder="搜索节点名">
     <button class="btn" type="submit">筛选</button></form>
-  <div class="card" style="padding:4px 0"><table><tr><th>节点</th><th>类型</th><th>claims</th><th>来源数</th></tr>${rowsHtml}</table></div>`);
+  <h2>枢纽榜单（按 claims 数，前 ${Math.min(60, rows.length)} / ${rows.length}）</h2>
+  <div class="card" style="padding:6px 10px">${rowsHtml}</div>`);
 }
 
 export function nodePage(node: { name: string; file: string; nodeType: string; aliases: readonly string[]; definition: string; claims: readonly { text: string; source: string }[]; related: readonly string[] }): string {

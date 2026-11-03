@@ -161,10 +161,12 @@ export function createServer(runtime: Runtime): http.Server {
         const url3 = new URL(req.url ?? '/', 'http://localhost');
         const type = url3.searchParams.get('type') ?? 'all';
         const q = url3.searchParams.get('q') ?? '';
+        const topRaw = Number(url3.searchParams.get('top') ?? '60');
+        const top = Number.isFinite(topRaw) ? Math.min(200, Math.max(20, Math.trunc(topRaw))) : 60;
         const allDocs = runtime.ctx.search.allDocs();
         const counts: Record<string, number> = { all: allDocs.length, concept: 0, topic: 0, person: 0 };
         for (const doc of allDocs) counts[doc.nodeType] = (counts[doc.nodeType] ?? 0) + 1;
-        return sendHtml(res, nodesPage(await listWikiNodes(runtime.ctx, { type, q }), type, q, counts, await nodeStats(runtime.ctx)));
+        return sendHtml(res, nodesPage(await listWikiNodes(runtime.ctx, { type, q }), type, q, counts, await nodeStats(runtime.ctx), top));
       }
       if (req.method === 'GET' && path.startsWith('/nodes/')) {
         const file = decodeURIComponent(path.slice('/nodes/'.length));
