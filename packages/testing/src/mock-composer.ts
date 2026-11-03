@@ -89,6 +89,9 @@ function outlineText(request: ComposeRequest, sections: readonly Section[]): str
 function bodyText(request: ComposeRequest, sections: readonly Section[]): string {
   const lines: string[] = [`# ${request.title.trim() || '未命名文章'}`, ''];
   if (request.theme.trim() !== '') lines.push(`> 主题：${request.theme.trim()}`, '');
+  // 改稿指令进入正文，保证 mock 模式下的版本 diff 有实际变化（真实模型由提示词影响行文）
+  const instruction = (request.instruction ?? '').trim();
+  if (instruction !== '') lines.push(`> 改稿要求：${instruction}`, '');
 
   for (const [index, section] of sections.entries()) {
     lines.push(sectionTitle(section, index), '');

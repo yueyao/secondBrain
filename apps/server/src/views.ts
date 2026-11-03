@@ -67,6 +67,16 @@ code{font-size:12.5px;color:var(--accent)}
 .prose p{margin:10px 0}
 .prose ul{margin:8px 0;padding-left:22px}
 .prose a{border-bottom:1px dotted rgba(94,234,212,.4)}
+.diff{font:13px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace}
+.diff th,.diff td{text-align:left!important;padding:3px 10px;white-space:pre-wrap;word-break:break-word;vertical-align:top}
+.diff th{font-size:11.5px;color:var(--dim);text-transform:none}
+.diff td:first-child{width:22px;text-align:center!important}
+.diff td:nth-child(2),.diff td:nth-child(3){width:56px;color:var(--dim);text-align:right!important;font-variant-numeric:tabular-nums}
+.diff-add{background:rgba(63,185,80,.10)}
+.diff-add td:first-child,.diff-add td:last-child{color:#9be3a8}
+.diff-del{background:rgba(239,95,107,.10)}
+.diff-del td:first-child,.diff-del td:last-child{color:#f0a6ac}
+.diff-same td:last-child{color:#9aa3ae}
 @media(max-width:860px){
   .nav{position:static;width:auto;flex-direction:row;flex-wrap:wrap;align-items:center;border-right:0;border-bottom:1px solid var(--line);padding:8px 10px;gap:2px}
   .nav a[href="/"]{padding:4px 8px 4px 4px}
@@ -901,6 +911,12 @@ const ARTICLE_SOURCE_LABEL: Record<string, string> = {
   ai_initial: 'AI 初稿', ai_refine: 'AI 改稿', manual_edit: '手工编辑', restore: '回滚',
 };
 
+/** 截断长文本用于表格单元格（保留标题提示完整内容）。 */
+function cut(text: string, maxChars: number): string {
+  const chars = [...text];
+  return chars.length <= maxChars ? text : `${chars.slice(0, maxChars).join('')}…`;
+}
+
 export function composeArticlePage(data: {
   id: string;
   title: string;
@@ -911,7 +927,8 @@ export function composeArticlePage(data: {
   nodes: readonly { name: string; nodeType: string; claimCount: number; claims: readonly { text: string; source: string }[] }[];
   versions: readonly {
     id: string; versionNo: number; source: string; provider: string | null; model: string | null;
-    inputTokens: number | null; outputTokens: number | null; cost: number | null; chars: number; createdAt: string;
+    inputTokens: number | null; outputTokens: number | null; cost: number | null; chars: number;
+    instruction: string | null; note: string | null; createdAt: string;
   }[];
   current: { versionNo: number; contentMd: string; createdAt: string } | null;
 }): string {
@@ -919,17 +936,55 @@ export function composeArticlePage(data: {
     <div><b>${esc(node.name)}</b> <span class="badge">${esc(node.nodeType)}</span> <span class="muted">${node.claimCount} claims</span></div>
     <ul style="margin:8px 0 0;padding-left:18px">${node.claims.map((claim) => `<li>${esc(claim.text)}<div class="muted">${esc(claim.source)}</div></li>`).join('') || '<li class="muted">无 claims</li>'}</ul>
   </div>`).join('');
-  const versions = data.versions.map((version) => `<tr><td>v${version.versionNo}</td><td>${esc(ARTICLE_SOURCE_LABEL[version.source] ?? version.source)}</td><td class="muted">${esc(version.model ?? '—')}</td><td>${version.chars}</td><td class="muted">${version.inputTokens ?? 0} / ${version.outputTokens ?? 0}</td><td class="muted">${version.cost === null ? '—' : `$${version.cost.toFixed(4)}`}</td><td class="muted">${esc(version.createdAt.slice(0, 16))}</td></tr>`).join('')
-    || '<tr><td colspan="7" class="muted">还没有正文版本</td></tr>';
+  const statusLabel = ARTICLE_STATUS_LABEL[data.status] ?? data.status;
+  const currentVersion = data.versions.find((version) => version.versionNo === data.current?.versionNo) ?? null;
+  const previousVersion = currentVersion
+    ? data.versions.find((version) => version.versionNo < currentVersion.versionNo) ?? null
+    : null;
   const hasOutline = (data.outline ?? '').trim().length > 0;
   const nextVersionNo = (data.versions[0]?.versionNo ?? 0) + 1;
+  const articleHref = encodeURIComponent(data.id);
+
+  const versionRows = data.versions.map((version) => {
+    const diffHref = currentVersion && version.versionNo !== currentVersion.versionNo
+      ? `/compose/${articleHref}/diff?from=${encodeURIComponent(version.id)}&to=${encodeURIComponent(currentVersion.id)}`
+      : previousVersion && currentVersion
+        ? `/compose/${articleHref}/diff?from=${encodeURIComponent(previousVersion.id)}&to=${encodeURIComponent(currentVersion.id)}`
+        : '';
+    const actions = diffHref
+      ? `<a href="${diffHref}">${version.versionNo === currentVersion?.versionNo ? '对比上一版' : '对比当前'}</a>`
+      : '';
+    const restore = currentVersion && version.versionNo !== currentVersion.versionNo
+      ? `<form method="post" action="/actions/compose/restore" style="display:inline;margin-left:10px" onsubmit="return confirm('把 v${version.versionNo} 的内容恢复为新版本？旧版本会保留。')"><input type="hidden" name="id" value="${esc(data.id)}"><input type="hidden" name="versionId" value="${esc(version.id)}"><button class="btn" type="submit" style="padding:2px 8px;font-size:12px">恢复此版</button></form>`
+      : '';
+    const note = version.instruction
+      ? `<span title="${esc(version.instruction)}">${esc(cut(version.instruction, 36))}</span>`
+      : version.note
+        ? esc(version.note)
+        : '—';
+    return `<tr><td>v${version.versionNo}${version.versionNo === currentVersion?.versionNo ? ' <span class="badge b-ok">当前</span>' : ''}</td><td>${esc(ARTICLE_SOURCE_LABEL[version.source] ?? version.source)}</td><td class="muted">${note}</td><td class="muted">${esc(version.model ?? '—')}</td><td>${version.chars}</td><td class="muted">${version.inputTokens ?? 0} / ${version.outputTokens ?? 0}</td><td class="muted">${version.cost === null ? '—' : `$${version.cost.toFixed(4)}`}</td><td class="muted">${esc(version.createdAt.slice(0, 16))}</td><td>${actions}${restore}</td></tr>`;
+  }).join('') || '<tr><td colspan="9" class="muted">还没有正文版本</td></tr>';
+
   const body = data.current
     ? `<div class="card prose">${renderArticleMarkdown(data.current.contentMd)}</div>
     <div class="muted">当前正文 v${data.current.versionNo}，生成于 ${esc(data.current.createdAt.slice(0, 16))}；引用可点开原文核对。</div>`
     : '<div class="card muted">还没有正文。先确认大纲，再生成 v1。</div>';
+
+  const actions = [
+    data.current
+      ? `<a class="btn" href="/compose/${articleHref}/export.md">导出 Markdown</a>`
+      : '',
+    data.current && data.status !== 'final'
+      ? `<form method="post" action="/actions/compose/finalize" style="display:inline"><input type="hidden" name="id" value="${esc(data.id)}"><button class="btn" type="submit">定稿</button></form>`
+      : '',
+    data.status === 'final'
+      ? `<form method="post" action="/actions/compose/reopen" style="display:inline"><input type="hidden" name="id" value="${esc(data.id)}"><button class="btn" type="submit">重新打开</button></form>`
+      : '',
+  ].filter((entry) => entry !== '').join(' ');
+
   return layout('主编台 · 文章', `${nav()}
-  <div class="row" style="justify-content:space-between"><h1>${esc(data.title)}</h1><a class="btn" href="/compose">← 主编台</a></div>
-  <div class="muted">${esc(data.theme || '未设主题')} · <span class="badge">${esc(ARTICLE_STATUS_LABEL[data.status] ?? data.status)}</span> · 更新 ${esc(data.updatedAt.slice(0, 16))}</div>
+  <div class="row" style="justify-content:space-between;align-items:center"><h1>${esc(data.title)}</h1><div class="row" style="gap:8px;align-items:center"><a class="btn" href="/compose">← 主编台</a>${actions}</div></div>
+  <div class="muted">${esc(data.theme || '未设主题')} · <span class="badge${data.status === 'final' ? ' b-ok' : ''}">${esc(statusLabel)}</span> · 更新 ${esc(data.updatedAt.slice(0, 16))}</div>
 
   <h2>大纲</h2>
   <div class="card"><form method="post" action="/actions/compose/outline/generate" onsubmit="return confirm('调用模型生成大纲，可能产生费用。继续？')"><input type="hidden" name="id" value="${esc(data.id)}">
@@ -947,8 +1002,39 @@ export function composeArticlePage(data: {
     <span class="muted" style="margin-left:10px">${hasOutline ? '基于已确认大纲与 claims 生成，文中每个判断都带来源引用' : '请先填写或生成大纲'}</span></form></div>
   ${body}
 
+  <h2>改稿</h2>
+  <div class="card"><form method="post" action="/actions/compose/refine" onsubmit="return confirm('按指令生成 v${nextVersionNo}，可能产生费用。继续？')">
+    <input type="hidden" name="id" value="${esc(data.id)}">
+    <textarea name="instruction" rows="3" placeholder="例如：语气更克制，减少形容词；第二小节补一个反例；结尾给出可执行建议" style="width:100%;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:10px;font:inherit"></textarea>
+    <div style="margin-top:8px"><button class="btn" type="submit"${data.current ? '' : ' disabled'}>按指令生成 v${nextVersionNo}</button>
+    <span class="muted">基于当前正文与指令生成新版本；旧版本保留，可对比与恢复</span></div>
+  </form></div>
+
   <h2>版本历史（${data.versions.length}）</h2>
-  <div class="card" style="padding:4px 0"><table><tr><th>版本</th><th>来源</th><th>模型</th><th>字数</th><th>tokens</th><th>成本</th><th>时间</th></tr>${versions}</table></div>
+  <div class="card" style="padding:4px 0"><table><tr><th>版本</th><th>来源</th><th>指令 / 备注</th><th>模型</th><th>字数</th><th>tokens</th><th>成本</th><th>时间</th><th>操作</th></tr>${versionRows}</table></div>
 
   <h2>节点与 claims（${data.nodes.length} 个节点）</h2>${nodes}`);
+}
+
+/** 版本对比页：行级 diff，新增绿 / 删除红。 */
+export function composeDiffPage(data: {
+  articleId: string;
+  title: string;
+  from: { versionNo: number; source: string; createdAt: string };
+  to: { versionNo: number; source: string; createdAt: string };
+  stats: { added: number; removed: number; same: number };
+  lines: readonly { kind: 'same' | 'add' | 'del'; text: string; fromNo: number | null; toNo: number | null }[];
+}): string {
+  const rows = data.lines.map((line) => {
+    const mark = line.kind === 'add' ? '+' : line.kind === 'del' ? '−' : ' ';
+    const fromNo = line.fromNo === null ? '' : String(line.fromNo);
+    const toNo = line.toNo === null ? '' : String(line.toNo);
+    return `<tr class="diff-${line.kind}"><td>${mark}</td><td>${fromNo}</td><td>${toNo}</td><td>${esc(line.text) || '&nbsp;'}</td></tr>`;
+  }).join('');
+  return layout('版本对比', `${nav()}
+  <div class="row" style="justify-content:space-between"><h1>版本对比</h1><a class="btn" href="/compose/${encodeURIComponent(data.articleId)}">← 回到文章</a></div>
+  <div class="muted">${esc(data.title)} · v${data.from.versionNo}（${esc(ARTICLE_SOURCE_LABEL[data.from.source] ?? data.from.source)}）→ v${data.to.versionNo}（${esc(ARTICLE_SOURCE_LABEL[data.to.source] ?? data.to.source)}）</div>
+  <div class="row" style="gap:10px;margin:14px 0"><span class="badge b-ok">新增 ${data.stats.added}</span><span class="badge b-block">删除 ${data.stats.removed}</span><span class="badge">未变 ${data.stats.same}</span></div>
+  <div class="card" style="padding:4px 0"><table class="diff"><tr><th></th><th>旧 v${data.from.versionNo}</th><th>新 v${data.to.versionNo}</th><th>内容</th></tr>${rows}</table></div>
+  <div class="muted">行级 diff（LCS）：绿色为新增行，红色为删除行，灰色为未变行。</div>`);
 }

@@ -1423,3 +1423,71 @@ pnpm run check
 
 生产环境复跑同一篇文章生成 v2：输入 tokens 从 92,638 降至 **20,983（-77%）**，成本从 $0.0331 降至 **$0.0122（-63%）**，输出 4,894 tokens / 正文 9,261 字符；v2 写入版本链并成为当前版本。
 另：第一次 v2 请求曾因模型输出不满足文本契约（引用不足）返回 500，重试后成功；抽样后材料变小，引用合规率预计改善，继续观察。
+
+
+---
+
+## 五十、Compose C3：改稿指令 + 版本 diff / 恢复（2026-11-03）
+
+### 50.1 交付
+
+| 层 | 改动 |
+|---|---|
+| app | `refineArticle`：按指令基于当前版本生成 vN+1（`ai_refine`，instruction 落库、`basedOnVersionId` 指向前一版）；`restoreArticleVersion`：把旧版本内容恢复为**新版本**（`restore`，note="恢复自 vN"，模型字段为 null）；`composeArticleDiff`：取任意两版并计算行级 diff；`composeArticleView` 版本项补 `instruction`/`note`；+10 例 |
+| app | 新增 `diff.ts`：行级 LCS（`diffLines`/`diffStats`，1-based 行号、CRLF 归一、平局先删后增保证确定性）；+7 例 |
+| testing | `MockComposer` 在收到改稿指令时把指令写进正文（`> 改稿要求：…`），让 mock 模式的版本 diff 有真实变化 |
+| server | 新增动作路由 `/actions/compose/refine`、`/actions/compose/restore`；新增只读页 `/compose/<id>/diff?from=&to=`；文章详情页加「改稿」表单、版本历史加「指令/备注」列与「对比当前 / 对比上一版」「恢复此版」操作；+2 例 e2e |
+| server | 版本历史当前版本标记「当前」；旧版本恢复有二次确认 |
+
+### 50.2 决策（D55-D57）
+
+| 编号 | 决策 | 理由 |
+|---|---|---|
+| D55 | 改稿 = 版本链追加 `ai_refine`，指令随版本落库 | 每版可追溯到"当时让模型改什么"，便于比较与复盘；旧版本永远不被覆盖 |
+| D56 | 恢复旧版 = 生成新版本（`restore`），不移动指针 | 历史不可变、可反复恢复；用户看到的"当前"始终是最大版本号 |
+| D57 | diff 用 app 层行级 LCS 纯函数，不引入 diff 库 | 文章百行级，Myers 优化无必要；纯函数可在无模型/无网络下测试 |
+
+### 50.3 验证（与 C4 合并跑）
+
+```
+pnpm run check
+ Test Files  31 passed (31)
+      Tests  259 passed (259)
+```
+
+---
+
+## 五十一、Compose C4：定稿 / 重新打开 / 导出 Markdown（2026-11-03）
+
+### 51.1 交付
+
+| 层 | 改动 |
+|---|---|
+| app | `publish.ts`：`finalizeArticle`（有当前版本才能定稿，重复定稿拒绝）、`reopenArticle`（final→review）、`exportArticleMarkdown`（按当前版本生成 Markdown，含标题/主题/状态/版本/导出时间/正文/引用来源清单）、`articleExportFilename`（标题清洗 + 按码点截断 60 + 空回退）；+13 例 |
+| server | 动作路由 `/actions/compose/finalize`、`/actions/compose/reopen`；下载路由 `GET /compose/<id>/export.md`（`text/markdown` + RFC 5987 中文文件名）；详情页头部按钮：导出 Markdown / 定稿 / 重新打开，状态徽标区分已定稿；+1 例 e2e |
+| docs | 新增 ADR 0009：文章模型与发布流程（版本链、状态机、引用、diff、导出格式） |
+
+### 51.2 决策（D58-D60）
+
+| 编号 | 决策 | 理由 |
+|---|---|---|
+| D58 | 定稿 = `status='final'`；重复定稿拒绝；重新打开回 `review` | final 是"可发布"的唯一信号，避免多次定稿产生歧义；改稿/恢复自动回 review |
+| D59 | 导出基于**当前版本**，任意状态可导出，文件头标注状态 | 实用：草稿也能导出给人看；正式发布时看状态即可，不必用导出动作反向锁状态 |
+| D60 | 导出格式 = Markdown（`# 标题` + 元信息引用块 + 正文 + `## 引用来源` 的 `[[raw/...]]` 清单） | 直接兼容 Obsidian/静态站点；引用来源可继续回溯原文，不接外部发布渠道 |
+
+### 51.3 验证
+
+```
+pnpm run check
+ Test Files  31 passed (31)
+      Tests  259 passed (259)   # 本轮新增 33 例（diff 7 + 改稿/恢复/对比 10 + 定稿/导出 13 + e2e 3）
+```
+
+生产环境（腾讯云 Lighthouse）用真实文章跑通：改稿生成 v3、diff 页展示行级变化、恢复 v2 生成 v4（不产生模型费用）、定稿、下载 `AI 时代的认知与商业机会-v4.md`、重新打开回待主编审。
+
+### 51.4 已知边界 / 下一步
+
+- 发布渠道仍未接：定稿后的分发（公众号/博客/静态站）需要新的应用用例与 target 适配器，不在 UI 层直接写外部系统；
+- 人工直接编辑正文（`manual_edit`）还没开放 UI，目前只能"指令改稿"或"恢复旧版"；
+- 文章列表页只有状态与大纲标记，还没显示当前版本号/字数（详情页齐全）；
+- `/usage` 仍不含 compose 调用，成本只记在 `article_version.cost`。

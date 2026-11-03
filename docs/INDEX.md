@@ -25,6 +25,7 @@
 | [docs/adr/0006-simplified-recovery.md](docs/adr/0006-simplified-recovery.md) | 简化版崩溃恢复（幂等重放） | 恢复策略变化、升级为完整对账时 |
 | [docs/adr/0007-hosting-and-sync.md](docs/adr/0007-hosting-and-sync.md) | 部署与多端同步：服务端唯一写者、总线、状态库边界 | 部署形态或同步策略变化时 |
 | [docs/adr/0008-automation.md](docs/adr/0008-automation.md) | 服务端自动流水线：server+worker 双进程、tick 语义、timer | 自动化流程变化时 |
+| [docs/adr/0009-articles.md](docs/adr/0009-articles.md) | 文章模型与发布流程：版本链、状态机、diff、定稿与导出 | 文章状态/版本语义/导出格式变化时 |
 
 ## 阅读路径
 

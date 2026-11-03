@@ -107,7 +107,7 @@ pnpm run check     # boundaries → typecheck → depcruise → test
 pnpm run boundaries   # 包边界、深引、纯度（无 node: / 无第三方 / 无 throw / 无时钟）
 pnpm run typecheck    # tsc --noEmit（strict + exactOptionalPropertyTypes）
 pnpm run depcruise    # 依赖方向、环形依赖
-pnpm test             # vitest：29 个文件 / 226 例
+pnpm test             # vitest：31 个文件 / 259 例
 ```
 
 ## 能证明什么
@@ -120,7 +120,7 @@ pnpm test             # vitest：29 个文件 / 226 例
 - **事务与锁可验证**：回滚不留痕、乐观锁只允许一个写者成功、任务领取原子且围栏令牌自增。
 - **vault 不可被越狱**：路径逃逸（`..`/绝对路径）与非 wiki 写入会被拒绝；提交失败可 `resetHard` 回滚。
 - **崩溃后可恢复**：批准后崩溃 → 启动时幂等重放（补提交或只补状态）；目标文件被外部修改 → 拒绝覆盖并回滚；无关脏改动 → 拒绝启动。
-- **主编台可离线验证**：MockComposer 走完整 HTTP 链路（建文章 → 生成大纲 → 正文 v1 → 版本历史），正文引用能解析回 raw 原文，版本只增不改。
+- **主编台全流程可离线验证**：MockComposer 走完整 HTTP 链路（建文章 → 生成大纲 → 正文 v1 → 改稿 vN+1 → 行级 diff → 恢复旧版 → 定稿 → 导出 Markdown），正文引用能解析回 raw 原文，版本只增不改。
 - **模型输出有契约**：digest 走 JSON 契约校验，compose 走文本契约（长度 + 至少 2 个引用标记）；不合规回喂重试一次，再失败落 `CONTRACT_VIOLATION`。
 - **包边界可执行**：深引 `@sb/domain/src/*`、domain→contracts 反向依赖、未登记的新包，都会让 CI 失败。
 

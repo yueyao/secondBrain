@@ -61,10 +61,16 @@ import {
   composeArticleView,
   generateArticleOutline,
   generateArticleBody,
+  refineArticle,
+  restoreArticleVersion,
+  composeArticleDiff,
+  finalizeArticle,
+  reopenArticle,
+  exportArticleMarkdown,
 } from '@sb/app';
 import { parseDraftId, parseRawPath, type DraftId, type RawPath } from '@sb/domain';
 import type { Runtime } from './runtime';
-import { adminPage, articlePage, articlesPage, claimsPage, composeArticlePage, composePage, dashboard, errorPage, guidePage, nodePage, nodesPage, reviewListPage, reviewPage, searchPage, usagePage } from './views';
+import { adminPage, articlePage, articlesPage, claimsPage, composeArticlePage, composeDiffPage, composePage, dashboard, errorPage, guidePage, nodePage, nodesPage, reviewListPage, reviewPage, searchPage, usagePage } from './views';
 
 function redirect(res: http.ServerResponse, location: string): void {
   res.writeHead(303, { location });
@@ -79,6 +85,17 @@ function sendHtml(res: http.ServerResponse, html: string, status = 200): void {
 function sendJson(res: http.ServerResponse, payload: unknown, status = 200): void {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(payload, null, 2));
+}
+
+/** 附件下载：中文文件名按 RFC 5987 编码，filename 兜底用 ASCII。 */
+function sendDownload(res: http.ServerResponse, filename: string, content: string): void {
+  const ascii = filename.replace(/[^\x20-\x7E]/g, '_').replace(/["\\]/g, '_');
+  res.writeHead(200, {
+    'content-type': 'text/markdown; charset=utf-8',
+    'content-disposition': `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    'content-length': Buffer.byteLength(content),
+  });
+  res.end(content);
 }
 
 async function readFormParams(req: http.IncomingMessage): Promise<URLSearchParams> {
@@ -172,6 +189,45 @@ export function createServer(runtime: Runtime): http.Server {
         const id = form.id ?? '';
         await generateArticleBody(runtime.ctx, id);
         return redirect(res, `/compose/${encodeURIComponent(id)}`);
+      }
+      if (req.method === 'POST' && path === '/actions/compose/refine') {
+        const form = await readForm(req);
+        const id = form.id ?? '';
+        await refineArticle(runtime.ctx, id, form.instruction ?? '');
+        return redirect(res, `/compose/${encodeURIComponent(id)}`);
+      }
+      if (req.method === 'POST' && path === '/actions/compose/restore') {
+        const form = await readForm(req);
+        const id = form.id ?? '';
+        await restoreArticleVersion(runtime.ctx, id, form.versionId ?? '');
+        return redirect(res, `/compose/${encodeURIComponent(id)}`);
+      }
+      if (req.method === 'POST' && path === '/actions/compose/finalize') {
+        const form = await readForm(req);
+        const id = form.id ?? '';
+        await finalizeArticle(runtime.ctx, id);
+        return redirect(res, `/compose/${encodeURIComponent(id)}`);
+      }
+      if (req.method === 'POST' && path === '/actions/compose/reopen') {
+        const form = await readForm(req);
+        const id = form.id ?? '';
+        await reopenArticle(runtime.ctx, id);
+        return redirect(res, `/compose/${encodeURIComponent(id)}`);
+      }
+      const composeDiffMatch = /^\/compose\/([^/]+)\/diff$/.exec(path);
+      if (req.method === 'GET' && composeDiffMatch) {
+        const id = composeDiffMatch[1] as string;
+        const from = url.searchParams.get('from') ?? '';
+        const to = url.searchParams.get('to') ?? '';
+        const diff = await composeArticleDiff(runtime.ctx, id, from, to);
+        if (!diff) return sendHtml(res, errorPage('版本对比失败：文章或版本不存在'), 404);
+        return sendHtml(res, composeDiffPage(diff));
+      }
+      const composeExportMatch = /^\/compose\/([^/]+)\/export\.md$/.exec(path);
+      if (req.method === 'GET' && composeExportMatch) {
+        const id = composeExportMatch[1] as string;
+        const exported = await exportArticleMarkdown(runtime.ctx, id);
+        return sendDownload(res, exported.filename, exported.markdown);
       }
       if (req.method === 'GET' && path.startsWith('/compose/')) {
         const id = decodeURIComponent(path.slice('/compose/'.length));

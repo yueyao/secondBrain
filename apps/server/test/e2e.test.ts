@@ -191,3 +191,117 @@ describe('主编台 Compose（AI 大纲 + 正文版本链）', () => {
     expect(detail).toContain('生成正文 v3');
   });
 });
+
+describe('主编台 C3/C4（改稿/对比/恢复/定稿/导出）', () => {
+  const versionsOf = (id: string) => runtime.ctx.store.transaction(async (tx) => tx.articleVersions.listByArticle(id));
+
+  const nodesWithClaims = (): string[] =>
+    runtime.ctx.search
+      .allDocs()
+      .filter((doc) => doc.body.includes('来源：[[raw/'))
+      .slice(0, 2)
+      .map((doc) => doc.name);
+
+  /** 建一篇文章并生成大纲 + 正文 v1。 */
+  async function createWithBody(): Promise<string> {
+    const form = new URLSearchParams({ title: 'C3C4 测试文章', theme: '写作' });
+    for (const node of nodesWithClaims()) form.append('node', node);
+    const created = await fetch(`${base}/actions/compose/create`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: form.toString(),
+      redirect: 'manual',
+    });
+    expect(created.status).toBe(303);
+    const articles = await runtime.ctx.store.transaction(async (tx) => tx.articles.list());
+    const id = articles[0]!.id;
+    await post('/actions/compose/outline/generate', { id });
+    await post('/actions/compose/body/generate', { id });
+    return id;
+  }
+
+  it('改稿指令生成 v2，并记录指令与 basedOn', async () => {
+    const id = await createWithBody();
+    const response = await post('/actions/compose/refine', { id, instruction: '结尾改成三条可执行建议' });
+    expect(response.status).toBe(303);
+
+    const versions = await versionsOf(id);
+    expect(versions.map((version) => version.versionNo)).toEqual([2, 1]);
+    expect(versions[0]?.source).toBe('ai_refine');
+    expect(versions[0]?.instruction).toBe('结尾改成三条可执行建议');
+    expect(versions[0]?.basedOnVersionId).toBe(`${id}-v1`);
+
+    const detail = await (await fetch(`${base}/compose/${encodeURIComponent(id)}`)).text();
+    expect(detail).toContain('版本历史（2）');
+    expect(detail).toContain('结尾改成三条可执行建议');
+    expect(detail).toContain('对比当前');
+    expect(detail).toContain('恢复此版');
+  });
+
+  it('版本对比页展示行级新增/删除', async () => {
+    const id = await createWithBody();
+    await post('/actions/compose/refine', { id, instruction: '把结尾改成三条可执行建议' });
+    const versions = await versionsOf(id);
+    const v2 = versions[0]!;
+    const v1 = versions[1]!;
+
+    const response = await fetch(
+      `${base}/compose/${encodeURIComponent(id)}/diff?from=${encodeURIComponent(v1.id)}&to=${encodeURIComponent(v2.id)}`,
+    );
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('版本对比');
+    expect(html).toContain('新增 2');
+    expect(html).toContain('删除 0');
+    expect(html).toContain('<tr class="diff-add">');
+    expect(html).toContain('改稿要求');
+
+    const missing = await fetch(
+      `${base}/compose/${encodeURIComponent(id)}/diff?from=not-a-version&to=${encodeURIComponent(v2.id)}`,
+    );
+    expect(missing.status).toBe(404);
+  });
+
+  it('恢复旧版本 / 定稿 / 导出 Markdown / 重新打开', async () => {
+    const id = await createWithBody();
+    await post('/actions/compose/refine', { id, instruction: '更克制一些' });
+    const versions = await versionsOf(id);
+    const v1 = versions[1]!;
+
+    const restore = await post('/actions/compose/restore', { id, versionId: v1.id });
+    expect(restore.status).toBe(303);
+    const afterRestore = await versionsOf(id);
+    expect(afterRestore[0]?.versionNo).toBe(3);
+    expect(afterRestore[0]?.source).toBe('restore');
+    expect(afterRestore[0]?.note).toBe('恢复自 v1');
+    expect(afterRestore[0]?.contentMd).toBe(v1.contentMd);
+    expect(afterRestore[0]?.provider).toBeNull();
+
+    const finalized = await post('/actions/compose/finalize', { id });
+    expect(finalized.status).toBe(303);
+    let article = await runtime.ctx.store.transaction(async (tx) => tx.articles.get(id));
+    expect(article?.status).toBe('final');
+    const finalPage = await (await fetch(`${base}/compose/${encodeURIComponent(id)}`)).text();
+    expect(finalPage).toContain('已定稿');
+    expect(finalPage).toContain('重新打开');
+    expect(finalPage).toContain('导出 Markdown');
+
+    const exported = await fetch(`${base}/compose/${encodeURIComponent(id)}/export.md`);
+    expect(exported.status).toBe(200);
+    expect(exported.headers.get('content-type')).toContain('text/markdown');
+    expect(exported.headers.get('content-disposition')).toContain('attachment');
+    const markdown = await exported.text();
+    expect(markdown.startsWith('# ')).toBe(true);
+    expect(markdown).toContain('C3C4 测试文章');
+    expect(markdown).toContain('已定稿');
+    expect(markdown).toContain('## 引用来源');
+    expect(markdown).toContain('[[raw/');
+
+    const reopened = await post('/actions/compose/reopen', { id });
+    expect(reopened.status).toBe(303);
+    article = await runtime.ctx.store.transaction(async (tx) => tx.articles.get(id));
+    expect(article?.status).toBe('review');
+    const reopenedPage = await (await fetch(`${base}/compose/${encodeURIComponent(id)}`)).text();
+    expect(reopenedPage).toContain('待主编审');
+  });
+});
