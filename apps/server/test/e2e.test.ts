@@ -103,11 +103,15 @@ describe('文章库与管理后台', () => {
     expect(html).toContain(first!.title);
   });
 
-  it('管理后台可打开', async () => {
-    const response = await fetch(`${base}/admin`);
+  it('运维中心可打开，/admin 301 过去', async () => {
+    const redirect = await fetch(`${base}/admin`, { redirect: 'manual' });
+    expect(redirect.status).toBe(301);
+    expect(redirect.headers.get('location')).toBe('/operations');
+
+    const response = await fetch(`${base}/operations`);
     const html = await response.text();
     expect(response.status).toBe(200);
-    expect(html).toContain('管理后台');
+    expect(html).toContain('运维中心');
     expect(html).toContain('今日进度');
     expect(html).toContain('运行状态');
     expect(html).toContain('队列与状态');

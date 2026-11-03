@@ -122,6 +122,10 @@ export function createServer(runtime: Runtime): http.Server {
         return redirect(res, '/admin');
       }
       if (req.method === 'GET' && path === '/admin') {
+        res.writeHead(301, { location: '/operations' });
+        return res.end();
+      }
+      if (req.method === 'GET' && path === '/operations') {
         const summary = await adminSummary(runtime.ctx, {
           mode: runtime.mode,
           dataDir: runtime.dataDir,
@@ -222,7 +226,14 @@ export function createServer(runtime: Runtime): http.Server {
         return sendJson(res, await reviewView(runtime.ctx, draftIdOf(path.slice('/api/reviews/'.length))));
       }
       if (req.method === 'GET' && path === '/api/overview') {
-        return sendJson(res, await overview(runtime.ctx));
+        const data = await overview(runtime.ctx);
+        let workerPhase: string | null = null;
+        try {
+          workerPhase = String((JSON.parse(fs.readFileSync(join(runtime.dataDir, 'worker-status.json'), 'utf8')) as { phase?: string }).phase ?? 'unknown');
+        } catch {
+          workerPhase = null;
+        }
+        return sendJson(res, { ...data, workerPhase });
       }
       if (req.method === 'GET' && path === '/api/usage') {
         const day = url.searchParams.get('day') ?? undefined;

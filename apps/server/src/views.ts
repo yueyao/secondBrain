@@ -49,7 +49,14 @@ function layout(title: string, body: string): string {
 (function(){
   var version=null;
   function show(text){var bar=document.getElementById('refresh-bar');if(!bar)return;bar.textContent=text;bar.style.display='block';bar.onclick=function(){location.reload();};}
+  function render(d){
+    var light=document.getElementById('worker-light');
+    if(light&&d.workerPhase){var m={drafting:'起草中',ingesting:'扫描中',sleeping:'等待中',paused:'已暂停',starting:'启动中',stopping:'停止中'};light.textContent='worker: '+(m[d.workerPhase]||d.workerPhase);}
+    var badge=document.getElementById('pending-badge');
+    if(badge&&typeof d.pendingDrafts==='number'){badge.textContent='待审 '+d.pendingDrafts;}
+  }
   function poll(){fetch('/api/overview',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
+    render(d);
     if(version===null){version=d.version;return;}
     if(d.version!==version&&document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){show('有更新（当前有输入，未自动刷新）· 点击刷新');return;}
     if(d.version!==version){version=d.version;show('有更新 · 点击刷新');}
@@ -311,8 +318,12 @@ export function usagePage(data: UsagePageData): string {
 
 function nav(): string {
   return `<div class="nav">
-    <a href="/">首页</a><a href="/articles">文章库</a><a href="/admin">管理</a>
-    <a href="/usage">用量</a><a href="/search">搜索</a>
+    <a href="/"><b>secondBrain</b></a>
+    <a href="/">工作台</a><a href="/articles">文章库</a><a href="/review">审核</a>
+    <a href="/operations">运维</a><a href="/usage">用量</a><a href="/search">搜索</a>
+    <span style="flex:1"></span>
+    <span id="worker-light" class="muted">worker: --</span>
+    <span id="pending-badge" class="badge b-warn">待审 0</span>
   </div>`;
 }
 
@@ -481,8 +492,8 @@ export function adminPage(data: AdminPageData): string {
        ${worker.stale ? '<div class="card" style="margin-top:10px;border-color:#a33">⚠️ worker 状态超过 10 分钟未更新，可能未运行</div>' : ''}`
     : '<div class="card muted">没有 worker 状态（worker 可能未启动）</div>';
 
-  return layout('管理后台', `${nav()}
-  <div class="row" style="justify-content:space-between"><h1>管理后台</h1><span class="muted">${esc(data.env.mode)} 模式</span></div>
+  return layout('运维中心', `${nav()}
+  <div class="row" style="justify-content:space-between"><h1>运维中心</h1><span class="muted">${esc(data.env.mode)} 模式</span></div>
 
   <h2>运行状态</h2>
   ${data.paused
