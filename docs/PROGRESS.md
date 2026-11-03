@@ -990,3 +990,9 @@ worker 测试断言：tick 后草稿数 = 队列数、**committed 为 0**（绝�
 2. 服务器端执行 legacy apply（`inserted 4408`）；
 3. 服务器访问控制（HTTPS / 认证）；
 4. 本地 wiki 只读的强制手段（pre-push hook）。
+
+
+### 25.6 安全护栏（2026-11-03）
+
+worker 启动时若未配置 `MODEL_BASE_URL` 且未显式设置 `WORKER_ALLOW_MOCK=1`，**直接拒绝启动**。
+原因：生产环境误用 MockAgent 会给真实文章写入假草稿；该护栏保证"要么真实模型，要么显式承认在演示"。

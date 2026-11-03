@@ -61,6 +61,10 @@ async function main(): Promise<void> {
   const maxJobsPerTick = envNumber('WORKER_MAX_JOBS', 5);
   const once = process.env.WORKER_ONCE === '1';
 
+  if (!process.env.MODEL_BASE_URL && process.env.WORKER_ALLOW_MOCK !== '1') {
+    throw new Error('worker 拒绝以 mock 模式运行（会为真实文章生成假草稿）；请配置 MODEL_BASE_URL，或显式设置 WORKER_ALLOW_MOCK=1 用于演示');
+  }
+
   const runtime = await createRuntime({
     dataDir,
     ...(process.env.VAULT_ROOT ? { vaultRoot: process.env.VAULT_ROOT } : {}),
