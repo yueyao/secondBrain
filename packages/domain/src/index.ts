@@ -12,6 +12,7 @@ export * from './model/raw-state';
 export * from './model/rule-input';
 export * from './state-machine';
 export * from './text';
+export * from './ai-flavor';
 export * from './frontmatter';
 export * from './draft-validation';
 export * from './policies';

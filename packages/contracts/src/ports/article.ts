@@ -1,6 +1,6 @@
 /** 文章与版本链（Compose C1）：大纲存在 article，正文每个版本只增不改。 */
 export type ArticleStatus = 'draft' | 'review' | 'final';
-export type ArticleVersionSource = 'ai_initial' | 'ai_refine' | 'manual_edit' | 'restore';
+export type ArticleVersionSource = 'ai_initial' | 'ai_refine' | 'deai' | 'manual_edit' | 'restore';
 
 export interface ArticleCitation {
   readonly text: string;

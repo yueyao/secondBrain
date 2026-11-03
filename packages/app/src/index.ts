@@ -5,4 +5,5 @@ export * from './queries';
 export * from './compose';
 export * from './diff';
 export * from './publish';
+export * from './deai';
 export * from './render';

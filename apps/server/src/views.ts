@@ -1,5 +1,6 @@
 /** 服务端渲染的审核台（无前端框架，手机可用）。 */
-import type { QueueItemV1, ReviewViewV1, ScoredHit } from '@sb/contracts';
+import type { DeAiStyle, QueueItemV1, ReviewViewV1, ScoredHit } from '@sb/contracts';
+import { AI_FLAVOR_RULES, type AiFlavorReport } from '@sb/domain';
 
 const esc = (value: unknown): string =>
   String(value ?? '')
@@ -384,7 +385,7 @@ function nav(): string {
   const links = [
     ['/', '工作台'], ['/articles', '素材库'], ['/nodes', '节点'], ['/compose', '主编台'], ['/review', '审核'],
     ['/claims', 'claims'], ['/operations', '运维'], ['/exceptions', '异常'],
-    ['/usage', '用量'], ['/search', '搜索'], ['/guide', '说明'], ['/about', '关于'],
+    ['/usage', '用量'], ['/search', '搜索'], ['/deai', '去 AI 味'], ['/guide', '说明'], ['/about', '关于'],
   ];
   const items = links.map(([href, label]) =>
     `<a href="${href}" style="padding:5px 9px;border-radius:6px;color:#9fb4ff;text-decoration:none;white-space:nowrap">${label}</a>`,
@@ -924,7 +925,7 @@ function renderArticleMarkdown(markdown: string): string {
 
 const ARTICLE_STATUS_LABEL: Record<string, string> = { draft: '草稿', review: '待主编审', final: '已定稿' };
 const ARTICLE_SOURCE_LABEL: Record<string, string> = {
-  ai_initial: 'AI 初稿', ai_refine: 'AI 改稿', manual_edit: '手工编辑', restore: '回滚',
+  ai_initial: 'AI 初稿', ai_refine: 'AI 改稿', deai: '去 AI 味', manual_edit: '手工编辑', restore: '回滚',
 };
 
 /** 截断长文本用于表格单元格（保留标题提示完整内容）。 */
@@ -989,6 +990,9 @@ export function composeArticlePage(data: {
   const actions = [
     data.current
       ? `<a class="btn" href="/compose/${articleHref}/export.md">导出 Markdown</a>`
+      : '',
+    data.current
+      ? `<form method="post" action="/actions/compose/deai" style="display:inline" onsubmit="return confirm('对当前正文做去 AI 味改写并生成新版本？会调用模型，可能产生费用。')"><input type="hidden" name="id" value="${esc(data.id)}"><button class="btn" type="submit">去 AI 味</button></form>`
       : '',
     data.current && data.status !== 'final'
       ? `<form method="post" action="/actions/compose/finalize" style="display:inline"><input type="hidden" name="id" value="${esc(data.id)}"><button class="btn" type="submit">定稿</button></form>`
@@ -1088,6 +1092,7 @@ export function aboutPage(data: AboutPageData): string {
     { title: '素材库', href: '/articles', body: '全部原文（含 4k+ 条 legacy）：6 个分组、来源/时间/triage 筛选、排序、分页；详情含 triage 理由、草稿 claims、来源与事件时间线。' },
     { title: '审核中心', href: '/review', body: 'AI 草稿在这里过人审：逐篇预览 claims/节点/finding，键盘 j/k/a/r 操作，支持勾选批量通过（服务端逐篇校验、二次确认、结果回显）。' },
     { title: '主编台', href: '/compose', body: '把知识节点写成文章：选节点 → AI 大纲 → 大纲可编辑 → 生成正文 → 改稿指令生成 vN+1 → 行级 diff → 恢复旧版 → 定稿 → 导出 Markdown。版本只增不改。' },
+    { title: '去 AI 味', href: '/deai', body: '独立能力：先用规则做 AI 味体检（框架词/黑话/对仗/宏大叙事/句长均匀/标点痕迹，加权评分），再由模型按命中清单改写；保留事实、数字与引用，主编台正文可一键生成新版本。' },
     { title: '知识节点', href: '/nodes', body: '已入库知识的结构化视图：Top N 枢纽气泡图（面积 ∝ claims 数）、类型筛选、搜索；节点详情含定义、claims、来源原文与相关概念。' },
     { title: 'claims', href: '/claims', body: '已入库草稿的全部判断句与来源，用来抽查"知识到底沉淀了什么"、追溯每句话的原文出处。' },
     { title: '搜索', href: '/search', body: '站内检索知识库（节点名 / 别名 / 正文），结果可直接打开节点。' },
@@ -1178,4 +1183,114 @@ export function aboutPage(data: AboutPageData): string {
   </table></div>
 
   <div class="muted" style="margin-top:18px">快捷入口：<a href="/">工作台</a> · <a href="/articles">素材库</a> · <a href="/review">审核</a> · <a href="/compose">主编台</a> · <a href="/operations">运维</a> · <a href="/guide">使用说明</a></div>`);
+}
+
+const AI_FLAVOR_LEVEL_LABEL: Record<string, string> = { low: '轻度', medium: '中度', high: '重度' };
+const AI_FLAVOR_LEVEL_CLASS: Record<string, string> = { low: 'b-ok', medium: 'b-warn', high: 'b-block' };
+const AI_FLAVOR_CATEGORY_LABEL: Record<string, string> = {
+  content: '内容', language: '语言', structure: '结构', format: '格式',
+};
+
+function aiFlavorReportCard(report: AiFlavorReport, label: string): string {
+  const levelLabel = AI_FLAVOR_LEVEL_LABEL[report.level] ?? report.level;
+  const levelClass = AI_FLAVOR_LEVEL_CLASS[report.level] ?? '';
+  const color = report.level === 'low' ? 'var(--ok)' : report.level === 'medium' ? 'var(--warn)' : 'var(--bad)';
+  const findings = report.findings.map((finding) => `<tr>
+    <td>${esc(finding.label)} <span class="muted">×${finding.count}</span></td>
+    <td class="muted">${esc(finding.examples.join(' / ') || '—')}</td>
+    <td class="muted">${esc(finding.advice)}</td>
+  </tr>`).join('') || '<tr><td colspan="3" class="muted">未命中明显 AI 味模式</td></tr>';
+  const highlights = report.highlights.length > 0
+    ? report.highlights.map((highlight) => `<span class="badge b-ok" style="margin:0 6px 6px 0">✓ ${esc(highlight.label)}</span>`).join('')
+    : '<span class="muted">没找到明显的人味信号；改写时注意别把原文里仅有的具体信息改没了。</span>';
+  return `<div class="card">
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <div><b>${esc(label)}</b> <span class="badge ${levelClass}">${esc(levelLabel)}</span></div>
+      <div style="font-size:26px;font-weight:650;font-variant-numeric:tabular-nums">${report.score}<span class="muted" style="font-size:13px"> / 100</span></div>
+    </div>
+    <div class="bar"><i style="width:${Math.max(2, report.score)}%;background:${color}"></i></div>
+    <div class="muted" style="margin-bottom:10px">分数越高越像 AI 生成；看聚簇不看孤例。</div>
+    <table><tr><th style="width:190px">命中项</th><th>原文示例</th><th style="width:220px">建议</th></tr>${findings}</table>
+    <div class="muted" style="margin-top:12px">指标：${report.metrics.chars} 字 · ${report.metrics.sentences} 句 · 平均 ${report.metrics.avgSentenceChars} 字/句 · 句长变异 ${report.metrics.sentenceVariation} · 段落变异 ${report.metrics.paragraphVariation} · 用词变化 ${report.metrics.uniqueBigramRatio} · 口语密度 ${report.metrics.colloquialRatio}/百字 · 具体信息点 ${report.metrics.concreteSignalCount}</div>
+    <div style="margin-top:12px">${highlights}</div>
+    <div class="muted" style="margin-top:8px">${esc(report.genreNote)}</div>
+  </div>`;
+}
+
+export interface DeAiPageData {
+  readonly mode: string;
+  readonly text: string;
+  readonly title: string;
+  readonly instruction: string;
+  readonly style: DeAiStyle;
+  readonly before: AiFlavorReport | null;
+  readonly after: AiFlavorReport | null;
+  readonly rewritten: string | null;
+  readonly model: string | null;
+  readonly cost: number | null;
+  readonly error: string | null;
+}
+
+/** 去 AI 味：独立能力页。先确定性体检，再让模型按命中项改写（保留事实与引用）。 */
+export function deAiPage(data: DeAiPageData): string {
+  const styleOptions = ([
+    ['auto', '自动（按内容判断）'],
+    ['casual', '更口语 / 更像聊天'],
+    ['formal', '更书面 / 接近正式发表'],
+    ['opinion', '允许明确立场与判断'],
+  ] as const).map(([value, label]) => `<option value="${value}"${data.style === value ? ' selected' : ''}>${label}</option>`).join('');
+
+  const errorCard = data.error
+    ? `<div class="card" style="border-color:rgba(239,95,107,.5)"><b style="color:#f0a6ac">处理失败：</b>${esc(data.error)}</div>`
+    : '';
+
+  const before = data.before ? aiFlavorReportCard(data.before, 'AI 味体检') : '';
+  const after = data.after && data.rewritten
+    ? `<h2>改写后</h2>${data.after ? aiFlavorReportCard(data.after, '改写后体检') : ''}
+       <div class="card" style="border-color:rgba(63,185,80,.35)">
+         <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px">
+           <b>改写结果</b>
+           <span class="muted">模型：${esc(data.model ?? '—')} · 成本：${data.cost === null ? '—' : `$${data.cost.toFixed(4)}`}</span>
+         </div>
+         <textarea name="rewritten" rows="14" readonly style="width:100%;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:10px;font:inherit;line-height:1.8">${esc(data.rewritten)}</textarea>
+         <div class="muted" style="margin-top:8px">可直接复制使用；主编台文章可在详情页点「去 AI 味」生成新版本（旧版本保留，可对比/恢复）。</div>
+       </div>`
+    : '';
+
+  const rules = AI_FLAVOR_RULES.map((rule) => `<tr>
+    <td>${esc(rule.label)}</td>
+    <td class="muted">${esc(AI_FLAVOR_CATEGORY_LABEL[rule.category] ?? rule.category)}</td>
+    <td class="muted">${rule.weight}</td>
+    <td class="muted">${esc(rule.advice)}</td>
+  </tr>`).join('');
+
+  return layout('去 AI 味', `${nav()}
+  <h1>去 AI 味</h1>
+  <div class="muted" style="max-width:860px">独立写作工具：先用确定性规则给文本做「AI 味体检」（框架路标词、互联网黑话、否定二分与排比、宏大叙事、套话结尾、句长均匀、标点格式痕迹），再由模型**按命中清单**逐项改写。
+  改写硬约束：保留事实、数字、观点归属与 <code>（来源：[[raw/...]]）</code> 引用；不编造第一人称经历，不越改越长。方法参考
+  <a href="https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing" target="_blank" rel="noreferrer">Wikipedia:Signs of AI writing</a>、
+  <a href="https://github.com/Warm1hear/humanizer-chinese" target="_blank" rel="noreferrer">humanizer-chinese</a> 与 CCL 2023 的量化研究。</div>
+
+  ${errorCard}
+
+  <h2>待处理文本</h2>
+  <div class="card"><form method="post" action="/actions/deai/analyze">
+    <div class="row" style="gap:10px;margin-bottom:8px">
+      <input name="title" value="${esc(data.title)}" placeholder="标题（可选）" style="width:280px">
+      <select name="style">${styleOptions}</select>
+    </div>
+    <textarea name="text" rows="10" placeholder="粘贴一段 AI 味重的文本（≥80 字）……" style="width:100%;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:10px;font:inherit;line-height:1.8">${esc(data.text)}</textarea>
+    <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <button class="btn" type="submit" formaction="/actions/deai/analyze">先做体检</button>
+      <button class="btn" type="submit" formaction="/actions/deai/rewrite">去 AI 味改写</button>
+      <span class="muted">体检不需要模型；改写会调用模型并产生费用（${esc(data.mode === 'cloud' ? '当前为云端模型' : '当前为 mock 模式')}）。</span>
+    </div>
+  </form></div>
+
+  ${before}
+  ${after}
+
+  <h2>检测项与权重</h2>
+  <div class="card" style="padding:4px 0"><table><tr><th>规则</th><th>类别</th><th>权重</th><th>改写建议</th></tr>${rules}</table></div>
+  <div class="muted" style="margin-top:14px">说明：这是"降 AI 味"的写作辅助，不承诺通过任何 AI 检测工具；引用、专名、被讨论的词一律不改。</div>`);
 }

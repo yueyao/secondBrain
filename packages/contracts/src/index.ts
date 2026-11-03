@@ -10,5 +10,6 @@ export * from './ports/vault';
 export * from './ports/search-index';
 export * from './ports/agent';
 export * from './ports/compose';
+export * from './ports/deai';
 export * from './dto/review-view';
 export * from './dto/queue-item';

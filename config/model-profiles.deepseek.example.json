@@ -140,6 +140,19 @@
       "maxInputTokens": 250000,
       "maxOutputTokens": 8000,
       "expectedClaims": 12
+    },
+    "deai": {
+      "requires": {
+        "contextTokens": 60000,
+        "structuredOutput": false,
+        "toolCalls": false
+      },
+      "profileOrder": [
+        "deepseek-flash"
+      ],
+      "maxInputTokens": 250000,
+      "maxOutputTokens": 8000,
+      "expectedClaims": 10
     }
   },
   "budget": {}

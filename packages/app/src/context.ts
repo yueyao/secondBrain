@@ -3,6 +3,7 @@ import type {
   AgentPort,
   Clock,
   ComposePort,
+  DeAiPort,
   HashPort,
   IdGenerator,
   SearchIndex,
@@ -36,6 +37,8 @@ export interface AppContext {
   readonly agent: AgentPort;
   /** 主编台生成端口（Compose C2）：大纲与正文都走它；未配置模型时缺省。 */
   readonly composer?: ComposePort;
+  /** 去 AI 味端口（独立能力）：未配置模型时缺省。 */
+  readonly deAi?: DeAiPort;
   readonly clock: Clock;
   readonly ids: IdGenerator;
   readonly hash: HashPort;

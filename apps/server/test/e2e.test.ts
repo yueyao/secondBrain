@@ -318,3 +318,69 @@ describe('关于页（功能地图）', () => {
     expect(html).toContain('href="/about"');
   });
 });
+
+describe('去 AI 味（独立能力）', () => {
+  const AI_TEXT = [
+    '首先，随着人工智能技术的不断发展，我们已经进入一个全新的时代。',
+    '其次，AI 正在赋能千行百业，打造闭环生态，成为不可或缺的底层逻辑。',
+    '值得注意的是，这不是一次简单的升级，而是一场深刻的革命。',
+    '由此可见，AI 必将带来深远影响，未来可期。',
+    '最后，希望本文对你有帮助，欢迎在评论区留言讨论。',
+  ].join('');
+
+  it('体检页可打开并列出检测项', async () => {
+    const response = await fetch(`${base}/deai`);
+    const html = await response.text();
+    expect(response.status).toBe(200);
+    expect(html).toContain('去 AI 味');
+    expect(html).toContain('检测项与权重');
+    expect(html).toContain('框架路标词');
+    expect(html).toContain('先做体检');
+  });
+
+  it('确定性体检能命中框架词、黑话、宏大叙事与套话', async () => {
+    const response = await post('/actions/deai/analyze', { text: AI_TEXT, style: 'auto' });
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('AI 味体检');
+    for (const label of ['框架路标词', 'AI 高频词与黑话', '宏大叙事与意义拔高', '套话结尾与对话残留']) {
+      expect(html).toContain(label);
+    }
+    expect(html).toContain('/ 100');
+  });
+
+  it('改写走 MockDeAi：保引用、给出改写后体检', async () => {
+    const withCitation = `${AI_TEXT}（来源：[[raw/knowledge/cubox/e2e.md]]）`;
+    const response = await post('/actions/deai/rewrite', { text: withCitation, style: 'casual' });
+    expect(response.status).toBe(200);
+    const html = await response.text();
+    expect(html).toContain('改写结果');
+    expect(html).toContain('改写后体检');
+    expect(html).toContain('raw/knowledge/cubox/e2e.md');
+  });
+
+  it('主编台正文可一键去 AI 味并生成新版本', async () => {
+    const form = new URLSearchParams({ title: '去 AI 味端到端文章', theme: '写作' });
+    for (const doc of runtime.ctx.search.allDocs().filter((entry) => entry.body.includes('来源：[[raw/')).slice(0, 2)) {
+      form.append('node', doc.name);
+    }
+    const created = await fetch(`${base}/actions/compose/create`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: form.toString(),
+      redirect: 'manual',
+    });
+    expect(created.status).toBe(303);
+    const articles = await runtime.ctx.store.transaction(async (tx) => tx.articles.list());
+    const id = articles[0]!.id;
+    await post('/actions/compose/outline/generate', { id });
+    await post('/actions/compose/body/generate', { id });
+    const response = await post('/actions/compose/deai', { id });
+    expect(response.status).toBe(303);
+    const versions = await runtime.ctx.store.transaction(async (tx) => tx.articleVersions.listByArticle(id));
+    expect(versions[0]?.source).toBe('deai');
+    expect(versions[0]?.note).toContain('去 AI 味：');
+    const page = await (await fetch(`${base}/compose/${encodeURIComponent(id)}`)).text();
+    expect(page).toContain('去 AI 味');
+  });
+});

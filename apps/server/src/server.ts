@@ -67,10 +67,13 @@ import {
   finalizeArticle,
   reopenArticle,
   exportArticleMarkdown,
+  deAiText,
+  deAiArticleVersion,
 } from '@sb/app';
-import { parseDraftId, parseRawPath, type DraftId, type RawPath } from '@sb/domain';
+import type { DeAiStyle } from '@sb/contracts';
+import { analyzeAiFlavor, parseDraftId, parseRawPath, type DraftId, type RawPath } from '@sb/domain';
 import type { Runtime } from './runtime';
-import { aboutPage, adminPage, articlePage, articlesPage, claimsPage, composeArticlePage, composeDiffPage, composePage, dashboard, errorPage, guidePage, nodePage, nodesPage, reviewListPage, reviewPage, searchPage, usagePage } from './views';
+import { aboutPage, adminPage, deAiPage, articlePage, articlesPage, claimsPage, composeArticlePage, composeDiffPage, composePage, dashboard, errorPage, guidePage, nodePage, nodesPage, reviewListPage, reviewPage, searchPage, usagePage } from './views';
 
 function redirect(res: http.ServerResponse, location: string): void {
   res.writeHead(303, { location });
@@ -202,6 +205,12 @@ export function createServer(runtime: Runtime): http.Server {
         await restoreArticleVersion(runtime.ctx, id, form.versionId ?? '');
         return redirect(res, `/compose/${encodeURIComponent(id)}`);
       }
+      if (req.method === 'POST' && path === '/actions/compose/deai') {
+        const form = await readForm(req);
+        const id = form.id ?? '';
+        await deAiArticleVersion(runtime.ctx, id);
+        return redirect(res, `/compose/${encodeURIComponent(id)}`);
+      }
       if (req.method === 'POST' && path === '/actions/compose/finalize') {
         const form = await readForm(req);
         const id = form.id ?? '';
@@ -297,6 +306,52 @@ export function createServer(runtime: Runtime): http.Server {
             estimatedCost: usage.totals.estimatedCost,
           },
         }));
+      }
+      if (req.method === 'GET' && path === '/deai') {
+        return sendHtml(res, deAiPage({
+          mode: runtime.mode, text: '', title: '', instruction: '', style: 'auto',
+          before: null, after: null, rewritten: null, model: null, cost: null, error: null,
+        }));
+      }
+      if (req.method === 'POST' && (path === '/actions/deai/analyze' || path === '/actions/deai/rewrite')) {
+        const form = await readForm(req);
+        const text = form.text ?? '';
+        const rawStyle = form.style ?? 'auto';
+        const styles: readonly DeAiStyle[] = ['auto', 'casual', 'formal', 'opinion'];
+        const style = styles.includes(rawStyle as DeAiStyle) ? rawStyle as DeAiStyle : 'auto';
+        const base = { mode: runtime.mode, text, title: form.title ?? '', instruction: '', style };
+        if (text.trim() === '') {
+          return sendHtml(res, deAiPage({
+            ...base, before: null, after: null, rewritten: null, model: null, cost: null,
+            error: '请先粘贴要处理的文本',
+          }), 400);
+        }
+        try {
+          if (path === '/actions/deai/analyze') {
+            return sendHtml(res, deAiPage({
+              ...base, before: analyzeAiFlavor(text), after: null, rewritten: null, model: null, cost: null, error: null,
+            }));
+          }
+          const result = await deAiText(runtime.ctx, {
+            text,
+            title: form.title && form.title.trim() !== '' ? form.title.trim() : null,
+            style,
+          });
+          return sendHtml(res, deAiPage({
+            ...base,
+            before: result.before,
+            after: result.after,
+            rewritten: result.rewritten,
+            model: result.provenance.model,
+            cost: result.cost,
+            error: null,
+          }));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          return sendHtml(res, deAiPage({
+            ...base, before: null, after: null, rewritten: null, model: null, cost: null, error: message,
+          }), 400);
+        }
       }
       if (req.method === 'GET' && path === '/exceptions') {
         return redirect(res, '/articles?group=error');

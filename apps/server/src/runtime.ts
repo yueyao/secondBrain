@@ -9,19 +9,21 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { recoverPending, type AppContext, type ProfilePricing } from '@sb/app';
-import type { AgentPort, ComposePort, ComposeRequest, DigestRequest } from '@sb/contracts';
+import type { AgentPort, ComposePort, ComposeRequest, DeAiPort, DeAiRequest, DigestRequest } from '@sb/contracts';
 import { parseDraftId, stringifyFrontmatter } from '@sb/domain';
 import { FsVault } from '@sb/adapters-vault';
 import { migrate, SqliteStore } from '@sb/adapters-sqlite';
 import { MemorySearch } from '@sb/adapters-search-memory';
-import { LEGACY_RAW, MOCK_NODES, MOCK_RAW, MockAgent, MockComposer } from '@sb/testing';
+import { LEGACY_RAW, MOCK_NODES, MOCK_RAW, MockAgent, MockComposer, MockDeAi } from '@sb/testing';
 import {
   AgentRunner,
   BudgetLedger,
   ComposeRunner,
   MemoryCompletionCache,
   parseModelPolicy,
+  DeAiRunner,
   type ComposePromptSpec,
+  type DeAiPromptSpec,
   type PromptSpec,
 } from '@sb/agent-runtime';
 import { OpenAICompatibleProvider } from '@sb/adapters-agent-openai';
@@ -142,9 +144,64 @@ export function composePrompts(): Readonly<Record<'outline' | 'body', ComposePro
   };
 }
 
+const DEAI_STYLE_LABEL: Readonly<Record<DeAiRequest['style'], string>> = {
+  auto: '自动（按内容判断）',
+  casual: '更口语、更像聊天',
+  formal: '更书面、接近正式发表',
+  opinion: '允许明确立场与判断',
+};
+
+const DEAI_SYSTEM = `你是中文写作编辑，任务是去除文本的“AI 味”，让文字读起来像真人写的。
+硬规则（先保信息，再谈风格）：
+1. 不新增原文没有的事实、数字、人名、日期、引语、出处；不得虚构第一人称经历；观点可以换表达，但立场和归属不能变。
+2. 所有“（来源：[[raw/...]]）”引用标记必须原样保留：不得删除、不得改写路径、不得新增来源。
+3. 保留原文全部信息点与论点；可以调整详略与段落划分，但不许删掉关键信息。
+4. 清除框架路标词（首先/其次/最后/总之/综上所述/值得注意的是/由此可见/不难发现 等），逻辑靠前后句自然承接。
+5. 拆掉“不是X，而是Y”“不仅…而且…”“一方面…另一方面…”式否定二分与排比堆砌，改成朴素、具体的陈述。
+6. 砍掉宏大开场与升华结尾（随着…的发展、未来可期、让我们拭目以待 等），直接说事。
+7. 减少形容词、副词、宣传腔与万能动词（进行/作出/赋能/抓手/闭环 等），把空泛表达换成具体对象、动作与场景（细节只能来自原文）。
+8. 句长要有变化：重要处写长，次要处写短，长短句交替；不要每段结构一模一样。
+9. 与原文篇幅相当（±30%），不许越改越长。
+10. 只输出改写后的全文：不要解释、不要标题前缀、不要代码块标记，不要输出“修改说明”。
+文风按输入指定的目标文体处理；公文、学术、新闻通稿的规范用语不必强行口语化。`;
+
+function renderDeAiInput(request: DeAiRequest): string {
+  const issues = request.issues.length > 0
+    ? request.issues.map((issue) => `- ${issue.label} ×${issue.count}${issue.examples.length > 0 ? `，例：${issue.examples.join(' / ')}` : ''}`).join('\n')
+    : '- （体检未命中明显模式，仍按硬规则整体润色）';
+  const citations = request.keepCitations.length > 0
+    ? request.keepCitations.map((source) => `- （来源：[[${source}]]）`).join('\n')
+    : '- （原文没有 raw 引用）';
+  return [
+    `文章标题：${request.title ?? '（未命名）'}`,
+    `目标文体：${DEAI_STYLE_LABEL[request.style]}`,
+    '',
+    '需要清除的 AI 味项：',
+    issues,
+    '',
+    '必须原样保留的引用标记：',
+    citations,
+    ...(request.instruction ? ['', `额外要求：${request.instruction}`] : []),
+    '',
+    '原文：',
+    request.text,
+  ].join('\n');
+}
+
+export function deAiPrompt(): DeAiPromptSpec {
+  return {
+    id: 'deai',
+    version: 1,
+    sha256: createHash('sha256').update(DEAI_SYSTEM).digest('hex'),
+    system: DEAI_SYSTEM,
+    render: renderDeAiInput,
+  };
+}
+
 interface AgentBuild {
   readonly agent: AgentPort;
   readonly composer: ComposePort;
+  readonly deAi: DeAiPort;
   readonly mode: AgentMode;
   readonly pricing: Readonly<Record<string, ProfilePricing>>;
 }
@@ -152,7 +209,13 @@ interface AgentBuild {
 function buildAgent(): AgentBuild {
   const baseUrl = process.env.MODEL_BASE_URL;
   if (!baseUrl) {
-    return { agent: new MockAgent(), composer: new MockComposer(), mode: 'mock', pricing: {} };
+    return {
+      agent: new MockAgent(),
+      composer: new MockComposer(),
+      deAi: new MockDeAi(),
+      mode: 'mock',
+      pricing: {},
+    };
   }
 
   const configPath = process.env.MODEL_CONFIG ?? path.resolve(process.cwd(), 'config/model-profiles.example.json');
@@ -195,10 +258,19 @@ function buildAgent(): AgentBuild {
     prompts: composePrompts(),
   });
 
+  const deAi = new DeAiRunner({
+    provider,
+    profiles: parsed.value.profiles,
+    policies: parsed.value.policies,
+    budget,
+    clock: systemClock,
+    prompt: deAiPrompt(),
+  });
+
   const pricing: Record<string, ProfilePricing> = {};
   for (const profile of parsed.value.profiles) pricing[profile.id] = profile.pricing;
 
-  return { agent, composer, mode: 'cloud', pricing };
+  return { agent, composer, deAi, mode: 'cloud', pricing };
 }
 
 export async function createRuntime(options: RuntimeOptions): Promise<Runtime> {
@@ -222,6 +294,7 @@ export async function createRuntime(options: RuntimeOptions): Promise<Runtime> {
     search,
     agent: built.agent,
     composer: built.composer,
+    deAi: built.deAi,
     clock: systemClock,
     ids: {
       draftId: () => {

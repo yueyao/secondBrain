@@ -23,7 +23,7 @@ secondBrain 知识生产流程的服务端实现，**pnpm workspaces monorepo**�
 | `@sb/adapters-search-memory` | 内存检索（mock 用） | domain + contracts | ✅ |
 | `@sb/app` | 用例：triage / digest / review / commit / compose（主编台） | domain + contracts | ✅ |
 | `@sb/testing` | 测试夹具、MockAgent、MockComposer、harness | 域 + 适配器 | ✅ |
-| `@sb/agent-runtime` | 能力路由 / 预算 / 缓存 / 重试 / 降级 / 契约校验 / ComposeRunner | domain + contracts | ✅ |
+| `@sb/agent-runtime` | 能力路由 / 预算 / 缓存 / 重试 / 降级 / 契约校验 / ComposeRunner / DeAiRunner | domain + contracts | ✅ |
 | `@sb/adapters-agent-openai` | OpenAI 兼容 provider（json / text 两种输出模式） | agent-runtime + contracts | ✅ |
 | `apps/server` | 审核台 + 素材库 + 主编台 + 运维中心：HTTP + 服务端渲染 UI | 全部 | ✅ |
 | `apps/worker` | 自动流水线：ingest → 起草（不自动入库） | 全部 | ✅ |
@@ -40,7 +40,7 @@ pnpm demo          # → http://127.0.0.1:8787（自动播种 mock 数据）
 首页「扫描 raw/ 并分档」→ 队列「生成草稿」→ 审阅页「通过并入库」，每一步都会在 demo vault 里产生真实 git commit。
 主编台 `/compose`：选知识节点创建文章 →「AI 生成大纲」→「生成正文 v1」→ 正文里的引用可点回原文，版本历史逐版累积（mock 模式自动使用 MockComposer，不产生费用）。
 测试方案见 [docs/TESTING.md](docs/TESTING.md)，页面快照见 `docs/snapshots/`。
-关于页 `/about` 汇总工作台全部功能与实时数据概览。
+关于页 `/about` 汇总工作台全部功能与实时数据概览；`/deai` 是独立的「去 AI 味」体检与改写工具。
 
 ## 支持哪些模型
 
@@ -108,7 +108,7 @@ pnpm run check     # boundaries → typecheck → depcruise → test
 pnpm run boundaries   # 包边界、深引、纯度（无 node: / 无第三方 / 无 throw / 无时钟）
 pnpm run typecheck    # tsc --noEmit（strict + exactOptionalPropertyTypes）
 pnpm run depcruise    # 依赖方向、环形依赖
-pnpm test             # vitest：31 个文件 / 260 例
+pnpm test             # vitest：35 个文件 / 318 例
 ```
 
 ## 能证明什么
@@ -122,6 +122,7 @@ pnpm test             # vitest：31 个文件 / 260 例
 - **vault 不可被越狱**：路径逃逸（`..`/绝对路径）与非 wiki 写入会被拒绝；提交失败可 `resetHard` 回滚。
 - **崩溃后可恢复**：批准后崩溃 → 启动时幂等重放（补提交或只补状态）；目标文件被外部修改 → 拒绝覆盖并回滚；无关脏改动 → 拒绝启动。
 - **主编台全流程可离线验证**：MockComposer 走完整 HTTP 链路（建文章 → 生成大纲 → 正文 v1 → 改稿 vN+1 → 行级 diff → 恢复旧版 → 定稿 → 导出 Markdown），正文引用能解析回 raw 原文，版本只增不改。
+- **去 AI 味可离线验证**：规则体检（8 项加权）不依赖模型；改写契约（长度区间、不得编造引用、不得丢引用）用 MockDeAi 全链路覆盖，真实模型只需替换端口实现。
 - **模型输出有契约**：digest 走 JSON 契约校验，compose 走文本契约（长度 + 至少 2 个引用标记）；不合规回喂重试一次，再失败落 `CONTRACT_VIOLATION`。
 - **包边界可执行**：深引 `@sb/domain/src/*`、domain→contracts 反向依赖、未登记的新包，都会让 CI 失败。
 

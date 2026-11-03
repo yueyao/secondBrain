@@ -5,4 +5,5 @@ export * from './budget';
 export * from './cache';
 export * from './runner';
 export * from './compose-runner';
+export * from './deai-runner';
 export * from './config';
