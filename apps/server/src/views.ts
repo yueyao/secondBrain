@@ -851,7 +851,7 @@ export function composePage(data: { articles: readonly { id: string; title: stri
 
 
 
-export function composeArticlePage(data: { id: string; title: string; theme: string; status: string; outline: string | null; nodes: readonly { name: string; nodeType: string; claimCount: number; claims: readonly { text: string; source: string }[] }[] }): string {
+export function composeArticlePage(data: { id: string; title: string; theme: string; status: string; outline: string | null; updatedAt: string; nodes: readonly { name: string; nodeType: string; claimCount: number; claims: readonly { text: string; source: string }[] }[] }): string {
   const nodes = data.nodes.map((node) => `<div class="card" style="margin:8px 0">
     <div><b>${esc(node.name)}</b> <span class="badge">${esc(node.nodeType)}</span> <span class="muted">${node.claimCount} claims</span></div>
     <ul style="margin:8px 0 0;padding-left:18px">${node.claims.map((claim) => `<li>${esc(claim.text)}<div class="muted">${esc(claim.source)}</div></li>`).join('') || '<li class="muted">无 claims</li>'}</ul>
