@@ -9,36 +9,59 @@ const esc = (value: unknown): string =>
 const LEVEL: Record<string, string> = { block: '阻断', warn: '注意', ok: '通过' };
 
 const CSS = `
-:root{--bg:#0f1115;--card:#171a21;--line:#262b36;--fg:#e6e8ee;--dim:#9aa3b2;
---red:#ef5f6b;--yellow:#e3b341;--green:#3fb950;--blue:#58a6ff;--mono:ui-monospace,Menlo,monospace}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);
-font:15px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}
-a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
-.wrap{max-width:1000px;margin:0 auto;padding:28px 20px 80px}
-h1{font-size:20px;margin:0 0 4px}h2{font-size:14px;color:var(--dim);margin:26px 0 10px;letter-spacing:.04em}
-.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
-.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-.stat{flex:1 1 120px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
-.stat b{display:block;font-size:24px}.stat span{color:var(--dim);font-size:12px}
-table{width:100%;border-collapse:collapse;font-size:14px}
-th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-th{color:var(--dim);font-weight:500;font-size:12px}
-.mono{font-family:var(--mono);font-size:12px;color:var(--dim);word-break:break-all}
-.badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;border:1px solid var(--line)}
-.b-block{color:var(--red);border-color:#5a2b31;background:#2a1618}
-.b-warn{color:var(--yellow);border-color:#5a4a1e;background:#2a2414}
-.b-ok{color:var(--green);border-color:#24512c;background:#152215}
-.b-blue{color:var(--blue);border-color:#243b5a;background:#141c2a}
-.btn{display:inline-block;padding:6px 14px;border-radius:8px;border:1px solid var(--line);
-background:#1d222b;color:var(--fg);cursor:pointer;font-size:13.5px}
-.btn.primary{background:#1f6feb;border-color:#1f6feb;color:#fff}
-.btn.danger{background:#3a1d22;border-color:#5a2b31;color:#ff9aa2}
-.btn[disabled]{opacity:.45;cursor:not-allowed}
-input[type=text]{width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--line);
-background:#0c0e12;color:var(--fg);font-size:14px}
-li{margin:6px 0}.muted{color:var(--dim)}
-pre{background:#0c0e12;border:1px solid var(--line);border-radius:8px;padding:12px;overflow:auto;font-size:12.5px}
+:root{--bg:#0a0b0d;--panel:#101216;--paper:#15181d;--ink:#e8eaed;--dim:#8b939e;--line:#23272e;--accent:#5eead4;--warn:#e3b341;--bad:#ef5f6b;--ok:#3fb950}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:14px/1.55 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0}
+.wrap{margin-left:224px;padding:28px 32px 48px;max-width:1280px}
+.nav{position:fixed;inset:0 auto 0 0;width:224px;display:flex;flex-direction:column;gap:1px;padding:20px 12px;border-right:1px solid var(--line);background:var(--bg);z-index:10;overflow:auto}
+.nav a[href="/"]{color:var(--ink);font-weight:700;font-size:15px;letter-spacing:-.01em;padding:0 10px 16px}
+.nav a[href="/"]:hover{background:none}
+.nav a{color:var(--dim);padding:6px 10px;border-radius:4px;font-size:13.5px;text-decoration:none;white-space:nowrap}
+.nav a:hover{color:var(--ink);background:var(--panel)}
+.nav a[href="/"]{color:var(--ink)}
+#worker-light{color:var(--dim);font-size:12px;padding:14px 10px 2px;white-space:nowrap}
+#pending-badge{background:none;border:1px solid var(--line);color:var(--ink);font-size:11px;padding:2px 6px;margin:0 10px}
+.refresh-bar{display:none;position:sticky;top:0;background:#1b1a10;color:var(--warn);border-bottom:1px solid #3d361a;padding:7px 16px;cursor:pointer;z-index:11;text-align:center;font-size:12.5px}
+h1{font-size:24px;font-weight:600;letter-spacing:-.02em;margin:0 0 8px}
+h2{font-size:12px;font-weight:500;color:var(--dim);margin:30px 0 8px;letter-spacing:0;text-transform:none}
+p{margin:8px 0}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+.muted{color:var(--dim);font-size:12.5px}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;margin:0}
+.row:has(.stat){gap:0;border:1px solid var(--line);border-radius:6px;background:var(--panel);overflow:hidden;margin:8px 0}
+.stat{flex:1 1 120px;padding:12px 16px;border-right:1px solid var(--line);background:var(--panel)}
+.row:has(.stat) .stat:last-child{border-right:0}
+.stat b{display:block;font-size:22px;font-weight:500;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat span{display:block;font-size:12px;color:var(--dim);margin-top:2px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px;margin:8px 0}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+th{font-size:12px;color:var(--dim);font-weight:400;text-align:left;padding:7px 10px;border-bottom:1px solid var(--line)}
+td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.045);vertical-align:top}
+tr:last-child td{border-bottom:0}
+th:nth-child(n+3),td:nth-child(n+3){text-align:right}
+.badge{display:inline-block;font-size:11px;padding:1px 6px;border-radius:3px;border:1px solid var(--line);color:#b7c0cc;background:var(--paper);white-space:nowrap}
+.b-ok{color:var(--ok);border-color:rgba(63,185,80,.35)}
+.b-warn{color:var(--warn);border-color:rgba(227,179,65,.35)}
+.b-block{color:var(--bad);border-color:rgba(239,95,107,.35)}
+.btn{display:inline-block;background:transparent;border:1px solid var(--line);color:var(--ink);padding:6px 12px;border-radius:4px;font:inherit;font-size:13px;cursor:pointer;text-decoration:none}
+.btn:hover{border-color:var(--accent);color:var(--accent);text-decoration:none}
+input,select{background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:4px;padding:6px 9px;font:inherit;font-size:13px}
+input:focus,select:focus,.btn:focus-visible,a:focus-visible{outline:1px solid var(--accent);outline-offset:1px}
+pre{background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:12px;overflow:auto;font-size:12.5px;color:#c7d0da}
+ul,ol{margin:8px 0;padding-left:20px}
+li{margin:5px 0}
+code{font-size:12.5px;color:var(--accent)}
+@media(max-width:860px){
+  .nav{position:static;width:auto;flex-direction:row;flex-wrap:wrap;align-items:center;border-right:0;border-bottom:1px solid var(--line);padding:8px 10px;gap:2px}
+  .nav a[href="/"]{padding:4px 8px 4px 4px}
+  #worker-light{padding:2px 6px}
+  #pending-badge{margin:0 4px}
+  .wrap{margin-left:0;padding:16px}
+  h1{font-size:20px}
+}
 `;
+
 
 function layout(title: string, body: string): string {
   return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
@@ -253,7 +276,7 @@ export function searchPage(query: string, hits: readonly ScoredHit[]): string {
     <td><b>${esc(hit.name)}</b><div class="mono">${esc(hit.file)} · ${esc(hit.matchType)}</div></td></tr>`).join('')
     || '<tr><td colspan="2" class="muted">没有命中</td></tr>';
 
-  return layout('搜索', `
+  return layout('搜索', `${nav()}
   <div class="row" style="justify-content:space-between"><h1>搜索知识库</h1><a class="btn" href="/">← 返回</a></div>
   <form class="card" method="get" action="/search" style="margin-top:12px">
     <input type="text" name="q" value="${esc(query)}" placeholder="概念 / 人物 / 关键词">
@@ -289,7 +312,7 @@ export function usagePage(data: UsagePageData): string {
     <td>${entry.outputTokens.toLocaleString()}</td>
     <td>${entry.estimatedCost}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">还没有调用记录</td></tr>';
 
-  return layout('用量', `
+  return layout('用量', `${nav()}
   <div class="row" style="justify-content:space-between"><h1>模型用量</h1><a class="btn" href="/">← 返回</a></div>
   <div class="muted">只计量、不拦截（ADR 0005 修订）。价格未配置时成本显示 0，tokens 仍然准确。</div>
 
