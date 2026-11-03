@@ -1123,3 +1123,30 @@ sync: vault/raw 均 "Already up to date"
 
 - 心跳文件写失败不影响 worker 主流程；
 - 速率按"今日调用次数 / 首次到末次调用时长"估算，样本少时会偏高，跑一会儿后趋于稳定。
+
+
+---
+
+## 三十一、暂停/继续控制（2026-11-03）
+
+### 31.1 机制
+
+- worker 每轮开始、每篇起草前检查 `DATA_DIR/worker-pause.json`；
+- 暂停 = 当前文章处理完、不再开始下一篇；已进入的模型调用不中断；
+- 继续 = 删除该文件，worker 最多 10 秒内恢复；
+- 管理后台「运行状态」区块提供「暂停（完成当前任务后）」/「继续处理」按钮。
+
+### 31.2 验证
+
+```
+ Test Files  26 passed (26)
+      Tests  188 passed (188)   # 新增 worker 暂停语义 1 例
+```
+
+### 31.3 自动处理是怎么跑起来的（说明）
+
+1. systemd 开机启动 `secondbrain-server`（UI）与 `secondbrain-worker`；
+2. worker 循环：ingest 新 raw → 取 queued 前 8 篇 → 逐篇 `draftDigest`（写状态库与草稿）→ 写心跳 `worker-status.json` → 休眠 2 分钟；
+3. 失败单篇记日志、下一轮重试；崩溃由 systemd 拉起，启动时 `recoverPending` 对账；
+4. `secondbrain-sync.timer` 每 15 分钟 `git pull`（raw/wiki）；`secondbrain-backup.timer` 每日 03:17 快照 state.db；
+5. 草稿不会自动入库：accept 只能由人在审核台点击。

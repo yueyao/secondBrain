@@ -112,6 +112,14 @@ export function createServer(runtime: Runtime): http.Server {
         return sendHtml(res, articlePage(detail));
       }
 
+      if (req.method === 'POST' && path === '/actions/worker/pause') {
+        fs.writeFileSync(join(runtime.dataDir, 'worker-pause.json'), JSON.stringify({ pausedAt: new Date().toISOString(), by: 'ui' }));
+        return redirect(res, '/admin');
+      }
+      if (req.method === 'POST' && path === '/actions/worker/resume') {
+        fs.rmSync(join(runtime.dataDir, 'worker-pause.json'), { force: true });
+        return redirect(res, '/admin');
+      }
       if (req.method === 'GET' && path === '/admin') {
         const summary = await adminSummary(runtime.ctx, {
           mode: runtime.mode,
@@ -145,6 +153,7 @@ export function createServer(runtime: Runtime): http.Server {
         }
 
         return sendHtml(res, adminPage({
+          paused: fs.existsSync(join(runtime.dataDir, 'worker-pause.json')),
           counts: summary.counts,
           total: summary.total,
           drafts: summary.drafts,

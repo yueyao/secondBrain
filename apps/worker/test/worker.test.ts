@@ -55,3 +55,22 @@ describe('worker tick', () => {
     }
   });
 });
+
+describe('暂停控制', () => {
+  it('shouldPause 为 true 时只处理完当前文章就停', async () => {
+    const harness = await createHarness();
+    try {
+      const ctx = ctxOf(harness);
+      let checks = 0;
+      const result = await runTick(ctx, {
+        maxJobsPerTick: 10,
+        shouldPause: () => ++checks > 2,
+      });
+      // 第 1 次在 ingest 前、第 2 次在第 1 篇前（false）→ 处理 1 篇；第 3 次暂停
+      expect(result.paused).toBe(true);
+      expect(result.drafted).toBe(1);
+    } finally {
+      await harness.cleanup();
+    }
+  });
+});

@@ -65,7 +65,7 @@ const REASON_LABEL: Record<string, string> = {
 };
 const DRAFT_LABEL: Record<string, string> = { pending: '待审核', approved: '已批准', rejected: '已驳回' };
 const PHASE_LABEL: Record<string, string> = {
-  starting: '启动中', ingesting: '扫描原文', drafting: '起草中', sleeping: '等待下一轮', stopping: '停止中',
+  starting: '启动中', ingesting: '扫描原文', drafting: '起草中', sleeping: '等待下一轮', paused: '已暂停', stopping: '停止中',
 };
 
 export function stateLabel(state: unknown): string {
@@ -417,6 +417,7 @@ export interface WorkerStatusView {
 }
 
 export interface AdminPageData {
+  readonly paused: boolean;
   readonly counts: Readonly<Record<string, number>>;
   readonly total: number;
   readonly drafts: Readonly<Record<string, number>>;
@@ -472,6 +473,11 @@ export function adminPage(data: AdminPageData): string {
   <div class="row" style="justify-content:space-between"><h1>管理后台</h1><span class="muted">${esc(data.env.mode)} 模式</span></div>
 
   <h2>运行状态</h2>
+  ${data.paused
+    ? `<div class="card" style="border-color:#e3b341;margin-bottom:10px"><b>已暂停</b>：当前任务处理完后不再开始新任务。
+         <form method="post" action="/actions/worker/resume" style="display:inline;margin-left:8px"><button class="btn" type="submit">继续处理</button></form></div>`
+    : `<div class="card" style="margin-bottom:10px">自动处理中。
+         <form method="post" action="/actions/worker/pause" style="display:inline;margin-left:8px"><button class="btn" type="submit">暂停（完成当前任务后）</button></form></div>`}
   ${workerBlock}
 
   <h2>今日进度（${esc(data.today.day)}）</h2>

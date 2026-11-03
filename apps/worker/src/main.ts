@@ -11,10 +11,12 @@ import { createRuntime } from '../../server/src/runtime';
 export interface TickOptions {
   readonly maxJobsPerTick: number;
   readonly onStatus?: (status: WorkerStatus) => void;
+  /** 返回 true 时：当前文章处理完后不再开始新的文章 */
+  readonly shouldPause?: () => boolean;
 }
 
 export interface WorkerStatus {
-  readonly phase: 'starting' | 'ingesting' | 'drafting' | 'sleeping' | 'stopping';
+  readonly phase: 'starting' | 'ingesting' | 'drafting' | 'sleeping' | 'paused' | 'stopping';
   readonly updatedAt: string;
   readonly rawPath?: string;
   readonly title?: string;
@@ -28,10 +30,16 @@ export interface TickResult {
   readonly drafted: number;
   readonly failed: number;
   readonly queueLength: number;
+  readonly paused: boolean;
 }
 
 /** 单次 tick：ingest 全部新原文，再为最多 N 个 queued 条目起草。 */
 export async function runTick(ctx: AppContext, options: TickOptions): Promise<TickResult> {
+  if (options.shouldPause?.()) {
+    options.onStatus?.({ phase: 'paused', updatedAt: new Date().toISOString() });
+    return { ingested: 0, drafted: 0, failed: 0, queueLength: 0, paused: true };
+  }
+
   options.onStatus?.({ phase: 'ingesting', updatedAt: new Date().toISOString() });
   const outcomes = await ingestAndTriage(ctx);
   const queue = await listQueue(ctx);
@@ -39,7 +47,12 @@ export async function runTick(ctx: AppContext, options: TickOptions): Promise<Ti
 
   let drafted = 0;
   let failed = 0;
+  let paused = false;
   for (const entry of candidates) {
+    if (options.shouldPause?.()) {
+      paused = true;
+      break;
+    }
     const parsed = parseRawPath(entry.rawPath);
     if (!parsed.ok) {
       failed += 1;
@@ -67,7 +80,7 @@ export async function runTick(ctx: AppContext, options: TickOptions): Promise<Ti
     }
   }
 
-  const result: TickResult = { ingested: outcomes.length, drafted, failed, queueLength: queue.length };
+  const result: TickResult = { ingested: outcomes.length, drafted, failed, queueLength: queue.length, paused };
   options.onStatus?.({
     phase: 'sleeping',
     updatedAt: new Date().toISOString(),
@@ -109,6 +122,8 @@ async function main(): Promise<void> {
       // 状态文件写失败不影响主流程
     }
   };
+  const pauseFile = path.join(dataDir, 'worker-pause.json');
+  const isPaused = (): boolean => fs.existsSync(pauseFile);
   writeStatus({ phase: 'starting', updatedAt: new Date().toISOString() });
 
   let stopping = false;
@@ -118,7 +133,12 @@ async function main(): Promise<void> {
 
   try {
     while (!stopping) {
-      const result = await runTick(runtime.ctx, { maxJobsPerTick, onStatus: writeStatus });
+      if (isPaused()) {
+        writeStatus({ phase: 'paused', updatedAt: new Date().toISOString() });
+        await new Promise((resolve) => setTimeout(resolve, Math.min(intervalMs, 10_000)));
+        continue;
+      }
+      const result = await runTick(runtime.ctx, { maxJobsPerTick, onStatus: writeStatus, shouldPause: isPaused });
       console.log(JSON.stringify({ level: 'info', event: 'tick', at: new Date().toISOString(), ...result }));
       if (once) break;
       await new Promise((resolve) => setTimeout(resolve, intervalMs));
