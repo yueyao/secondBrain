@@ -16,10 +16,11 @@ import {
   articleDetail,
   adminSummary,
   overview,
+  pendingReviewList,
 } from '@sb/app';
 import { parseDraftId, parseRawPath, type DraftId, type RawPath } from '@sb/domain';
 import type { Runtime } from './runtime';
-import { adminPage, articlePage, articlesPage, dashboard, errorPage, reviewPage, searchPage, usagePage } from './views';
+import { adminPage, articlePage, articlesPage, dashboard, errorPage, reviewListPage, reviewPage, searchPage, usagePage } from './views';
 
 function redirect(res: http.ServerResponse, location: string): void {
   res.writeHead(303, { location });
@@ -34,6 +35,12 @@ function sendHtml(res: http.ServerResponse, html: string, status = 200): void {
 function sendJson(res: http.ServerResponse, payload: unknown, status = 200): void {
   res.writeHead(status, { 'content-type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(payload, null, 2));
+}
+
+async function readFormParams(req: http.IncomingMessage): Promise<URLSearchParams> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) chunks.push(chunk as Buffer);
+  return new URLSearchParams(Buffer.concat(chunks).toString('utf8'));
 }
 
 async function readForm(req: http.IncomingMessage): Promise<Record<string, string>> {
@@ -181,6 +188,26 @@ export function createServer(runtime: Runtime): http.Server {
         }));
       }
 
+      if (req.method === 'GET' && path === '/review') {
+        const url2 = new URL(req.url ?? '/', 'http://localhost');
+        return sendHtml(res, reviewListPage({
+          items: await pendingReviewList(runtime.ctx),
+          accepted: Number(url2.searchParams.get('ok') ?? '0'),
+          failed: Number(url2.searchParams.get('failed') ?? '0'),
+        }));
+      }
+      if (req.method === 'POST' && path === '/actions/review/bulk-accept') {
+        const params = await readFormParams(req);
+        const draftIds = params.getAll('draftId');
+        let ok = 0; let failed = 0;
+        for (const rawId of draftIds) {
+          const parsed = parseDraftId(rawId);
+          if (!parsed.ok) { failed += 1; continue; }
+          try { await decideReview(runtime.ctx, parsed.value, 'accept', { actor: 'owner', note: '批量通过' }); ok += 1; }
+          catch { failed += 1; }
+        }
+        return redirect(res, `/review?ok=${ok}&failed=${failed}`);
+      }
       if (req.method === 'GET' && path.startsWith('/review/')) {
         const view = await reviewView(runtime.ctx, draftIdOf(path.slice('/review/'.length)));
         const query = url.searchParams.get('q') ?? '';

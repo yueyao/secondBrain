@@ -579,3 +579,50 @@ vault: ${esc(data.env.vaultRoot)}
   <h2>最近事件</h2>
   <div class="card" style="padding:4px 0"><table><tr><th>时间</th><th>事件</th><th>对象</th></tr>${events}</table></div>`);
 }
+
+
+export interface ReviewListPageData {
+  readonly items: readonly { draftId: string; title: string; rawPath: string; tier: string; rationale: string; hasBlock: boolean; createdAt: string }[];
+  readonly accepted: number;
+  readonly failed: number;
+}
+
+export function reviewListPage(data: ReviewListPageData): string {
+  const rows = data.items.map((item) => `<tr class="review-row">
+    <td><input type="checkbox" name="draftId" value="${esc(item.draftId)}"></td>
+    <td><a href="/review/${encodeURIComponent(item.draftId)}" class="review-link">${esc(item.title)}</a></td>
+    <td>${esc(item.tier)}</td>
+    <td>${item.hasBlock ? '<span class="badge b-block">阻断</span>' : '<span class="badge b-ok">可审</span>'}</td>
+    <td class="muted">${esc(item.createdAt.slice(5, 16))}</td></tr>`).join('')
+    || '<tr><td colspan="5" class="muted">没有待审草稿</td></tr>';
+
+  const flash = data.accepted > 0 || data.failed > 0
+    ? `<div class="card" style="border-color:#3fb950">批量结果：成功 ${data.accepted} 篇${data.failed > 0 ? `，失败 ${data.failed} 篇（失败项仍在待审，见日志）` : ''}</div>` : '';
+
+  return layout('审核中心', `${nav()}
+  <div class="row" style="justify-content:space-between"><h1>审核中心</h1><span class="muted">${data.items.length} 篇待审</span></div>
+  ${flash}
+  <form method="post" action="/actions/review/bulk-accept" id="bulk-form">
+    <div class="row" style="gap:8px;margin:12px 0">
+      <button class="btn" type="button" onclick="document.querySelectorAll('input[name=draftId]').forEach(function(c){c.checked=true;})">全选本页</button>
+      <button class="btn" type="button" onclick="document.querySelectorAll('input[name=draftId]').forEach(function(c){c.checked=false;})">取消全选</button>
+      <button class="btn" type="submit" onclick="return confirm('将逐篇通过选中的草稿并写入 wiki，确定？')">批量通过</button>
+      <span class="muted">键盘：j/k 移动，Enter 打开，a 勾选，r 取消</span>
+    </div>
+    <div class="card" style="padding:4px 0"><table>
+      <tr><th></th><th>标题</th><th>tier</th><th>检查</th><th>创建</th></tr>${rows}
+    </table></div>
+  </form>
+  <script>
+  (function(){
+    var rows=Array.prototype.slice.call(document.querySelectorAll('.review-row'));var i=-1;
+    function focus(n){if(rows.length===0)return;if(n<0)n=0;if(n>=rows.length)n=rows.length-1;i=n;var link=rows[i].querySelector('.review-link');if(link)link.focus();}
+    document.addEventListener('keydown',function(e){
+      if(/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))return;
+      if(e.key==='j'){focus(i+1);e.preventDefault();}
+      else if(e.key==='k'){focus(i-1);e.preventDefault();}
+      else if(e.key==='a'||e.key==='r'){if(i>=0){var c=rows[i].querySelector('input');if(c){c.checked=e.key==='a';}e.preventDefault();}}
+    });
+  })();
+  </script>`);
+}

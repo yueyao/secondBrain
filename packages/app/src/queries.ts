@@ -487,3 +487,32 @@ export async function overview(ctx: AppContext): Promise<OverviewV1> {
   const committed = counts.committed ?? 0;
   return { pendingDrafts: pending, queued, draftReady, committed, version: `${pending}/${queued}/${draftReady}/${committed}` };
 }
+
+
+export interface ReviewListItemV1 {
+  readonly draftId: string;
+  readonly title: string;
+  readonly rawPath: string;
+  readonly tier: string;
+  readonly rationale: string;
+  readonly hasBlock: boolean;
+  readonly createdAt: string;
+}
+
+export async function pendingReviewList(ctx: AppContext): Promise<readonly ReviewListItemV1[]> {
+  const drafts = await ctx.store.transaction(async (tx) => tx.drafts.listByStatus('pending'));
+  const items = await ctx.store.transaction(async (tx) => tx.rawItems.listAll());
+  const byId = new Map(items.map((item) => [item.id, item]));
+  return drafts.map((draft) => {
+    const item = byId.get(draft.rawItemId);
+    return {
+      draftId: draft.id,
+      title: item?.title ?? draft.id,
+      rawPath: String(item?.rawPath ?? ''),
+      tier: draft.proposal.tier,
+      rationale: draft.proposal.rationale,
+      hasBlock: draft.findings.some((finding) => finding.severity === 'block'),
+      createdAt: draft.createdAt,
+    };
+  }).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
