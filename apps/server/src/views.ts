@@ -476,6 +476,8 @@ export interface WorkerStatusView {
 
 export interface AdminPageData {
   readonly paused: boolean;
+  readonly ops: readonly { action: string; at: string; ok: boolean; detail: string }[];
+  readonly logs: readonly string[];
   readonly counts: Readonly<Record<string, number>>;
   readonly total: number;
   readonly drafts: Readonly<Record<string, number>>;
@@ -560,6 +562,19 @@ export function adminPage(data: AdminPageData): string {
     <div class="stat"><b>${(data.drafts.rejected ?? 0).toLocaleString()}</b><span>已驳回草稿</span></div>
   </div>
   <div class="card" style="padding:4px 0;margin-top:10px"><table><tr><th>状态</th><th>数量</th></tr>${stateRows}</table></div>
+
+  <h2>运维操作</h2>
+  <div class="card"><div class="row" style="gap:8px;flex-wrap:wrap">
+    <form method="post" action="/actions/ops/scan"><button class="btn" type="submit">立即扫描新原文</button></form>
+    <form method="post" action="/actions/ops/sync"><button class="btn" type="submit">立即同步 git</button></form>
+    <form method="post" action="/actions/ops/backup"><button class="btn" type="submit">立即备份状态库</button></form>
+  </div>
+  <table style="margin-top:10px"><tr><th>时间</th><th>动作</th><th>结果</th><th>详情</th></tr>
+  ${data.ops.length === 0 ? '<tr><td colspan="4" class="muted">还没有执行记录</td></tr>' : data.ops.map((op) => `<tr><td class="muted">${esc(op.at.slice(0, 19))}</td><td>${esc(op.action)}</td><td>${op.ok ? '✅ 成功' : '❌ 失败'}</td><td class="muted">${esc(op.detail)}</td></tr>`).join('')}
+  </table></div>
+
+  <h2>worker 日志（最近 12 行）</h2>
+  <div class="card"><pre>${data.logs.length === 0 ? '（无法读取日志，可能权限不足）' : data.logs.map((line) => esc(line)).join('\n')}</pre></div>
 
   <h2>快捷操作</h2>
   <div class="card"><div class="row">

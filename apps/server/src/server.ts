@@ -3,6 +3,37 @@ import http from 'node:http';
 import { URL } from 'node:url';
 import fs from 'node:fs';
 import { join } from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
+
+interface OpsRecord { readonly action: string; readonly at: string; readonly ok: boolean; readonly detail: string; }
+
+function readOps(dataDir: string): OpsRecord[] {
+  try {
+    return (JSON.parse(fs.readFileSync(join(dataDir, 'last-ops.json'), 'utf8')) as OpsRecord[]).slice(-5);
+  } catch {
+    return [];
+  }
+}
+
+function recordOps(dataDir: string, record: OpsRecord): void {
+  const next = [...readOps(dataDir), record].slice(-10);
+  fs.writeFileSync(join(dataDir, 'last-ops.json'), JSON.stringify(next, null, 2));
+}
+
+async function runLogged(dataDir: string, action: string, fn: () => Promise<string>): Promise<string> {
+  try {
+    const detail = await fn();
+    recordOps(dataDir, { action, at: new Date().toISOString(), ok: true, detail });
+    return detail;
+  } catch (error) {
+    const detail = String((error as Error).message ?? error).slice(0, 300);
+    recordOps(dataDir, { action, at: new Date().toISOString(), ok: false, detail });
+    return detail;
+  }
+}
 import {
   decideReview,
   draftDigest,
@@ -129,6 +160,35 @@ export function createServer(runtime: Runtime): http.Server {
         fs.writeFileSync(join(runtime.dataDir, 'worker-pause.json'), JSON.stringify({ pausedAt: new Date().toISOString(), by: 'ui' }));
         return redirect(res, '/admin');
       }
+      if (req.method === 'POST' && path === '/actions/ops/sync') {
+        await runLogged(runtime.dataDir, '同步', async () => {
+          const outputs: string[] = [];
+          for (const repo of [runtime.vaultRoot, join(runtime.vaultRoot, 'raw')]) {
+            const { stdout } = await execFileAsync('git', ['-C', repo, 'pull', '--ff-only'], { timeout: 120_000 });
+            outputs.push(stdout.trim().split('\n').pop() ?? 'ok');
+          }
+          return outputs.join(' / ');
+        });
+        return redirect(res, '/operations');
+      }
+      if (req.method === 'POST' && path === '/actions/ops/scan') {
+        const outcomes = await runLogged(runtime.dataDir, '扫描', async () => {
+          const result = await ingestAndTriage(runtime.ctx);
+          return `扫描 ${result.length} 篇`;
+        });
+        void outcomes;
+        return redirect(res, '/operations');
+      }
+      if (req.method === 'POST' && path === '/actions/ops/backup') {
+        await runLogged(runtime.dataDir, '备份', async () => {
+          const backupDir = join(runtime.dataDir, 'backup');
+          fs.mkdirSync(backupDir, { recursive: true });
+          const file = join(backupDir, `state-${new Date().toISOString().slice(0, 10)}.db`);
+          await execFileAsync('sqlite3', [join(runtime.dataDir, 'state.db'), `.backup '${file}'`], { timeout: 120_000 });
+          return `已备份 ${file}`;
+        });
+        return redirect(res, '/operations');
+      }
       if (req.method === 'POST' && path === '/actions/worker/resume') {
         fs.rmSync(join(runtime.dataDir, 'worker-pause.json'), { force: true });
         return redirect(res, '/admin');
@@ -169,7 +229,16 @@ export function createServer(runtime: Runtime): http.Server {
           worker = null;
         }
 
+        let logs: string[] = [];
+        try {
+          const { stdout } = await execFileAsync('journalctl', ['-u', 'secondbrain-worker', '-n', '12', '--no-pager'], { timeout: 5_000 });
+          logs = stdout.trim().split('\n').slice(-12);
+        } catch {
+          logs = [];
+        }
         return sendHtml(res, adminPage({
+          ops: readOps(runtime.dataDir),
+          logs,
           paused: fs.existsSync(join(runtime.dataDir, 'worker-pause.json')),
           counts: summary.counts,
           total: summary.total,
