@@ -145,3 +145,38 @@ describe('OpenAI 兼容 provider', () => {
     expect(response.raw).toBe('这不是 JSON');
   });
 });
+
+describe('OpenAI 兼容 provider：text 输出模式（compose）', () => {
+  it('不请求 json_object，并把模型返回的原始 Markdown 原样交给 runner', async () => {
+    const content = '# 标题\n\n正文第一段（来源：[[raw/knowledge/cubox/a.md]]）。';
+    server = await startServer((_captured, res) => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          choices: [{ message: { content }, finish_reason: 'stop' }],
+          usage: { prompt_tokens: 10, completion_tokens: 20 },
+        }),
+      );
+    });
+    const provider = new OpenAICompatibleProvider({ baseUrl: server.baseUrl, apiKey: 'k' });
+
+    const response = await provider.complete({ ...request(), responseFormat: 'text' });
+
+    expect(server.captured[0]?.body.response_format).toBeUndefined();
+    expect(response.raw).toBe(content);
+    expect(response.usage).toEqual({ inputTokens: 10, outputTokens: 20 });
+  });
+
+  it('text 模式下内容即使像 JSON 也不解析（Markdown 不能被吞）', async () => {
+    const content = '{"tier":"standard"}';
+    server = await startServer((_captured, res) => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ choices: [{ message: { content }, finish_reason: 'stop' }] }));
+    });
+    const provider = new OpenAICompatibleProvider({ baseUrl: server.baseUrl, apiKey: 'k' });
+
+    const response = await provider.complete({ ...request(), responseFormat: 'text' });
+
+    expect(response.raw).toBe(content);
+  });
+});

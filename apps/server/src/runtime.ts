@@ -9,17 +9,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { recoverPending, type AppContext, type ProfilePricing } from '@sb/app';
-import type { AgentPort, DigestRequest } from '@sb/contracts';
+import type { AgentPort, ComposePort, ComposeRequest, DigestRequest } from '@sb/contracts';
 import { parseDraftId, stringifyFrontmatter } from '@sb/domain';
 import { FsVault } from '@sb/adapters-vault';
 import { migrate, SqliteStore } from '@sb/adapters-sqlite';
 import { MemorySearch } from '@sb/adapters-search-memory';
-import { LEGACY_RAW, MOCK_NODES, MOCK_RAW, MockAgent } from '@sb/testing';
+import { LEGACY_RAW, MOCK_NODES, MOCK_RAW, MockAgent, MockComposer } from '@sb/testing';
 import {
   AgentRunner,
   BudgetLedger,
+  ComposeRunner,
   MemoryCompletionCache,
   parseModelPolicy,
+  type ComposePromptSpec,
   type PromptSpec,
 } from '@sb/agent-runtime';
 import { OpenAICompatibleProvider } from '@sb/adapters-agent-openai';
@@ -88,8 +90,61 @@ function randomHex(bytes = 6): string {
   return randomUUID().replace(/-/g, '').slice(0, bytes * 2);
 }
 
+const OUTLINE_SYSTEM = `你是资深主编。基于给定的知识节点与 claims，为文章生成一份可执行的中文大纲。
+规则：
+- 4-7 节，每节 3-6 个要点；节标题用 Markdown "## 一、标题" 形式，要点用 "- " 开头；
+- 每个要点写清"要论证什么"，并注明依据哪个节点的哪条判断；
+- 只能使用给定 claims 里的信息，不编造知识库以外的内容；
+- 只输出 Markdown 大纲，不要解释、不要代码块。`;
+
+const BODY_SYSTEM = `你是资深主编，负责把已确认的大纲写成可发表的中文文章。
+规则：
+- 严格按大纲的小节结构写；开头写一段导语，每个小节 2-5 段；
+- 每一个来自知识库的判断，必须在句末用"（来源：[[raw/路径]]）"标注来源，路径必须原样取自材料里的 claims 来源，不要改写、不要只写节点名；
+- 不要编造材料之外的事实、数据、人名、价格或案例；需要例子时只用材料里的；
+- 只输出 Markdown 正文（## 小节标题 + 段落），不要解释、不要代码块。`;
+
+/** 把文章标题、大纲与节点 claims 渲染成模型输入。 */
+function renderComposeInput(request: ComposeRequest): string {
+  const nodes = request.nodes
+    .map((node) => [
+      `## 节点：${node.name}（${node.nodeType}）`,
+      node.claims.map((claim) => `- ${claim.text}\n  来源：${claim.source}`).join('\n'),
+    ].join('\n'))
+    .join('\n\n');
+  return [
+    `文章标题：${request.title}`,
+    `主题：${request.theme || '未设定'}`,
+    ...(request.outline ? ['', '已确认大纲：', request.outline] : []),
+    ...(request.instruction ? ['', '改稿指令：', request.instruction] : []),
+    '',
+    '材料（知识节点与 claims）：',
+    nodes,
+  ].join('\n');
+}
+
+export function composePrompts(): Readonly<Record<'outline' | 'body', ComposePromptSpec>> {
+  return {
+    outline: {
+      id: 'compose-outline',
+      version: 1,
+      sha256: createHash('sha256').update(OUTLINE_SYSTEM).digest('hex'),
+      system: OUTLINE_SYSTEM,
+      render: renderComposeInput,
+    },
+    body: {
+      id: 'compose-body',
+      version: 1,
+      sha256: createHash('sha256').update(BODY_SYSTEM).digest('hex'),
+      system: BODY_SYSTEM,
+      render: renderComposeInput,
+    },
+  };
+}
+
 interface AgentBuild {
   readonly agent: AgentPort;
+  readonly composer: ComposePort;
   readonly mode: AgentMode;
   readonly pricing: Readonly<Record<string, ProfilePricing>>;
 }
@@ -97,7 +152,7 @@ interface AgentBuild {
 function buildAgent(): AgentBuild {
   const baseUrl = process.env.MODEL_BASE_URL;
   if (!baseUrl) {
-    return { agent: new MockAgent(), mode: 'mock', pricing: {} };
+    return { agent: new MockAgent(), composer: new MockComposer(), mode: 'mock', pricing: {} };
   }
 
   const configPath = process.env.MODEL_CONFIG ?? path.resolve(process.cwd(), 'config/model-profiles.example.json');
@@ -118,20 +173,32 @@ function buildAgent(): AgentBuild {
     timeoutMs: Number(process.env.MODEL_TIMEOUT_MS ?? 120_000),
   });
 
+  // 主编台与 digest 共用同一份 profile/策略/预算账本（ADR 0005）
+  const budget = new BudgetLedger(parsed.value.budget, systemClock);
+
   const agent = new AgentRunner({
     provider,
     profiles: parsed.value.profiles,
     policies: parsed.value.policies,
     cache: new MemoryCompletionCache(),
-    budget: new BudgetLedger(parsed.value.budget, systemClock),
+    budget,
     clock: systemClock,
     prompt: digestPrompt(),
+  });
+
+  const composer = new ComposeRunner({
+    provider,
+    profiles: parsed.value.profiles,
+    policies: parsed.value.policies,
+    budget,
+    clock: systemClock,
+    prompts: composePrompts(),
   });
 
   const pricing: Record<string, ProfilePricing> = {};
   for (const profile of parsed.value.profiles) pricing[profile.id] = profile.pricing;
 
-  return { agent, mode: 'cloud', pricing };
+  return { agent, composer, mode: 'cloud', pricing };
 }
 
 export async function createRuntime(options: RuntimeOptions): Promise<Runtime> {
@@ -154,6 +221,7 @@ export async function createRuntime(options: RuntimeOptions): Promise<Runtime> {
     vault,
     search,
     agent: built.agent,
+    composer: built.composer,
     clock: systemClock,
     ids: {
       draftId: () => {

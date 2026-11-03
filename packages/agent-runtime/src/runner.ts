@@ -15,6 +15,8 @@ export interface CompletionRequest {
   readonly system: string;
   readonly input: string;
   readonly maxOutputTokens: number;
+  /** 输出格式：默认 json（digest 的结构化草稿）；compose 用 text 拿原始 Markdown。 */
+  readonly responseFormat?: 'json' | 'text';
 }
 
 export interface CompletionUsage {

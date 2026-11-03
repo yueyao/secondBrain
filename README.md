@@ -21,13 +21,12 @@ secondBrain 知识生产流程的服务端实现，**pnpm workspaces monorepo**�
 | `@sb/adapters-sqlite` | StateStore 实现、迁移、事务、乐观锁、事件流 | domain + contracts | ✅ |
 | `@sb/adapters-vault` | 文件系统 + git 提交 + 单写者文件锁 | domain + contracts | ✅ |
 | `@sb/adapters-search-memory` | 内存检索（mock 用） | domain + contracts | ✅ |
-| `@sb/app` | 用例：triage / digest / review / commit | domain + contracts | ✅ |
-| `@sb/testing` | 测试夹具、MockAgent、harness | 域 + 适配器 | ✅ |
-| `@sb/agent-runtime` | 能力路由 / 预算 / 缓存 / 重试 / 降级 / 契约校验（P4.1 ✅） | domain + contracts | ✅ |
-| `@sb/adapters-agent-openai` | OpenAI 兼容 provider（真实模型） | agent-runtime + contracts | ✅ P4.2 |
-| `@sb/app` | 用例：triage / digest / commit / recover | domain + contracts | ⬜ P5 |
-| `apps/cli` | 人审与运维命令 | 全部 | ⬜ P5 |
-| `@sb/server` | mock 审核台：HTTP + 服务端渲染 UI | 全部 | ✅ |
+| `@sb/app` | 用例：triage / digest / review / commit / compose（主编台） | domain + contracts | ✅ |
+| `@sb/testing` | 测试夹具、MockAgent、MockComposer、harness | 域 + 适配器 | ✅ |
+| `@sb/agent-runtime` | 能力路由 / 预算 / 缓存 / 重试 / 降级 / 契约校验 / ComposeRunner | domain + contracts | ✅ |
+| `@sb/adapters-agent-openai` | OpenAI 兼容 provider（json / text 两种输出模式） | agent-runtime + contracts | ✅ |
+| `apps/server` | 审核台 + 素材库 + 主编台 + 运维中心：HTTP + 服务端渲染 UI | 全部 | ✅ |
+| `apps/worker` | 自动流水线：ingest → 起草（不自动入库） | 全部 | ✅ |
 
 依赖方向由工具强制：`tools/check-boundaries.mjs`（源码级）+ `.dependency-cruiser.cjs`（图级）+ 各包 `package.json` 声明三者交叉校验。
 
@@ -39,6 +38,7 @@ pnpm demo          # → http://127.0.0.1:8787（自动播种 mock 数据）
 ```
 
 首页「扫描 raw/ 并分档」→ 队列「生成草稿」→ 审阅页「通过并入库」，每一步都会在 demo vault 里产生真实 git commit。
+主编台 `/compose`：选知识节点创建文章 →「AI 生成大纲」→「生成正文 v1」→ 正文里的引用可点回原文，版本历史逐版累积（mock 模式自动使用 MockComposer，不产生费用）。
 测试方案见 [docs/TESTING.md](docs/TESTING.md)，页面快照见 `docs/snapshots/`。
 
 ## 支持哪些模型
@@ -107,7 +107,7 @@ pnpm run check     # boundaries → typecheck → depcruise → test
 pnpm run boundaries   # 包边界、深引、纯度（无 node: / 无第三方 / 无 throw / 无时钟）
 pnpm run typecheck    # tsc --noEmit（strict + exactOptionalPropertyTypes）
 pnpm run depcruise    # 依赖方向、环形依赖
-pnpm test             # vitest：24 个文件 / 176 例
+pnpm test             # vitest：29 个文件 / 223 例
 ```
 
 ## 能证明什么
@@ -120,20 +120,28 @@ pnpm test             # vitest：24 个文件 / 176 例
 - **事务与锁可验证**：回滚不留痕、乐观锁只允许一个写者成功、任务领取原子且围栏令牌自增。
 - **vault 不可被越狱**：路径逃逸（`..`/绝对路径）与非 wiki 写入会被拒绝；提交失败可 `resetHard` 回滚。
 - **崩溃后可恢复**：批准后崩溃 → 启动时幂等重放（补提交或只补状态）；目标文件被外部修改 → 拒绝覆盖并回滚；无关脏改动 → 拒绝启动。
+- **主编台可离线验证**：MockComposer 走完整 HTTP 链路（建文章 → 生成大纲 → 正文 v1 → 版本历史），正文引用能解析回 raw 原文，版本只增不改。
+- **模型输出有契约**：digest 走 JSON 契约校验，compose 走文本契约（长度 + 至少 2 个引用标记）；不合规回喂重试一次，再失败落 `CONTRACT_VIOLATION`。
 - **包边界可执行**：深引 `@sb/domain/src/*`、domain→contracts 反向依赖、未登记的新包，都会让 CI 失败。
 
 ## 目录
 
 ```
-packages/domain/       纯领域：状态 / 迁移表 / 策略 / 规则 + 测试
-packages/contracts/    端口（StateStore/Vault/SearchIndex/Agent/Lock/Clock）+ DTO + 契约测试
-packages/adapters-sqlite/  StateStore 实现：迁移、事务、乐观锁、事件流 + 21 例测试
-packages/adapters-vault/   fs + git 提交 + 单写者锁（含路径逃逸防护）+ 17 例测试
-tools/                 零依赖检查脚本（包边界）
-docs/                  PROGRESS / DOMAIN / MONOREPO / ADR
-apps/                  入口（待创建）
+packages/domain/          纯领域：状态 / 迁移表 / 策略 / 规则 / 文本与引用解析 + 测试
+packages/contracts/       端口（StateStore/Vault/SearchIndex/Agent/Compose/Lock/Clock）+ DTO + 契约测试
+packages/adapters-sqlite/ StateStore 实现：迁移、事务、乐观锁、事件流
+packages/adapters-vault/  fs + git 提交 + 单写者锁（含路径逃逸防护）
+packages/adapters-search-memory/ 内存检索（mock 用）
+packages/adapters-agent-openai/  OpenAI 兼容 provider（json / text）
+packages/agent-runtime/   路由 / 预算 / 缓存 / 重试 / 降级 / AgentRunner / ComposeRunner
+packages/app/             用例：triage / digest / review / commit / compose
+packages/testing/         测试夹具、MockAgent、MockComposer、harness
+apps/server/              审核台 + 素材库 + 主编台 + 运维中心（node:http + SSR）
+apps/worker/              自动流水线（ingest → 起草，不自动入库）
+tools/                    零依赖检查脚本（包边界）
+docs/                     PROGRESS / DOMAIN / MONOREPO / ADR
 ```
 
 ## 不做的事（当前）
 
-HTTP、数据库、模型调用、CLI、UI。契约已在 `@sb/contracts` 定义，实现留给对应适配器包。
+CLI（人审与运维都在 Web UI）、多用户与权限系统、移动端 App、向量检索/重排、发布分发渠道（微信公众号等）。模型只做"提议"：草稿必须人工审核，主编台文章也必须人工确认后才会进入后续发布流程。

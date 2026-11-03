@@ -35,6 +35,7 @@ export class OpenAICompatibleProvider implements CompletionProvider {
 
   async complete(request: CompletionRequest): Promise<CompletionResponse> {
     const url = `${this.options.baseUrl.replace(/\/+$/, '')}/chat/completions`;
+    const responseFormat = request.responseFormat ?? 'json';
     const body: Record<string, unknown> = {
       model: request.profile.model,
       messages: [
@@ -43,7 +44,8 @@ export class OpenAICompatibleProvider implements CompletionProvider {
       ],
       temperature: this.temperature,
       max_tokens: request.maxOutputTokens,
-      response_format: { type: 'json_object' },
+      // 只有 json 模式才要求结构；text 模式（compose）直接拿原始 Markdown
+      ...(responseFormat === 'json' ? { response_format: { type: 'json_object' } } : {}),
       // 厂商私有参数（如 DeepSeek thinking / reasoning_effort）原样透传
       ...(request.profile.providerOptions ?? {}),
     };
@@ -84,7 +86,7 @@ export class OpenAICompatibleProvider implements CompletionProvider {
 
     const content = choice?.message?.content;
     let raw: unknown = content;
-    if (typeof content === 'string') {
+    if (responseFormat === 'json' && typeof content === 'string') {
       try {
         raw = JSON.parse(content);
       } catch {

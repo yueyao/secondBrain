@@ -2,6 +2,7 @@
 import type {
   AgentPort,
   Clock,
+  ComposePort,
   HashPort,
   IdGenerator,
   SearchIndex,
@@ -33,6 +34,8 @@ export interface AppContext {
   readonly vault: VaultPort;
   readonly search: SearchIndex;
   readonly agent: AgentPort;
+  /** 主编台生成端口（Compose C2）：大纲与正文都走它；未配置模型时缺省。 */
+  readonly composer?: ComposePort;
   readonly clock: Clock;
   readonly ids: IdGenerator;
   readonly hash: HashPort;
@@ -52,7 +55,8 @@ export type AppErrorCode =
   | 'INVALID_STATE'
   | 'GATE_BLOCKED'
   | 'UNKNOWN_NODE'
-  | 'EMPTY_CLAIMS';
+  | 'EMPTY_CLAIMS'
+  | 'MODEL_UNAVAILABLE';
 
 export class AppError extends Error {
   constructor(

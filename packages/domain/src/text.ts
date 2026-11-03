@@ -88,3 +88,23 @@ export function truncate(input: string, maxChars: number): string {
   const chars = [...input];
   return chars.length <= maxChars ? input : `${chars.slice(0, maxChars).join('')}…`;
 }
+
+/**
+ * 正文引用标记：`（来源：[[raw/路径]]）`（兼容半角括号/冒号）。
+ * wiki 节点里的 claims 用同一格式，所以正文可以直接复用来源路径。
+ */
+export const CITATION_MARKER = /[（(]来源[：:]\s*\[\[(raw\/[^\]\n]+)\]\]\s*[）)]/gu;
+
+/** 从 Markdown 里抽出引用来源（按出现顺序去重）。只认 `raw/` 前缀。 */
+export function extractCitationSources(input: string): readonly string[] {
+  const sources: string[] = [];
+  const seen = new Set<string>();
+  for (const match of input.matchAll(CITATION_MARKER)) {
+    const source = match[1];
+    if (source !== undefined && !seen.has(source)) {
+      seen.add(source);
+      sources.push(source);
+    }
+  }
+  return sources;
+}

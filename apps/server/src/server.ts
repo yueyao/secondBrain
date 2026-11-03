@@ -59,6 +59,8 @@ import {
   listComposeArticles,
   saveArticleOutline,
   composeArticleView,
+  generateArticleOutline,
+  generateArticleBody,
 } from '@sb/app';
 import { parseDraftId, parseRawPath, type DraftId, type RawPath } from '@sb/domain';
 import type { Runtime } from './runtime';
@@ -162,25 +164,13 @@ export function createServer(runtime: Runtime): http.Server {
       if (req.method === 'POST' && path === '/actions/compose/outline/generate') {
         const form = await readForm(req);
         const id = form.id ?? '';
-        const detail = await composeArticleView(runtime.ctx, id);
-        if (!detail) return sendHtml(res, errorPage('文章不存在'), 404);
-        const baseUrl = process.env.MODEL_BASE_URL;
-        const apiKey = process.env.MODEL_API_KEY;
-        if (!baseUrl || !apiKey) return sendHtml(res, errorPage('未配置模型（MODEL_BASE_URL / MODEL_API_KEY）'), 500);
-        const material = detail.nodes.map((node) => `## 节点：${node.name}\n${node.claims.map((claim) => `- ${claim.text}`).join('\n')}`).join('\n\n');
-        const prompt = `你是资深主编。基于下面的知识节点与 claims，为文章《${detail.title}》生成一份中文大纲。\n规则：4-7 节；每节给 3-6 个要点；每个要点注明使用哪个节点的判断；不要编造知识库以外的内容；只输出 Markdown 大纲。\n\n${material}`;
-        try {
-          const response = await fetch(`${baseUrl.replace(/\/+$/, '')}/chat/completions`, {
-            method: 'POST', headers: { authorization: `Bearer ${apiKey}`, 'content-type': 'application/json' },
-            body: JSON.stringify({ model: 'deepseek-flash', messages: [{ role: 'user', content: prompt }], max_tokens: 2000 }),
-          });
-          const payload = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
-          const outline = payload.choices?.[0]?.message?.content ?? '';
-          if (outline.trim() === '') throw new Error('模型返回空内容');
-          await saveArticleOutline(runtime.ctx, id, outline);
-        } catch (error) {
-          return sendHtml(res, errorPage(`大纲生成失败：${String((error as Error).message ?? error)}`), 500);
-        }
+        await generateArticleOutline(runtime.ctx, id);
+        return redirect(res, `/compose/${encodeURIComponent(id)}`);
+      }
+      if (req.method === 'POST' && path === '/actions/compose/body/generate') {
+        const form = await readForm(req);
+        const id = form.id ?? '';
+        await generateArticleBody(runtime.ctx, id);
         return redirect(res, `/compose/${encodeURIComponent(id)}`);
       }
       if (req.method === 'GET' && path.startsWith('/compose/')) {

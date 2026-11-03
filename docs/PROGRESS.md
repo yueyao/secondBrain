@@ -1345,3 +1345,47 @@ Compose 页面正式命名为 **「主编台」**（导航/标题/说明同步�
 
 - 文章详情增加「AI 生成大纲」：服务端直接调用 DeepSeek（MODEL_BASE_URL/KEY），基于所选节点 claims 生成 4–7 节 Markdown 大纲并保存；
 - 说明：这是快速原型，模型调用暂时写在 server 层；后续应迁到 agent-runtime 的 compose 任务策略（统一预算/重试/缓存/记账）。
+
+
+---
+
+## 四十八、主编台 C2：模型接入（AI 大纲 + 正文 v1 版本链）（2026-11-03）
+
+### 48.1 交付
+
+| 层 | 改动 |
+|---|---|
+| contracts | 新增 `ComposePort`（`ComposeRequest` / `ComposeResult` / `ComposeKind` / `ComposeNodeMaterial`）：大纲与正文都从同一端口出；provenance 复用 digest 的 `AgentProvenance` |
+| domain | `CITATION_MARKER` + `extractCitationSources`：正文引用 `（来源：[[raw/...]]）` 的纯函数解析（按出现顺序去重、只认 `raw/`）；+2 例 |
+| agent-runtime | `AgentTask` 增加 `compose`；新增 `ComposeRunner`（路由 → 预算 preflight → text 调用 → 文本契约校验 → 重试 → 降级 → 记账 → provenance）；`CompletionRequest.responseFormat`（默认 json，text 模式不发送 `response_format`）；+13 例 |
+| adapters-agent-openai | provider 支持 text 模式：不强制 JSON、raw 保留原始 Markdown（不再 JSON.parse）；+2 例 |
+| app | `generateArticleOutline` / `generateArticleBody`：业务校验、引用补 claim 原文、`article_version` 版本链（v1 `ai_initial`、v2+ `ai_refine`、`basedOnVersionId`、tokens/cost）、事件 `article:version_created`，正文生成后状态转 `review`；`AppContext.composer?` + 新错误码 `MODEL_UNAVAILABLE`；+6 例 |
+| testing | `MockComposer`：确定性生成大纲/正文（正文 ≥400 字、≥2 个引用标记），e2e 无需模型 key；+5 例 |
+| server | 大纲/正文两个生成动作都走 `ComposePort`（删除第 47 章 server 直连 DeepSeek 的原型）；`/compose/<id>`：大纲编辑、生成正文按钮（无大纲时禁用）、正文 Markdown 渲染（引用可点回 `/articles/<raw>`）、版本历史表；+3 例 e2e |
+| config | `model-profiles*.json` 增加 `compose` 任务策略（`maxOutputTokens` 8000、`expectedClaims` 12、不需要结构化输出） |
+
+### 48.2 决策（D50-D53）
+
+| 编号 | 决策 | 理由 |
+|---|---|---|
+| D50 | compose 是独立任务策略，不借用 digest | 正文不需要结构化输出，靠文本契约 + 引用标记；独立策略便于单独调模型/预算 |
+| D51 | 大纲/正文用 **text 模式**，不强制 JSON | 长文包成 JSON 一旦截断就整体非法、重试浪费；Markdown 直接回传更稳 |
+| D52 | 引用格式统一为 `（来源：[[raw/...]]）`，由 domain 纯函数解析 | 与 wiki claims 同格式；不信任模型自报结构，解析不到引用就拒收 |
+| D53 | 第 47 章 server 直连模型的原型迁到 `ComposePort` | mock/cloud 对称、可单测、统一预算与 provenance；server 层不再出现 provider 调用 |
+
+### 48.3 验证
+
+```
+pnpm run check
+ Test Files  29 passed (29)
+      Tests  223 passed (223)
+```
+
+新增 34 例（agent-runtime 13 + MockComposer 5 + provider 2 + config 3 + domain 2 + app 6 + e2e 3）。
+
+### 48.4 已知边界 / 下一步
+
+- C3：改稿指令（vN+1）与 diff/restore（版本表已支持，缺 UI 与指令透传）；
+- C4：发布/导出（定稿 → 导出 Markdown / 发布状态）；
+- compose 调用暂未写 `usage_record`（该表是 digest 专用结构），成本记在 `article_version.cost`，`/usage` 暂不含主编台；后续迁移 usage 表时一起做；
+- 提示词暂放组合根 `apps/server/runtime.ts`，与 digest 提示词同处；后续可抽独立 prompt 包做版本管理。

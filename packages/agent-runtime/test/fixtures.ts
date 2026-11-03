@@ -67,6 +67,14 @@ export const policies = {
   digest: digestPolicy,
   'review-rewrite': { ...digestPolicy, task: 'review-rewrite' as AgentTask },
   decide: { ...digestPolicy, task: 'decide' as AgentTask },
+  compose: {
+    task: 'compose' as AgentTask,
+    requires: { contextTokens: 60_000, structuredOutput: false, toolCalls: false },
+    profileOrder: ['strong', 'mid'],
+    maxInputTokens: 120_000,
+    maxOutputTokens: 8_000,
+    expectedClaims: 12,
+  },
 } satisfies Record<AgentTask, TaskPolicy>;
 
 const RAW = (() => {

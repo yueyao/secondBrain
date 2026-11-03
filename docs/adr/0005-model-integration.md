@@ -84,6 +84,7 @@ interface DigestRequest {
 | `digest` | 长上下文 + 结构化 + 工具 | 强模型 | 60k |
 | `review-rewrite` | 长上下文 + 结构化 | 同 digest 或降一档 | 60k |
 | `decide` | 长上下文 + 检索综合 | 强模型 | 40k |
+| `compose` | 长上下文 + 文本 Markdown（无需结构化） | 同 digest 或降一档 | 8k 输出 |
 
 > 规律：**只有 digest 值得用强模型**。triage 是"值不值得"，judge 错一次的成本远低于 digest 一次的钱。
 
@@ -317,3 +318,20 @@ DeepSeek 提供 OpenAI 兼容端点，因此**不需要新适配器**，只需�
 2. **分工（2026-10-31 调整）**：默认**全部任务用 `deepseek-flash`**（关闭 thinking），不自动降级到 v4-pro；v4-pro 仅作为手动升级选项。理由：先跑通、成本可控；质量不足时再切。
 3. **JSON 空白内容**：DeepSeek JSON 模式在解析失败时会返回空白 content。provider 原样返回，runner 契约校验失败后重试一次（已有逻辑），仍失败则 `CONTRACT_VIOLATION`。
 4. 价格账本暂按单一定价（峰值 cache-miss）估算，cache hit 折扣未细分——列为后续优化。
+
+---
+
+## 13. 主编台生成（Compose C2，2026-11-03）
+
+新增任务 `compose`，覆盖「AI 生成大纲」与「生成正文 v1」：
+
+| 项 | 决策 |
+|---|---|
+| 输出模式 | **text**（请求体不发送 `response_format`），Markdown 直接回传；digest 仍为 json（D51） |
+| 引用 | 正文每个判断后 `（来源：[[raw/...]]）`；由 `@sb/domain` 的 `extractCitationSources` 解析，应用层补 claim 原文；解析不到引用即拒收（D52） |
+| 执行层 | `ComposeRunner`（`@sb/agent-runtime`）复用路由/预算/重试/降级/provenance；与 digest 各自实例、共用 profile/policy 配置（D50） |
+| 端口 | `ComposePort` 在 `@sb/contracts`；mock 模式由 `@sb/testing` 的 `MockComposer` 实现，测试与本地演示不花钱（D53） |
+| 版本 | 正文写入 `article_version`：v1 `ai_initial`、v2+ `ai_refine`，记录 `basedOnVersionId` / tokens / cost；文章状态生成后转 `review` |
+| 计费 | 暂不写 `usage_record`（该表是 digest 专用结构），成本记在 `article_version.cost`；预算闸门仍由 `BudgetLedger` 生效 |
+
+**已知风险**：模型可能写出材料里不存在的引用路径；当前应用层只做记录、不阻断。C3 起在读取侧校验引用路径必须存在于 vault。

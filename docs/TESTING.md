@@ -9,16 +9,18 @@
 
 | 层 | 位置 | 依赖 | 数量 | 特点 |
 |---|---|---|---|---|
-| 领域单测 | `packages/domain/test` | 无 | 58 | 纯函数：状态矩阵、规则、策略、文本工具 |
+| 领域单测 | `packages/domain/test` | 无 | 74 | 纯函数：状态矩阵、规则、策略、文本工具、引用解析 |
 | 契约冒烟 | `packages/contracts/test` | 无 | 7 | 用假实现证明端口可实现、DTO 形状稳定 |
-| 适配器集成 | `packages/adapters-*/test` | 真实临时目录 / `:memory:` SQLite / 真实 git | 34 | 迁移、事务、乐观锁、路径逃逸、锁 |
-| 应用集成 | `packages/app/test` | 真实 git + SQLite + MockAgent | 11 | 完整流程 + 用量账本 + 崩溃恢复 4 例 |
-| 端到端 | `apps/server/test` | 真实 HTTP 服务 + 浏览器级 HTML | 3 | 起服务、走 UI 路由、断言 wiki 与 git |
+| 适配器集成 | `packages/adapters-{sqlite,vault,search-memory}/test` | 真实临时目录 / `:memory:` SQLite / 真实 git | 46 | 迁移、事务、乐观锁、路径逃逸、锁 |
+| 应用集成 | `packages/app/test` | 真实 git + SQLite + MockAgent + 假 Composer | 17 | 完整流程 + 用量账本 + 崩溃恢复 4 例 + 主编台版本链 6 例 |
+| 端到端 | `apps/server/test/e2e.test.ts` | 真实 HTTP 服务 + 浏览器级 HTML + MockComposer | 9 | 起服务、走 UI 路由、断言 wiki/git/主编台生成 |
 | 云端链路 | `apps/server/test/cloud.test.ts` | 本地假 OpenAI 服务，无外网/无费用 | 2 | provider→runner→存储→入库→usage 全链路 |
-| 运行时 | `packages/agent-runtime/test` | fake provider，无真实模型 | 30 | 路由/预算/缓存/重试/降级/契约校验/配置解析 |
-| provider | `packages/adapters-agent-openai/test` | 本地假 HTTP 服务，无真实网络 | 6 | 请求体、鉴权、providerOptions 透传、429/5xx/content_filter/超时 |
+| 运行时 | `packages/agent-runtime/test` | fake provider，无真实模型 | 48 | 路由/预算/缓存/重试/降级/契约校验/配置解析/compose 文本契约 13 例 |
+| provider | `packages/adapters-agent-openai/test` | 本地假 HTTP 服务，无真实网络 | 8 | 请求体、鉴权、providerOptions 透传、429/5xx/content_filter/超时、text 模式 |
+| worker | `apps/worker/test` | 临时 vault + 内存 SQLite | 4 | 自动流水线 tick、背压、暂停语义 |
+| 测试夹具包 | `packages/testing/test` | 临时目录 + 内存 SQLite | 8 | harness 自检 + MockComposer 确定性输出 |
 
-当前总数：**176 例 / 24 个文件**。
+当前总数：**223 例 / 29 个文件**。
 
 ---
 
@@ -59,6 +61,10 @@ await harness.cleanup();                 // 删临时目录、关连接
 
 `MockAgent` 是**确定性替身**：读取 frontmatter 的 `node_hint` 与检索命中，产出 patch/新建草稿。它不调用任何模型，因此测试可重复。
 
+`MockComposer` 同理，服务主编台（Compose C2）：按文章所选节点的 claims 生成确定性大纲与正文，正文 ≥400 字且带 ≥2 个 `（来源：[[raw/...]]）` 引用标记。需要在测试里注入 composer 时直接 `new MockComposer()` 放进 `AppContext.composer`；运行时在 mock 模式下会自动挂载它。
+
+`packages/agent-runtime/test/fake-provider.ts` 是**假 provider**：按队列返回成功/超时/限流/非法输出，用于验证 ComposeRunner 的重试、降级与文本契约（不碰真实模型）。
+
 ---
 
 ## 4. 启动可交互的 mock 审核台
@@ -72,6 +78,7 @@ PORT=9000 DATA_DIR=/tmp/sb-demo pnpm demo   # 换端口/数据目录
 
 - 首次启动会在 `DATA_DIR/vault` 播种 mock 原文与节点，并建立真实 git 仓库；
 - 首页点「扫描 raw/ 并分档」→ 队列出现 4 篇 → 对任一篇「生成草稿」→ 审阅页 → 「通过并入库」；
+- 主编台 `/compose`：勾选知识节点创建文章 → 「AI 生成大纲」→「生成正文 v1」→ 正文渲染出来、引用可点回原文，版本历史出现 v1（mock 模式由 MockComposer 自动接管，不产生费用）；
 - 每次入库都会在 `DATA_DIR/vault` 里产生一个 `digest: <raw>` commit；
 - 想重置：删掉 `DATA_DIR` 再启动。
 

@@ -1,7 +1,7 @@
 /** 能力路由（ADR 0005 §2）：按能力筛选，不按模型名。 */
 import type { Sensitivity } from '@sb/contracts';
 
-export type AgentTask = 'triage' | 'digest' | 'review-rewrite' | 'decide';
+export type AgentTask = 'triage' | 'digest' | 'review-rewrite' | 'decide' | 'compose';
 
 export interface ModelCapabilities {
   readonly contextTokens: number;

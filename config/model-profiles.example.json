@@ -57,6 +57,13 @@
       "maxInputTokens": 60000,
       "maxOutputTokens": 3000,
       "expectedClaims": 5
+    },
+    "compose": {
+      "requires": { "contextTokens": 60000, "structuredOutput": false, "toolCalls": false },
+      "profileOrder": ["strong", "mid"],
+      "maxInputTokens": 120000,
+      "maxOutputTokens": 8000,
+      "expectedClaims": 12
     }
   },
   "budget": {}

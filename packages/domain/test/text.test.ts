@@ -4,6 +4,7 @@ import {
   countChars,
   countJudgmentSentences,
   diceSimilarity,
+  extractCitationSources,
   normalizeText,
   splitSentences,
   stripMarkdown,
@@ -60,5 +61,23 @@ describe('文本工具（确定性、可复现）', () => {
   it('truncate 按码点截断并加省略号', () => {
     expect(truncate('一二三四五', 3)).toBe('一二三…');
     expect(truncate('一二', 3)).toBe('一二');
+  });
+
+  it('extractCitationSources 按出现顺序去重，只认 raw/ 前缀', () => {
+    const body = [
+      '幂律分布解释了头部效应（来源：[[raw/knowledge/cubox/a.md]]）。',
+      '复利需要时间（来源：[[raw/knowledge/cubox/b.md]]）。',
+      '再次引用同一来源（来源：[[raw/knowledge/cubox/a.md]]）。',
+      '不是引用的括号（来源：[[wiki/concepts/幂律]]）应被忽略。',
+    ].join('\n');
+    expect(extractCitationSources(body)).toEqual([
+      'raw/knowledge/cubox/a.md',
+      'raw/knowledge/cubox/b.md',
+    ]);
+  });
+
+  it('extractCitationSources 兼容半角括号与冒号，没有标记时返回空数组', () => {
+    expect(extractCitationSources('一句话(来源: [[raw/x.md]])。')).toEqual(['raw/x.md']);
+    expect(extractCitationSources('没有任何引用。')).toEqual([]);
   });
 });

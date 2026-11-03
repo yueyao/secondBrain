@@ -16,7 +16,7 @@ export type ParseModelPolicyResult =
   | { readonly ok: true; readonly value: ModelPolicyConfig }
   | { readonly ok: false; readonly errors: readonly string[] };
 
-const TASKS: readonly AgentTask[] = ['triage', 'digest', 'review-rewrite', 'decide'];
+const TASKS: readonly AgentTask[] = ['triage', 'digest', 'review-rewrite', 'decide', 'compose'];
 const SENSITIVITIES: readonly Sensitivity[] = ['public', 'restricted'];
 
 function isRecord(value: unknown): value is Record<string, unknown> {

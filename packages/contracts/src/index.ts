@@ -9,5 +9,6 @@ export * from './ports/state-store';
 export * from './ports/vault';
 export * from './ports/search-index';
 export * from './ports/agent';
+export * from './ports/compose';
 export * from './dto/review-view';
 export * from './dto/queue-item';

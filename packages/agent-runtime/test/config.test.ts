@@ -103,3 +103,39 @@ describe('DeepSeek 示例配置', () => {
     expect(result.value.policies.triage.profileOrder).toEqual(['deepseek-flash']);
   });
 });
+
+describe('compose 策略（主编台 C2）', () => {
+  it('未显式配置 compose 时复用 digest 策略', () => {
+    const result = parseModelPolicy(clone());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.policies.compose.task).toBe('compose');
+    expect(result.value.policies.compose.profileOrder).toEqual(['strong', 'mid']);
+    expect(result.value.policies.compose.expectedClaims).toBe(8);
+  });
+
+  /** 断言某个模型配置文件里 compose 策略的硬指标（缺文件时跳过，本地配置不入库）。 */
+  function expectComposePolicy(file: string): void {
+    const absolute = path.resolve(import.meta.dirname, '../../../', file);
+    if (!fs.existsSync(absolute)) return;
+    const raw = JSON.parse(fs.readFileSync(absolute, 'utf8')) as unknown;
+    const result = parseModelPolicy(raw);
+    expect(result.ok, file).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.policies.compose, file).toMatchObject({
+      requires: { structuredOutput: false, toolCalls: false },
+      maxOutputTokens: 8000,
+      expectedClaims: 12,
+    });
+    expect(result.value.policies.compose.profileOrder.length, file).toBeGreaterThan(0);
+  }
+
+  it('仓库内模型示例配置都带 compose 策略（纯文本输出、8000 输出 token、12 条预期 claims）', () => {
+    expectComposePolicy('config/model-profiles.example.json');
+    expectComposePolicy('config/model-profiles.deepseek.example.json');
+  });
+
+  it('本地 model-profiles.json（gitignore）存在时也带 compose 策略', () => {
+    expectComposePolicy('config/model-profiles.json');
+  });
+});

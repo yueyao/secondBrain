@@ -117,3 +117,77 @@ describe('素材库与管理后台', () => {
     expect(html).toContain('队列与状态');
   });
 });
+
+describe('主编台 Compose（AI 大纲 + 正文版本链）', () => {
+  /** 创建一篇文章并返回 id：先走表单路由，再从状态库读最新一篇。 */
+  async function createComposeArticle(nodes: readonly string[]): Promise<string> {
+    const form = new URLSearchParams({ title: '主编台端到端测试文章', theme: '写作' });
+    for (const node of nodes) form.append('node', node);
+    const response = await fetch(`${base}/actions/compose/create`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      body: form.toString(),
+      redirect: 'manual',
+    });
+    expect(response.status).toBe(303);
+    const articles = await runtime.ctx.store.transaction(async (tx) => tx.articles.list());
+    const latest = articles[0];
+    expect(latest).toBeTruthy();
+    return latest!.id;
+  }
+
+  /** 从 wiki 索引里挑有 claims 的节点。 */
+  function nodesWithClaims(limit: number): string[] {
+    return runtime.ctx.search
+      .allDocs()
+      .filter((doc) => doc.body.includes('来源：[[raw/'))
+      .slice(0, limit)
+      .map((doc) => doc.name);
+  }
+
+  it('未确认大纲时不能生成正文（按钮禁用，接口拒绝）', async () => {
+    const id = await createComposeArticle(nodesWithClaims(2));
+    const page = await fetch(`${base}/compose/${encodeURIComponent(id)}`);
+    const html = await page.text();
+    expect(page.status).toBe(200);
+    expect(html).toContain('<button class="btn" type="submit" disabled>生成正文 v1</button>');
+
+    const blocked = await post('/actions/compose/body/generate', { id });
+    expect(blocked.status).toBe(500);
+    expect(await blocked.text()).toContain('大纲');
+  });
+
+  it('AI 生成大纲 → 生成正文 v1 → 版本进入待主编审', async () => {
+    const id = await createComposeArticle(nodesWithClaims(2));
+
+    const outline = await post('/actions/compose/outline/generate', { id });
+    expect(outline.status).toBe(303);
+    const afterOutline = await (await fetch(`${base}/compose/${encodeURIComponent(id)}`)).text();
+    expect(afterOutline).toContain('<button class="btn" type="submit">生成正文 v1</button>');
+
+    const body = await post('/actions/compose/body/generate', { id });
+    expect(body.status).toBe(303);
+    const detail = await (await fetch(`${base}/compose/${encodeURIComponent(id)}`)).text();
+    expect(detail).toContain('版本历史（1）');
+    expect(detail).toContain('AI 初稿');
+    expect(detail).toContain('待主编审');
+    // 正文里的引用渲染成可点开的原文链接
+    expect(detail).toContain('/articles/raw%2F');
+
+    const article = await runtime.ctx.store.transaction(async (tx) => tx.articles.get(id));
+    expect(article?.status).toBe('review');
+    expect(article?.currentVersionId).toBe(`${id}-v1`);
+  });
+
+  it('再次生成正文生成 v2（版本只增不改）', async () => {
+    const id = await createComposeArticle(nodesWithClaims(2));
+    await post('/actions/compose/outline/generate', { id });
+    await post('/actions/compose/body/generate', { id });
+    await post('/actions/compose/body/generate', { id });
+
+    const detail = await (await fetch(`${base}/compose/${encodeURIComponent(id)}`)).text();
+    expect(detail).toContain('版本历史（2）');
+    expect(detail).toContain('AI 改稿');
+    expect(detail).toContain('生成正文 v3');
+  });
+});

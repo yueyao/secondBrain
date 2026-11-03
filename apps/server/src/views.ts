@@ -59,6 +59,14 @@ pre{background:var(--paper);border:1px solid var(--line);border-radius:4px;paddi
 ul,ol{margin:8px 0;padding-left:20px}
 li{margin:5px 0}
 code{font-size:12.5px;color:var(--accent)}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
+.btn[disabled]:hover{border-color:var(--line);color:var(--ink)}
+.prose{font-size:15.5px;line-height:1.85}
+.prose h2{font-size:21px;color:var(--ink);margin:26px 0 10px;font-weight:650;letter-spacing:-.01em}
+.prose h3{font-size:17px;color:var(--ink);margin:20px 0 8px;font-weight:600}
+.prose p{margin:10px 0}
+.prose ul{margin:8px 0;padding-left:22px}
+.prose a{border-bottom:1px dotted rgba(94,234,212,.4)}
 @media(max-width:860px){
   .nav{position:static;width:auto;flex-direction:row;flex-wrap:wrap;align-items:center;border-right:0;border-bottom:1px solid var(--line);padding:8px 10px;gap:2px}
   .nav a[href="/"]{padding:4px 8px 4px 4px}
@@ -837,7 +845,7 @@ export function composePage(data: { articles: readonly { id: string; title: stri
   const nodeOptions = data.nodes.map((node) => `<label class="muted" style="display:inline-flex;gap:6px;align-items:center;margin:2px 10px 2px 0"><input type="checkbox" name="node" value="${esc(node.name)}">${esc(node.name)} <span style="opacity:.6">${node.claimCount}</span></label>`).join('');
   return layout('主编台', `${nav()}
   <h1>主编台</h1>
-  <div class="muted">主编台：选择知识节点，组织大纲，把 wiki 里的判断写成文章（正文生成 C2 接入模型）</div>
+  <div class="muted">主编台：选择知识节点，由模型生成大纲与正文；文中每个判断都带 raw 原文引用，可点开核对</div>
   <div class="card" style="margin-top:12px"><form method="post" action="/actions/compose/create">
     标题：<input name="title" placeholder="文章标题" style="width:280px">
     主题：<input name="theme" placeholder="主题（可选）" style="width:200px">
@@ -851,22 +859,96 @@ export function composePage(data: { articles: readonly { id: string; title: stri
 
 
 
-export function composeArticlePage(data: { id: string; title: string; theme: string; status: string; outline: string | null; updatedAt: string; nodes: readonly { name: string; nodeType: string; claimCount: number; claims: readonly { text: string; source: string }[] }[] }): string {
+/** 主编台正文的最小 Markdown 渲染：先转义再排版，只支持标题/列表/段落/加粗/引用链接。 */
+function renderArticleMarkdown(markdown: string): string {
+  const inline = (text: string): string =>
+    esc(text)
+      .replace(/\[\[(raw\/[^\]\n]+)\]\]/g, (_match, source: string) => {
+        const label = esc(source.split('/').pop() ?? source);
+        return `<a href="/articles/${encodeURIComponent(source)}">${label}</a>`;
+      })
+      .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+  const html: string[] = [];
+  let inList = false;
+  const closeList = (): void => {
+    if (inList) { html.push('</ul>'); inList = false; }
+  };
+  for (const raw of markdown.split('\n')) {
+    const line = raw.trimEnd();
+    if (line.trim() === '') { closeList(); continue; }
+    const heading = /^(#{1,4})\s+(.*)$/.exec(line);
+    if (heading) {
+      closeList();
+      const level = Math.min(4, (heading[1] as string).length + 1);
+      html.push(`<h${level}>${inline(heading[2] as string)}</h${level}>`);
+      continue;
+    }
+    const item = /^[-*+]\s+(.*)$/.exec(line);
+    if (item) {
+      if (!inList) { html.push('<ul>'); inList = true; }
+      html.push(`<li>${inline(item[1] as string)}</li>`);
+      continue;
+    }
+    closeList();
+    html.push(`<p>${inline(line)}</p>`);
+  }
+  closeList();
+  return html.join('\n');
+}
+
+const ARTICLE_STATUS_LABEL: Record<string, string> = { draft: '草稿', review: '待主编审', final: '已定稿' };
+const ARTICLE_SOURCE_LABEL: Record<string, string> = {
+  ai_initial: 'AI 初稿', ai_refine: 'AI 改稿', manual_edit: '手工编辑', restore: '回滚',
+};
+
+export function composeArticlePage(data: {
+  id: string;
+  title: string;
+  theme: string;
+  status: string;
+  outline: string | null;
+  updatedAt: string;
+  nodes: readonly { name: string; nodeType: string; claimCount: number; claims: readonly { text: string; source: string }[] }[];
+  versions: readonly {
+    id: string; versionNo: number; source: string; provider: string | null; model: string | null;
+    inputTokens: number | null; outputTokens: number | null; cost: number | null; chars: number; createdAt: string;
+  }[];
+  current: { versionNo: number; contentMd: string; createdAt: string } | null;
+}): string {
   const nodes = data.nodes.map((node) => `<div class="card" style="margin:8px 0">
     <div><b>${esc(node.name)}</b> <span class="badge">${esc(node.nodeType)}</span> <span class="muted">${node.claimCount} claims</span></div>
     <ul style="margin:8px 0 0;padding-left:18px">${node.claims.map((claim) => `<li>${esc(claim.text)}<div class="muted">${esc(claim.source)}</div></li>`).join('') || '<li class="muted">无 claims</li>'}</ul>
   </div>`).join('');
+  const versions = data.versions.map((version) => `<tr><td>v${version.versionNo}</td><td>${esc(ARTICLE_SOURCE_LABEL[version.source] ?? version.source)}</td><td class="muted">${esc(version.model ?? '—')}</td><td>${version.chars}</td><td class="muted">${version.inputTokens ?? 0} / ${version.outputTokens ?? 0}</td><td class="muted">${version.cost === null ? '—' : `$${version.cost.toFixed(4)}`}</td><td class="muted">${esc(version.createdAt.slice(0, 16))}</td></tr>`).join('')
+    || '<tr><td colspan="7" class="muted">还没有正文版本</td></tr>';
+  const hasOutline = (data.outline ?? '').trim().length > 0;
+  const nextVersionNo = (data.versions[0]?.versionNo ?? 0) + 1;
+  const body = data.current
+    ? `<div class="card prose">${renderArticleMarkdown(data.current.contentMd)}</div>
+    <div class="muted">当前正文 v${data.current.versionNo}，生成于 ${esc(data.current.createdAt.slice(0, 16))}；引用可点开原文核对。</div>`
+    : '<div class="card muted">还没有正文。先确认大纲，再生成 v1。</div>';
   return layout('主编台 · 文章', `${nav()}
   <div class="row" style="justify-content:space-between"><h1>${esc(data.title)}</h1><a class="btn" href="/compose">← 主编台</a></div>
-  <div class="muted">${esc(data.theme || '未设主题')} · ${esc(data.status)} · 更新 ${esc(data.updatedAt.slice(0, 16))}</div>
-  <h2>节点与 claims（${data.nodes.length} 个节点）</h2>${nodes}
+  <div class="muted">${esc(data.theme || '未设主题')} · <span class="badge">${esc(ARTICLE_STATUS_LABEL[data.status] ?? data.status)}</span> · 更新 ${esc(data.updatedAt.slice(0, 16))}</div>
+
   <h2>大纲</h2>
-  <div class="card"><form method="post" action="/actions/compose/outline/generate"><input type="hidden" name="id" value="${esc(data.id)}">
-    <button class="btn" type="submit">AI 生成大纲</button><span class="muted" style="margin-left:10px">基于 ${data.nodes.length} 个节点与 claims，生成后可在下方编辑</span></form></div>
+  <div class="card"><form method="post" action="/actions/compose/outline/generate" onsubmit="return confirm('调用模型生成大纲，可能产生费用。继续？')"><input type="hidden" name="id" value="${esc(data.id)}">
+    <button class="btn" type="submit">AI 生成大纲</button><span class="muted" style="margin-left:10px">基于 ${data.nodes.length} 个节点与 claims，生成后可编辑</span></form></div>
   <div class="card"><form method="post" action="/actions/compose/outline">
     <input type="hidden" name="id" value="${esc(data.id)}">
     <textarea name="outline" rows="12" style="width:100%;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:10px;font:inherit">${esc(data.outline ?? '')}</textarea>
     <div style="margin-top:8px"><button class="btn" type="submit">保存大纲</button>
-    <span class="muted">大纲确认后即可生成初稿（C2 下一步接入模型）</span></div>
-  </form></div>`);
+    <span class="muted">大纲是正文的结构依据；保存后即可生成正文</span></div>
+  </form></div>
+
+  <h2>正文</h2>
+  <div class="card"><form method="post" action="/actions/compose/body/generate" onsubmit="return confirm('调用模型生成正文 v${nextVersionNo}，可能产生费用。继续？')"><input type="hidden" name="id" value="${esc(data.id)}">
+    <button class="btn" type="submit"${hasOutline ? '' : ' disabled'}>生成正文 v${nextVersionNo}</button>
+    <span class="muted" style="margin-left:10px">${hasOutline ? '基于已确认大纲与 claims 生成，文中每个判断都带来源引用' : '请先填写或生成大纲'}</span></form></div>
+  ${body}
+
+  <h2>版本历史（${data.versions.length}）</h2>
+  <div class="card" style="padding:4px 0"><table><tr><th>版本</th><th>来源</th><th>模型</th><th>字数</th><th>tokens</th><th>成本</th><th>时间</th></tr>${versions}</table></div>
+
+  <h2>节点与 claims（${data.nodes.length} 个节点）</h2>${nodes}`);
 }
