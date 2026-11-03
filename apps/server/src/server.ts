@@ -57,10 +57,12 @@ import {
   nodeStats,
   createArticle,
   listComposeArticles,
+  saveArticleOutline,
+  composeArticleView,
 } from '@sb/app';
 import { parseDraftId, parseRawPath, type DraftId, type RawPath } from '@sb/domain';
 import type { Runtime } from './runtime';
-import { adminPage, articlePage, articlesPage, claimsPage, composePage, dashboard, errorPage, guidePage, nodePage, nodesPage, reviewListPage, reviewPage, searchPage, usagePage } from './views';
+import { adminPage, articlePage, articlesPage, claimsPage, composeArticlePage, composePage, dashboard, errorPage, guidePage, nodePage, nodesPage, reviewListPage, reviewPage, searchPage, usagePage } from './views';
 
 function redirect(res: http.ServerResponse, location: string): void {
   res.writeHead(303, { location });
@@ -156,6 +158,17 @@ export function createServer(runtime: Runtime): http.Server {
         const id = `article-${Date.now().toString(36)}`;
         await createArticle(runtime.ctx, id, { title: params.get('title') ?? '', theme: params.get('theme') ?? '', nodeIds: nodes });
         return redirect(res, '/compose');
+      }
+      if (req.method === 'GET' && path.startsWith('/compose/')) {
+        const id = decodeURIComponent(path.slice('/compose/'.length));
+        const detail = await composeArticleView(runtime.ctx, id);
+        if (!detail) return sendHtml(res, errorPage('文章不存在'), 404);
+        return sendHtml(res, composeArticlePage(detail));
+      }
+      if (req.method === 'POST' && path === '/actions/compose/outline') {
+        const form = await readForm(req);
+        await saveArticleOutline(runtime.ctx, form.id ?? '', form.outline ?? '');
+        return redirect(res, `/compose/${encodeURIComponent(form.id ?? '')}`);
       }
       if (req.method === 'GET' && path === '/nodes') {
         const url3 = new URL(req.url ?? '/', 'http://localhost');

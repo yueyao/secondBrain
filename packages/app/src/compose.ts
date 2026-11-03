@@ -32,3 +32,42 @@ export async function saveArticleOutline(ctx: AppContext, id: string, outline: s
     await tx.articles.setOutline(id, outline, now);
   });
 }
+
+
+export interface ComposeNodeView {
+  readonly name: string;
+  readonly nodeType: string;
+  readonly claimCount: number;
+  readonly claims: readonly { readonly text: string; readonly source: string }[];
+}
+
+export interface ComposeArticleView {
+  readonly id: string;
+  readonly title: string;
+  readonly theme: string;
+  readonly status: string;
+  readonly outline: string | null;
+  readonly updatedAt: string;
+  readonly nodes: readonly ComposeNodeView[];
+}
+
+function claimsIn(body: string): { text: string; source: string }[] {
+  const rows: { text: string; source: string }[] = [];
+  for (const line of body.split('\n')) {
+    const match = line.match(/^- (.+?)（来源：\[\[(raw\/[^\]]+)\]\]/);
+    if (match) rows.push({ text: match[1] as string, source: match[2] as string });
+  }
+  return rows;
+}
+
+export async function composeArticleView(ctx: AppContext, id: string): Promise<ComposeArticleView | null> {
+  const article = await ctx.store.transaction(async (tx) => tx.articles.get(id));
+  if (!article) return null;
+  const docs = ctx.search.allDocs();
+  const nodes = article.nodeIds.map((name) => {
+    const doc = docs.find((entry) => entry.name === name || entry.aliases.includes(name));
+    const claims = doc ? claimsIn(doc.body) : [];
+    return { name, nodeType: doc?.nodeType ?? 'unknown', claimCount: claims.length, claims: claims.slice(0, 12) };
+  });
+  return { id: article.id, title: article.title, theme: article.theme, status: article.status, outline: article.outline, updatedAt: article.updatedAt, nodes };
+}

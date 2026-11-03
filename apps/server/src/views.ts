@@ -348,7 +348,7 @@ export function usagePage(data: UsagePageData): string {
 
 function nav(): string {
   const links = [
-    ['/', '工作台'], ['/articles', '文章库'], ['/nodes', '节点'], ['/review', '审核'],
+    ['/', '工作台'], ['/articles', '素材库'], ['/nodes', '节点'], ['/compose', '主编台'], ['/review', '审核'],
     ['/claims', 'claims'], ['/operations', '运维'], ['/exceptions', '异常'],
     ['/usage', '用量'], ['/search', '搜索'],
   ];
@@ -423,8 +423,8 @@ export function articlesPage(data: ArticlesPageData): string {
   const prev = data.page > 1 ? `<a class="btn" href="/articles${qs({ page: data.page - 1 })}">← 上一页</a>` : '';
   const next = data.page < data.pages ? `<a class="btn" href="/articles${qs({ page: data.page + 1 })}">下一页 →</a>` : '';
 
-  return layout('文章库', `${nav()}
-  <div class="row" style="justify-content:space-between"><h1>文章库</h1><span class="muted">${data.total.toLocaleString()} 篇 · 第 ${data.page}/${data.pages} 页</span></div>
+  return layout('素材库', `${nav()}
+  <div class="row" style="justify-content:space-between"><h1>素材库</h1><span class="muted">${data.total.toLocaleString()} 篇 · 第 ${data.page}/${data.pages} 页</span></div>
   <div class="row" style="gap:6px;margin:12px 0;flex-wrap:wrap">${tabs}</div>
   <form class="row" method="get" action="/articles" style="gap:8px;margin-bottom:12px;flex-wrap:wrap">
     <input type="hidden" name="group" value="${esc(data.group)}">
@@ -642,7 +642,7 @@ export function adminPage(data: AdminPageData): string {
   <h2>快捷操作</h2>
   <div class="card"><div class="row">
     <form method="post" action="/actions/ingest"><button class="btn" type="submit">扫描 raw/ 并分档</button></form>
-    <a class="btn" href="/articles?state=queued">看待处理</a>
+    <a class="btn" href="/articles?state=queued">看待处理素材</a>
     <a class="btn" href="/articles?state=draft_ready">看待审核</a>
     <a class="btn" href="/usage">用量明细</a>
     <a class="btn" href="/api/health">健康检查</a>
@@ -849,3 +849,22 @@ export function composePage(data: { articles: readonly { id: string; title: stri
 }
 
 
+
+
+export function composeArticlePage(data: { id: string; title: string; theme: string; status: string; outline: string | null; nodes: readonly { name: string; nodeType: string; claimCount: number; claims: readonly { text: string; source: string }[] }[] }): string {
+  const nodes = data.nodes.map((node) => `<div class="card" style="margin:8px 0">
+    <div><b>${esc(node.name)}</b> <span class="badge">${esc(node.nodeType)}</span> <span class="muted">${node.claimCount} claims</span></div>
+    <ul style="margin:8px 0 0;padding-left:18px">${node.claims.map((claim) => `<li>${esc(claim.text)}<div class="muted">${esc(claim.source)}</div></li>`).join('') || '<li class="muted">无 claims</li>'}</ul>
+  </div>`).join('');
+  return layout('主编台 · 文章', `${nav()}
+  <div class="row" style="justify-content:space-between"><h1>${esc(data.title)}</h1><a class="btn" href="/compose">← 主编台</a></div>
+  <div class="muted">${esc(data.theme || '未设主题')} · ${esc(data.status)} · 更新 ${esc(data.updatedAt.slice(0, 16))}</div>
+  <h2>节点与 claims（${data.nodes.length} 个节点）</h2>${nodes}
+  <h2>大纲</h2>
+  <div class="card"><form method="post" action="/actions/compose/outline">
+    <input type="hidden" name="id" value="${esc(data.id)}">
+    <textarea name="outline" rows="12" style="width:100%;background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:10px;font:inherit">${esc(data.outline ?? '')}</textarea>
+    <div style="margin-top:8px"><button class="btn" type="submit">保存大纲</button>
+    <span class="muted">大纲确认后即可生成初稿（C2 下一步接入模型）</span></div>
+  </form></div>`);
+}
