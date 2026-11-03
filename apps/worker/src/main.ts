@@ -13,6 +13,8 @@ export interface TickOptions {
   readonly onStatus?: (status: WorkerStatus) => void;
   /** 返回 true 时：当前文章处理完后不再开始新的文章 */
   readonly shouldPause?: () => boolean;
+  /** 待审草稿达到该数量时停止起草（背压） */
+  readonly maxPendingDrafts?: number;
 }
 
 export interface WorkerStatus {
@@ -31,6 +33,7 @@ export interface TickResult {
   readonly failed: number;
   readonly queueLength: number;
   readonly paused: boolean;
+  readonly pausedReason?: 'user' | 'pending_limit';
 }
 
 /** 单次 tick：ingest 全部新原文，再为最多 N 个 queued 条目起草。 */
@@ -43,6 +46,13 @@ export async function runTick(ctx: AppContext, options: TickOptions): Promise<Ti
   options.onStatus?.({ phase: 'ingesting', updatedAt: new Date().toISOString() });
   const outcomes = await ingestAndTriage(ctx);
   const queue = await listQueue(ctx);
+  const maxPendingDrafts = options.maxPendingDrafts ?? Number(process.env.WORKER_MAX_PENDING_DRAFTS ?? 300);
+  const pendingDrafts = (await ctx.store.transaction(async (tx) => tx.drafts.listByStatus('pending'))).length;
+  if (pendingDrafts >= maxPendingDrafts) {
+    const result: TickResult = { ingested: outcomes.length, drafted: 0, failed: 0, queueLength: queue.length, paused: true, pausedReason: 'pending_limit' };
+    options.onStatus?.({ phase: 'sleeping', updatedAt: new Date().toISOString(), lastTickAt: new Date().toISOString(), lastTick: result });
+    return result;
+  }
   const candidates = queue.filter((entry) => entry.state === 'queued').slice(0, options.maxJobsPerTick);
 
   let drafted = 0;

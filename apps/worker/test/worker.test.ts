@@ -74,3 +74,19 @@ describe('暂停控制', () => {
     }
   });
 });
+
+
+describe('背压限制', () => {
+  it('待审草稿达到上限时停止起草', async () => {
+    const harness = await createHarness();
+    try {
+      const ctx = ctxOf(harness);
+      await runTick(ctx, { maxJobsPerTick: 2, maxPendingDrafts: 300 });
+      const result = await runTick(ctx, { maxJobsPerTick: 10, maxPendingDrafts: 1 });
+      expect(result.drafted).toBe(0);
+      expect(result.pausedReason).toBe('pending_limit');
+    } finally {
+      await harness.cleanup();
+    }
+  });
+});

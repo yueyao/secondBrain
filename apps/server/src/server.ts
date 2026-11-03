@@ -266,6 +266,7 @@ export function createServer(runtime: Runtime): http.Server {
         return sendHtml(res, adminPage({
           ops: readOps(runtime.dataDir),
           logs,
+          pendingLimit: Number(process.env.WORKER_MAX_PENDING_DRAFTS ?? 300),
           paused: fs.existsSync(join(runtime.dataDir, 'worker-pause.json')),
           counts: summary.counts,
           total: summary.total,

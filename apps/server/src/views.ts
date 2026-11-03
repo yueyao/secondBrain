@@ -489,6 +489,7 @@ export interface AdminPageData {
   readonly paused: boolean;
   readonly ops: readonly { action: string; at: string; ok: boolean; detail: string }[];
   readonly logs: readonly string[];
+  readonly pendingLimit: number;
   readonly counts: Readonly<Record<string, number>>;
   readonly total: number;
   readonly drafts: Readonly<Record<string, number>>;
@@ -544,6 +545,7 @@ export function adminPage(data: AdminPageData): string {
   <div class="row" style="justify-content:space-between"><h1>运维中心</h1><span class="muted">${esc(data.env.mode)} 模式</span></div>
 
   <h2>运行状态</h2>
+  ${data.drafts.pending >= data.pendingLimit ? `<div class="card" style="border-color:#e3b341;margin-bottom:10px"><b>已触发背压</b>：待审草稿 ${data.drafts.pending} / 上限 ${data.pendingLimit}，worker 已停止起草。请先审核（<a href="/review">审核中心</a>）。</div>` : `<div class="muted" style="margin-bottom:10px">待审草稿 ${data.drafts.pending} / 上限 ${data.pendingLimit}（达到上限自动停止起草）</div>`}
   ${data.paused
     ? `<div class="card" style="border-color:#e3b341;margin-bottom:10px"><b>已暂停</b>：当前任务处理完后不再开始新任务。
          <form method="post" action="/actions/worker/resume" style="display:inline;margin-left:8px"><button class="btn" type="submit">继续处理</button></form></div>`

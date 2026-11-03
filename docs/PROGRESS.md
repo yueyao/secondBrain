@@ -1245,3 +1245,13 @@ sync: vault/raw 均 "Already up to date"
 - `/nodes/<file>`：节点详情（定义、views、来源原文链接、相关概念）；
 - 数据来自已加载的搜索索引（含 body），无需逐文件读取；
 - 说明：已入库**文章**在 `/articles?group=committed`，已入库**知识**在 `/nodes`。
+
+
+---
+
+## 四十、起草背压：待审上限 300（2026-11-03）
+
+- worker 每轮开始统计 pending 草稿，达到 `WORKER_MAX_PENDING_DRAFTS`（默认 300）时**停止起草**（ingest 仍继续）；
+- 心跳标记 `pausedReason: pending_limit`；运维页显示「已触发背压 X/300」并链接审核中心；
+- 防止审核跟不上时模型 API 过度消耗；
+- 测试 188 → 189 例。
