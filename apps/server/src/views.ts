@@ -9,6 +9,8 @@ import {
   type CitationAuditReport,
   type KnowledgeHealthReport,
   type QualityStatus,
+  type TopicMapV1,
+  type TopicRowV1,
   type WritingContractReport,
 } from '@sb/app';
 import { webRepoUrl, type RepoStatus } from './repos';
@@ -444,6 +446,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
     label: '知识',
     children: [
       { href: '/nodes', label: '知识节点' },
+      { href: '/topics', label: '主题' },
       { href: '/claims', label: 'claims' },
       { href: '/kb-health', label: '体检' },
       { href: '/search', label: '搜索' },
@@ -1276,6 +1279,7 @@ export function aboutPage(data: AboutPageData): string {
     { title: '主编台', href: '/compose', group: '写作', body: '把知识节点写成文章：选节点 → AI 大纲 → 大纲可编辑 → 生成正文 → 改稿指令生成 vN+1 → 行级 diff → 恢复旧版 → 定稿 → 导出 Markdown。版本只增不改。' },
     { title: '去 AI 味', href: '/deai', group: '写作', body: '独立能力：先用规则做 AI 味体检（框架词/黑话/对仗/宏大叙事/句长均匀/标点痕迹，加权评分），再由模型按命中清单改写；保留事实、数字与引用，主编台正文可一键生成新版本。' },
     { title: '知识节点', href: '/nodes', group: '知识', body: '已入库知识的结构化视图：Top N 枢纽气泡图（面积 ∝ claims 数）、类型筛选、搜索；节点详情含定义、claims、来源原文与相关概念。' },
+    { title: '主题地图', href: '/topics', group: '知识', body: '把 118 个 topic 节点（一句话定义、收录边界、核心判断、相关概念/人物、来源）汇总成 MOC 索引：主题 claims 数、入链、文章覆盖、有料未成文与无 claims 缺口。' },
     { title: 'claims', href: '/claims', group: '知识', body: '已入库草稿的全部判断句与来源，用来抽查"知识到底沉淀了什么"、追溯每句话的原文出处。' },
     { title: '知识体检', href: '/kb-health', group: '知识', body: '知识库健康度只读检查：断链、孤立节点、无 claims/无定义节点、无来源判断、重复节点/claims、raw 来源缺失与陈旧节点。' },
     { title: '搜索', href: '/search', group: '知识', body: '站内检索知识库（节点名 / 别名 / 正文），结果可直接打开节点。' },
@@ -1568,6 +1572,108 @@ export function healthPage(data: KnowledgeHealthReport): string {
       <li><b>重复节点/claims</b> 优先合并，避免同一判断在多处漂移。</li>
       <li>孤立节点检查是否漏挂到主题地图，或本来就该删除/归档。</li>
       <li>体检是只读建议；改动仍走审核/编辑流程，不要直接改状态库。</li>
+    </ol>
+  </div>`);
+}
+
+/** 主题地图（MOC）页：把 node_type=topic 的主题节点汇总成可导航索引。 */
+export function topicsPage(data: TopicMapV1): string {
+  const truncate = (text: string, max: number): string => (text.length > max ? `${text.slice(0, max)}…` : text);
+  const nodeHref = (file: string): string => `/nodes/${encodeURIComponent(file)}`;
+
+  const topicRows = data.topics.map((row) => {
+    const articleLinks = row.articles.length === 0
+      ? '<span class="muted">—</span>'
+      : row.articles.map((article) => `<a class="badge b-blue" href="/compose/${esc(article.id)}">${esc(truncate(article.title, 18))}</a>`).join(' ');
+    return `<tr>
+      <td><a href="${nodeHref(row.file)}"><b>${esc(row.name)}</b></a></td>
+      <td class="muted" style="max-width:420px">${esc(truncate(row.definition || '（暂无定义）', 90))}</td>
+      <td>${row.claims > 0 ? `<span class="badge b-ok">${row.claims}</span>` : '<span class="badge b-warn">0</span>'}</td>
+      <td class="muted">${row.relatedConcepts.length}</td>
+      <td class="muted">${row.relatedPeople.length}</td>
+      <td class="muted">${row.inbound}</td>
+      <td>${articleLinks}</td>
+      <td class="muted">${esc(formatDate(row.updatedAt))}</td>
+    </tr>`;
+  }).join('');
+
+  const articleRows = data.articles.map((article) => `<tr>
+    <td><a href="/compose/${esc(article.id)}">${esc(truncate(article.title, 32))}</a></td>
+    <td class="muted">${esc(article.theme || '—')}</td>
+    <td>${article.topics.length === 0 ? '<span class="muted">—</span>' : article.topics.map((topic) => `<span class="badge" style="margin:0 4px 4px 0">${esc(topic)}</span>`).join('')}</td>
+    <td class="muted">${article.claims}</td>
+    <td>${article.hasTopic ? '<span class="badge b-ok">已挂主题</span>' : '<span class="badge b-warn">未挂主题</span>'}</td>
+  </tr>`).join('') || '<tr><td colspan="5" class="muted">还没有文章</td></tr>';
+
+  const unwritten = data.topics.filter((row) => row.articles.length === 0).slice(0, 24);
+  const emptyTopics = data.topics.filter((row) => row.claims === 0);
+  const sourceless = data.topics.filter((row) => row.sourceCount === 0);
+  const chipList = (rows: readonly TopicRowV1[], max: number): string =>
+    rows.length === 0
+      ? '<span class="muted">无</span>'
+      : rows.slice(0, max).map((row) => `<span class="badge" style="margin:0 6px 6px 0">${esc(row.name)}${row.claims > 0 ? ` · ${row.claims}` : ''}</span>`).join('') + (rows.length > max ? `<span class="muted">…等 ${rows.length} 个</span>` : '');
+
+  return layout('主题地图', `${nav('/topics')}
+  <div class="row" style="justify-content:space-between"><h1>主题地图</h1><a class="btn" href="/kb-health">看知识体检 →</a></div>
+  <div class="muted" style="max-width:900px">MOC（Map of Content）：把 vault 中 <code>node_type: topic</code> 的主题节点汇总成索引。每个主题页负责"入口 + 边界 + 判断 + 相关概念/人物"，
+  这里只做导航与缺口统计，不修改知识库。生成时间：${esc(formatDateTime(data.generatedAt, { seconds: true }))}。</div>
+
+  <form method="get" action="/topics" class="row" style="margin:14px 0;gap:8px">
+    <input type="text" name="q" value="${esc(data.q)}" placeholder="筛选主题：名称 / 定义 / 相关概念" style="max-width:360px">
+    <button class="btn" type="submit">筛选</button>
+    ${data.q === '' ? '' : '<a class="btn" href="/topics">清除</a>'}
+    <span class="muted">显示 ${data.topics.length} / ${data.totalTopics} 个主题</span>
+  </form>
+
+  <div class="row" style="margin:18px 0">
+    <div class="stat"><b>${data.totals.topics}</b><span>主题节点</span></div>
+    <div class="stat"><b>${data.totals.topicClaims.toLocaleString()}</b><span>主题 claims</span></div>
+    <div class="stat"><b>${data.totals.withArticles}</b><span>已有文章</span></div>
+    <div class="stat"><b>${data.totals.withoutArticles}</b><span>未成文主题</span></div>
+    <div class="stat"><b>${data.totals.withoutClaims}</b><span>无 claims 主题</span></div>
+    <div class="stat"><b>${data.totals.articlesWithoutTopics}</b><span>未挂主题文章</span></div>
+  </div>
+
+  <h2>主题清单</h2>
+  <div class="card" style="padding:4px 0"><table>
+    <tr><th>主题</th><th>一句话定义</th><th>claims</th><th>概念</th><th>人物</th><th>入链</th><th>文章</th><th>更新</th></tr>
+    ${topicRows || '<tr><td colspan="8" class="muted">没有匹配的主题</td></tr>'}
+  </table></div>
+
+  <h2>文章覆盖</h2>
+  <div class="muted">文章通过 nodeIds 挂到主题节点；「未挂主题」的文章说明它还没有进入任何 MOC 入口。</div>
+  <div class="card" style="padding:4px 0"><table>
+    <tr><th>文章</th><th>theme</th><th>主题</th><th>主题 claims</th><th>状态</th></tr>
+    ${articleRows}
+  </table></div>
+
+  <h2>缺口提示</h2>
+  <div class="row" style="align-items:flex-start;gap:16px;flex-wrap:wrap">
+    <div class="card" style="flex:1;min-width:280px">
+      <b>有料但未成文（${data.totals.withoutArticles}）</b>
+      <div class="muted" style="margin:6px 0">claims 已积累、但还没有文章引用；通常是最值得先写的主题。括号内为 claims 数。</div>
+      ${chipList(unwritten, 24)}
+    </div>
+    <div class="card" style="flex:1;min-width:280px">
+      <b>无 claims 主题（${data.totals.withoutClaims}）</b>
+      <div class="muted" style="margin:6px 0">只有入口、没有判断；可能是占位或需要补内容。</div>
+      ${chipList(emptyTopics, 24)}
+    </div>
+    <div class="card" style="flex:1;min-width:280px">
+      <b>无来源主题（${sourceless.length}）</b>
+      <div class="muted" style="margin:6px 0">「来源」小节为空；主题页里的判断将缺少可回溯证据。</div>
+      ${chipList(sourceless, 24)}
+    </div>
+  </div>
+
+  <h2>使用建议</h2>
+  <div class="card">
+    <ol>
+      <li>先看「有料但未成文」：claims 多、文章为 0 的主题通常已经可以起稿，去主编台选这些节点即可。</li>
+      <li>「未挂主题文章」：在文章页把 nodeIds 补上对应主题，地图才会显示覆盖关系。</li>
+      <li>「无 claims 主题」：判断是占位（补内容）还是误建（合并/归档）。</li>
+      <li>点击主题名进入主题页，那里有定义、收录边界、核心判断、相关概念/人物和来源，适合作为写作前的选题入口。</li>
+      <li>本页只读；增删主题与合并节点仍走审核/编辑流程。</li>
     </ol>
   </div>`);
 }

@@ -122,7 +122,7 @@ pnpm run check     # boundaries → typecheck → depcruise → test
 pnpm run boundaries   # 包边界、深引、纯度（无 node: / 无第三方 / 无 throw / 无时钟）
 pnpm run typecheck    # tsc --noEmit（strict + exactOptionalPropertyTypes）
 pnpm run depcruise    # 依赖方向、环形依赖
-pnpm test             # vitest：38 个文件 / 347 例
+pnpm test             # vitest：39 个文件 / 352 例
 ```
 
 ## 能证明什么
@@ -137,7 +137,7 @@ pnpm test             # vitest：38 个文件 / 347 例
 - **崩溃后可恢复**：批准后崩溃 → 启动时幂等重放（补提交或只补状态）；目标文件被外部修改 → 拒绝覆盖并回滚；无关脏改动 → 拒绝启动。
 - **主编台全流程可离线验证**：MockComposer 走完整 HTTP 链路（建文章 → 生成大纲 → 正文 v1 → 改稿 vN+1 → 行级 diff → 恢复旧版 → 定稿 → 导出 Markdown），正文引用能解析回 raw 原文，版本只增不改。
 - **去 AI 味可离线验证**：规则体检（8 项加权）不依赖模型；改写契约（长度区间、不得编造引用、不得丢引用）用 MockDeAi 全链路覆盖，真实模型只需替换端口实现。
-- **知识库可体检、成稿有契约**：`/kb-health` 只读检查断链/孤立/重复/无来源/陈旧节点；主编台正文附「写作契约 + 审引清单」（引用是否来自 claims、能否回溯 raw、与版本记录是否一致），均为确定性检查、不依赖模型自评。
+- **知识库可导航、可体检、成稿有契约**：`/topics` 把 118 个 topic 节点汇总成 MOC（主题 claims/入链/文章覆盖/未成文缺口）；`/kb-health` 只读检查断链/孤立/重复/无来源/陈旧节点；主编台正文附「写作契约 + 审引清单」（引用是否来自 claims、能否回溯 raw、与版本记录是否一致），均为确定性检查、不依赖模型自评。
 - **模型输出有契约**：digest 走 JSON 契约校验，compose 走文本契约（长度 + 至少 2 个引用标记）；不合规回喂重试一次，再失败落 `CONTRACT_VIOLATION`。
 - **包边界可执行**：深引 `@sb/domain/src/*`、domain→contracts 反向依赖、未登记的新包，都会让 CI 失败。
 

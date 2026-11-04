@@ -416,7 +416,7 @@ describe('导航信息架构（一级分组 + 二级菜单）', () => {
     for (const label of ['工作台', '内容', '知识', '写作', '运维', '帮助']) {
       expect(home).toContain(label);
     }
-    for (const href of ['/articles', '/review', '/exceptions', '/nodes', '/claims', '/kb-health', '/search', '/compose', '/deai', '/operations', '/usage', '/guide', '/about']) {
+    for (const href of ['/articles', '/review', '/exceptions', '/nodes', '/topics', '/claims', '/kb-health', '/search', '/compose', '/deai', '/operations', '/usage', '/guide', '/about']) {
       expect(home).toContain(`href="${href}"`);
     }
     // 首页：工作台 active；主编台：写作分组 active
@@ -447,6 +447,18 @@ describe('知识库体检页（只读）', () => {
     const html = await response.text();
     expect(response.status).toBe(200);
     for (const keyword of ['知识库体检', '链接健康', '节点完整性', 'claims 健康', '处理建议', '知识节点', 'raw 来源缺失', '孤立节点', '重复 claims']) {
+      expect(html).toContain(keyword);
+    }
+  });
+});
+
+
+describe('主题地图页（只读）', () => {
+  it('主题页可打开并给出主题清单、文章覆盖与缺口提示', async () => {
+    const response = await fetch(`${base}/topics`);
+    const html = await response.text();
+    expect(response.status).toBe(200);
+    for (const keyword of ['主题地图', '主题清单', '文章覆盖', '缺口提示', '有料但未成文', '无 claims 主题', '无来源主题', '筛选']) {
       expect(html).toContain(keyword);
     }
   });
