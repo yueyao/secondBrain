@@ -333,7 +333,10 @@ async function acceptDraft(
     });
   });
 
-  return commitApproved(ctx, draftId, input.rebaseFiles ? { rebaseFiles: input.rebaseFiles } : {});
+  return commitApproved(ctx, draftId, {
+    ...(input.rebaseFiles === undefined ? {} : { rebaseFiles: input.rebaseFiles }),
+    ...(input.rebaseAll === true || draft.status !== 'pending' ? { rebaseAll: true } : {}),
+  });
 }
 
 /** 批量通过用：读取草稿将要写入的文件列表（用于同批冲突重基）。 */

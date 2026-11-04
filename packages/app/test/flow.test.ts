@@ -119,6 +119,21 @@ describe('应用层：完整流程', () => {
     expect(after).toContain('（来源：[[raw/knowledge/cubox/mock-2026-10-01 反脆弱的第二条证据.md]]）');
   });
 
+  it('批量重试：rebaseAll 允许对已被改过的节点追加写入', async () => {
+    const ctx = ctxOf(harness);
+    await ingestAndTriage(ctx);
+    const { draftId } = await draftDigest(ctx, await findRaw(harness, '反脆弱的第二条证据'));
+    const target = 'wiki/concepts/反脆弱.md';
+    const before = await harness.vault.readNode(target);
+    await harness.vault.writeNode(target, `${before}\n- 批量重试前的外部追加。\n`);
+
+    const result = await decideReview(ctx, draftId, 'accept', { actor: 'owner', note: '批量通过', rebaseAll: true });
+    expect(result.ok).toBe(true);
+    const after = await harness.vault.readNode(target);
+    expect(after).toContain('批量重试前的外部追加');
+    expect(after).toContain('（来源：[[raw/knowledge/cubox/mock-2026-10-01 反脆弱的第二条证据.md]]）');
+  });
+
   it('全新概念走 new 分支并生成节点文件', async () => {
     const ctx = ctxOf(harness);
     await ingestAndTriage(ctx);
