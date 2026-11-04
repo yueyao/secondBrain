@@ -2493,3 +2493,27 @@ D107：阻断草稿不提供"强行通过"；来源缺失与重复入库属于�
 ### 79.4 验证
 
 `pnpm run check`：40 文件 / 364 例。生产页需强刷后使用。
+
+
+---
+
+## 八十、最近一次提交无事件：缓存页面与可观测性（2026-11-04）
+
+### 80.1 排查结论
+
+22:11 之后事件表没有新的 `approved/committed/rolled_back`，draft 状态完全不变；服务健康、无 git 锁。说明最近一次点击**没有执行到 accept 事务**，最常见原因是浏览器仍在用旧的内联脚本（前面两次脚本事故后缓存未失效），或点到了禁用行/未选中任何行。
+
+### 80.2 修复
+
+- `sendHtml` 统一加 `Cache-Control: no-store, max-age=0` + `Pragma: no-cache`，从根上避免旧脚本被缓存；
+- 新增 `GET /api/jobs`：返回最近 20 个批量 job（含 createdAt/updatedAt/done/ok/failed/failures），以后可直接判断"有没有提交到服务端、卡在第几篇"；
+- 服务端 console 增加 `[bulk] submit` 与 `[bulk] done` 日志（journalctl 可查）；
+- e2e 增加 cache-control 断言。
+
+### 80.3 决策
+
+D108：审核页不允许被 HTML 缓存；批量 job 必须有可查询的列表入口。用户遇到"点了没反应"时，先看 `/api/jobs` 有没有 job、再看事件表有没有 approved，而不是猜。
+
+### 80.4 验证
+
+40 文件 / 364 例；部署后页面响应头应含 `no-store`，强刷一次即可使用新脚本。

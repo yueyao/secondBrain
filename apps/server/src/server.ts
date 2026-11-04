@@ -8,7 +8,7 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
-interface BulkJob { total: number; done: number; ok: number; failed: number; status: 'running' | 'done'; failedIds: string[]; failures: Array<{ readonly draftId: string; readonly reason: string }>; }
+interface BulkJob { total: number; done: number; ok: number; failed: number; status: 'running' | 'done'; failedIds: string[]; failures: Array<{ readonly draftId: string; readonly reason: string }>; readonly createdAt: string; updatedAt: string; }
 const bulkJobs = new Map<string, BulkJob>();
 
 interface OpsRecord { readonly action: string; readonly at: string; readonly ok: boolean; readonly detail: string; }
@@ -90,7 +90,12 @@ function redirect(res: http.ServerResponse, location: string): void {
 }
 
 function sendHtml(res: http.ServerResponse, html: string, status = 200): void {
-  res.writeHead(status, { 'content-type': 'text/html; charset=utf-8' });
+  // 页面内联了大量脚本；禁止缓存，避免用户继续跑旧版上传/审核脚本。
+  res.writeHead(status, {
+    'content-type': 'text/html; charset=utf-8',
+    'cache-control': 'no-store, max-age=0',
+    pragma: 'no-cache',
+  });
   res.end(html);
 }
 
@@ -700,8 +705,10 @@ export function createServer(runtime: Runtime): http.Server {
           return redirect(res, '/review?failed=0');
         }
         const jobId = Math.random().toString(36).slice(2, 10);
-        const job: BulkJob = { total: draftIds.length, done: 0, ok: 0, failed: 0, status: 'running', failedIds: [], failures: [] };
+        const createdAt = new Date().toISOString();
+        const job: BulkJob = { total: draftIds.length, done: 0, ok: 0, failed: 0, status: 'running', failedIds: [], failures: [], createdAt, updatedAt: createdAt };
         bulkJobs.set(jobId, job);
+        console.log(`[bulk] submit job=${jobId} total=${draftIds.length}`);
         // 先让本次响应发出去，再在后台串行处理：每次 accept 是一次 git commit，必须串行；
         // 每篇处理完让出事件循环，避免阻塞其他 HTTP 请求。
         setImmediate(() => {
@@ -736,13 +743,22 @@ export function createServer(runtime: Runtime): http.Server {
                 job.failures.push({ draftId: rawId, reason: String((error as Error).message ?? error) });
               }
               job.done += 1;
+              job.updatedAt = new Date().toISOString();
               await new Promise<void>((resolve) => setImmediate(resolve));
             }
             job.status = 'done';
+            job.updatedAt = new Date().toISOString();
+            console.log(`[bulk] done job=${jobId} ok=${job.ok} failed=${job.failed}`);
           })();
         });
         if (wantsJson) return sendJson(res, { ok: true, jobId, total: job.total });
         return redirect(res, `/review?job=${jobId}`);
+      }
+      if (req.method === 'GET' && path === '/api/jobs') {
+        return sendJson(res, [...bulkJobs.entries()]
+          .sort((a, b) => b[1].createdAt.localeCompare(a[1].createdAt))
+          .slice(0, 20)
+          .map(([id, job]) => ({ id, ...job })));
       }
       if (req.method === 'GET' && path.startsWith('/api/jobs/')) {
         return sendJson(res, bulkJobs.get(path.slice('/api/jobs/'.length)) ?? { total: 0, done: 0, ok: 0, failed: 0, status: 'done' });

@@ -42,6 +42,7 @@ describe('HTTP 审核台', () => {
     expect(response.status).toBe(200);
     expect(html).toContain('secondBrain 审核台');
     expect(html).toContain('扫描 raw/ 并分档');
+    expect(response.headers.get('cache-control')).toContain('no-store');
   });
 
   it('扫描→起草→审阅→入库 全链路', async () => {
