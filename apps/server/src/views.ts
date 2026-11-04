@@ -308,7 +308,9 @@ export interface DashboardData {
 }
 
 export function dashboard(data: DashboardData): string {
-  const pendingRows = data.pending.map((view) => {
+  const pendingShown = data.pending.slice(0, 10);
+  const queueShown = data.queue.slice(0, 15);
+  const pendingRows = pendingShown.map((view) => {
     const level = view.actions.accept ? (view.findings.some((f) => f.severity === 'warn') ? 'warn' : 'ok') : 'block';
     return `<tr>
       <td>${findingBadge(level)}</td>
@@ -317,7 +319,7 @@ export function dashboard(data: DashboardData): string {
       <td>${view.claims.length}</td><td>${esc(view.tier)}</td></tr>`;
   }).join('') || '<tr><td colspan="4" class="muted">没有待审草稿。先点「扫描并分档」，再对队列里的条目生成草稿。</td></tr>';
 
-  const queueRows = data.queue.map((item) => `<tr>
+  const queueRows = queueShown.map((item) => `<tr>
       <td>${esc(item.title)}<div class="mono">${esc(item.rawPath)}</div></td>
       <td>${item.charCount.toLocaleString()} 字</td>
       <td><span class="badge b-blue">${esc(item.state)}</span></td>
@@ -360,12 +362,13 @@ export function dashboard(data: DashboardData): string {
     <div class="row" style="margin-top:10px"><button class="btn" type="submit">搜索</button></div>
   </form>
 
-  <h2>待审草稿（人只在这里动手）</h2>
+  <h2>待审草稿（人只在这里动手）· ${data.pending.length} 篇${data.pending.length > pendingShown.length ? `，显示前 ${pendingShown.length}` : ''}</h2>
   <div class="card" style="padding:4px 0"><table>
     <tr><th>预警</th><th>草稿</th><th>claims</th><th>档位</th></tr>${pendingRows}
   </table></div>
+  ${data.pending.length > pendingShown.length ? `<div class="row" style="justify-content:flex-end;margin-top:6px"><a class="btn" href="/review">查看全部 ${data.pending.length} 篇 →</a></div>` : ''}
 
-  <h2>队列</h2>
+  <h2>队列 · ${data.queue.length} 条${data.queue.length > queueShown.length ? `，显示前 ${queueShown.length}` : ''}</h2>
   <div class="card" style="padding:4px 0"><table>
     <tr><th>原文</th><th>字数</th><th>状态</th><th></th></tr>${queueRows}
   </table></div>`);
