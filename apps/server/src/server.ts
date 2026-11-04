@@ -653,6 +653,9 @@ export function createServer(runtime: Runtime): http.Server {
       }
 
       if (req.method === 'GET' && path === '/review') {
+        return redirect(res, `/audit${url.search}`);
+      }
+      if (req.method === 'GET' && path === '/audit') {
         const url2 = new URL(req.url ?? '/', 'http://localhost');
         const repairedRaw = url2.searchParams.get('repaired');
         const rejectedRaw = url2.searchParams.get('rejected');
@@ -683,7 +686,7 @@ export function createServer(runtime: Runtime): http.Server {
             // 单篇失败不阻断其余；计数只统计成功
           }
         }
-        return redirect(res, `/review?rejected=${rejected}`);
+        return redirect(res, `/audit?rejected=${rejected}`);
       }
       if (req.method === 'POST' && path === '/actions/review/repair') {
         const report = await repairPendingDrafts(runtime.ctx);
@@ -692,7 +695,7 @@ export function createServer(runtime: Runtime): http.Server {
           repaired: String(report.repaired),
           still: String(report.stillBlocked),
         });
-        return redirect(res, `/review?${params.toString()}`);
+        return redirect(res, `/audit?${params.toString()}`);
       }
       if (req.method === 'POST' && path === '/actions/review/bulk-accept') {
         const params = await readFormParams(req);
@@ -702,7 +705,7 @@ export function createServer(runtime: Runtime): http.Server {
           if (wantsJson) {
             return sendJson(res, { ok: false, error: { code: 'NO_DRAFTS', message: '没有收到任何草稿 id（表单格式不匹配）' } }, 400);
           }
-          return redirect(res, '/review?failed=0');
+          return redirect(res, '/audit?failed=0');
         }
         const jobId = Math.random().toString(36).slice(2, 10);
         const createdAt = new Date().toISOString();
@@ -752,7 +755,7 @@ export function createServer(runtime: Runtime): http.Server {
           })();
         });
         if (wantsJson) return sendJson(res, { ok: true, jobId, total: job.total });
-        return redirect(res, `/review?job=${jobId}`);
+        return redirect(res, `/audit?job=${jobId}`);
       }
       if (req.method === 'GET' && path === '/api/jobs') {
         return sendJson(res, [...bulkJobs.entries()]
@@ -764,7 +767,10 @@ export function createServer(runtime: Runtime): http.Server {
         return sendJson(res, bulkJobs.get(path.slice('/api/jobs/'.length)) ?? { total: 0, done: 0, ok: 0, failed: 0, status: 'done' });
       }
       if (req.method === 'GET' && path.startsWith('/review/')) {
-        const view = await reviewView(runtime.ctx, draftIdOf(path.slice('/review/'.length)));
+        return redirect(res, `/audit/${path.slice('/review/'.length)}${url.search}`);
+      }
+      if (req.method === 'GET' && path.startsWith('/audit/')) {
+        const view = await reviewView(runtime.ctx, draftIdOf(path.slice('/audit/'.length)));
         const query = url.searchParams.get('q') ?? '';
         const hits = query ? await searchWiki(runtime.ctx, query) : [];
         return sendHtml(res, reviewPage(view, hits, query));
@@ -783,11 +789,11 @@ export function createServer(runtime: Runtime): http.Server {
       if (req.method === 'POST' && path === '/actions/digest') {
         const form = await readForm(req);
         const draft = await draftDigest(runtime.ctx, rawPathOf(form.rawPath ?? ''));
-        return redirect(res, `/review/${draft.draftId}`);
+        return redirect(res, `/audit/${draft.draftId}`);
       }
 
-      if (req.method === 'POST' && path.startsWith('/review/')) {
-        const rest = path.slice('/review/'.length);
+      if (req.method === 'POST' && (path.startsWith('/audit/') || path.startsWith('/review/'))) {
+        const rest = path.startsWith('/audit/') ? path.slice('/audit/'.length) : path.slice('/review/'.length);
         const [id, action] = rest.split('/');
         if (!id || (action !== 'accept' && action !== 'reject')) {
           return sendHtml(res, errorPage(`未知操作：${path}`), 404);

@@ -45,6 +45,12 @@ describe('HTTP 审核台', () => {
     expect(response.headers.get('cache-control')).toContain('no-store');
   });
 
+  it('旧 /review 路由重定向到 /audit', async () => {
+    const response = await fetch(`${base}/review`, { redirect: 'manual' });
+    expect([301, 302, 303, 307, 308]).toContain(response.status);
+    expect(response.headers.get('location') ?? '').toContain('/audit');
+  });
+
   it('扫描→起草→审阅→入库 全链路', async () => {
     expect((await post('/actions/ingest', {})).status).toBe(303);
 
@@ -56,14 +62,14 @@ describe('HTTP 审核台', () => {
     const digestResponse = await post('/actions/digest', { rawPath: target!.rawPath });
     expect(digestResponse.status).toBe(303);
     const reviewPath = digestResponse.headers.get('location') ?? '';
-    expect(reviewPath.startsWith('/review/')).toBe(true);
+    expect(reviewPath.startsWith('/audit/')).toBe(true);
 
     const reviewHtml = await (await fetch(`${base}${reviewPath}`)).text();
     expect(reviewHtml).toContain('反脆弱');
     expect(reviewHtml).toContain('通过并入库');
 
-    const draftId = reviewPath.replace('/review/', '');
-    const acceptResponse = await post(`/review/${draftId}/accept`, {});
+    const draftId = reviewPath.replace('/audit/', '');
+    const acceptResponse = await post(`/audit/${draftId}/accept`, {});
     expect(acceptResponse.status).toBe(303);
 
     const content = await runtime.vault.readNode('wiki/concepts/反脆弱.md');
@@ -426,7 +432,7 @@ describe('导航信息架构（一级分组 + 二级菜单）', () => {
     for (const label of ['工作台', '内容', '知识', '写作', '运维', '帮助']) {
       expect(home).toContain(label);
     }
-    for (const href of ['/articles', '/review', '/exceptions', '/nodes', '/topics', '/claims', '/kb-health', '/search', '/compose', '/deai', '/qa', '/operations', '/usage', '/guide', '/about']) {
+    for (const href of ['/articles', '/audit', '/exceptions', '/nodes', '/topics', '/claims', '/kb-health', '/search', '/compose', '/deai', '/qa', '/operations', '/usage', '/guide', '/about']) {
       expect(home).toContain(`href="${href}"`);
     }
     // 首页：工作台 active；主编台：写作分组 active
@@ -517,7 +523,7 @@ describe('审核批量通过（异步）', () => {
     expect(target).toBeTruthy();
     const digest = await post('/actions/digest', { rawPath: target!.rawPath });
     expect(digest.status).toBe(303);
-    const draftId = (digest.headers.get('location') ?? '').replace('/review/', '');
+    const draftId = (digest.headers.get('location') ?? '').replace('/audit/', '');
     expect(draftId).not.toBe('');
 
     // 浏览器 FormData 走 multipart，服务端必须能解析到 draftId
@@ -554,7 +560,7 @@ describe('审核批量通过（异步）', () => {
     expect(emptyBody.ok).toBe(false);
     expect(emptyBody.error?.code).toBe('NO_DRAFTS');
 
-    const reviewHtml = await (await fetch(`${base}/review`)).text();
+    const reviewHtml = await (await fetch(`${base}/audit`)).text();
     expect(reviewHtml).toContain('批量通过');
     expect(reviewHtml).toContain('已选 0 项');
   });
@@ -562,7 +568,7 @@ describe('审核批量通过（异步）', () => {
 
 describe('内联脚本可解析（防止模板字符串换行回归）', () => {
   it('主要页面脚本语法正确', async () => {
-    for (const path of ['/', '/review', '/compose', '/deai', '/qa', '/nodes', '/articles']) {
+    for (const path of ['/', '/audit', '/compose', '/deai', '/qa', '/nodes', '/articles']) {
       const html = await (await fetch(`${base}${path}`)).text();
       const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1] as string);
       expect(scripts.length, `${path} 应有内联脚本`).toBeGreaterThan(0);

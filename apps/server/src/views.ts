@@ -322,7 +322,7 @@ export function dashboard(data: DashboardData): string {
     const level = view.actions.accept ? (view.findings.some((f) => f.severity === 'warn') ? 'warn' : 'ok') : 'block';
     return `<tr>
       <td>${findingBadge(level)}</td>
-      <td><a href="/review/${esc(view.draftId)}">${esc(view.title)}</a>
+      <td><a href="/audit/${esc(view.draftId)}">${esc(view.title)}</a>
         <div class="mono">${esc(view.rawPath)}</div></td>
       <td>${view.claims.length}</td><td>${esc(view.tier)}</td></tr>`;
   }).join('') || '<tr><td colspan="4" class="muted">没有待审草稿。先点「扫描并分档」，再对队列里的条目生成草稿。</td></tr>';
@@ -332,7 +332,7 @@ export function dashboard(data: DashboardData): string {
       <td>${item.charCount.toLocaleString()} 字</td>
       <td><span class="badge b-blue">${esc(item.state)}</span></td>
       <td>${item.draftId
-        ? `<a class="btn" href="/review/${esc(item.draftId)}">去审阅</a>`
+        ? `<a class="btn" href="/audit/${esc(item.draftId)}">去审阅</a>`
         : `<form method="post" action="/actions/digest" style="margin:0">
              <input type="hidden" name="rawPath" value="${esc(item.rawPath)}">
              <button class="btn" type="submit">生成草稿</button></form>`}</td></tr>`).join('')
@@ -374,7 +374,7 @@ export function dashboard(data: DashboardData): string {
   <div class="card" style="padding:4px 0"><table>
     <tr><th>预警</th><th>草稿</th><th>claims</th><th>档位</th></tr>${pendingRows}
   </table></div>
-  ${data.pending.length > pendingShown.length ? `<div class="row" style="justify-content:flex-end;margin-top:6px"><a class="btn" href="/review">查看全部 ${data.pending.length} 篇 →</a></div>` : ''}
+  ${data.pending.length > pendingShown.length ? `<div class="row" style="justify-content:flex-end;margin-top:6px"><a class="btn" href="/audit">查看全部 ${data.pending.length} 篇 →</a></div>` : ''}
 
   <h2>队列 · ${data.queue.length} 条${data.queue.length > queueShown.length ? `，显示前 ${queueShown.length}` : ''}</h2>
   <div class="card" style="padding:4px 0"><table>
@@ -432,10 +432,10 @@ export function reviewPage(view: ReviewViewV1, hits: readonly ScoredHit[] = [], 
 
   <h2>④ 决策</h2>
   <div class="card row">
-    <form method="post" action="/review/${esc(view.draftId)}/accept" style="margin:0">
+    <form method="post" action="/audit/${esc(view.draftId)}/accept" style="margin:0">
       <button class="btn primary" type="submit" ${view.actions.accept ? '' : 'disabled'}>通过并入库</button>
     </form>
-    <form method="post" action="/review/${esc(view.draftId)}/reject" class="row" style="margin:0">
+    <form method="post" action="/audit/${esc(view.draftId)}/reject" class="row" style="margin:0">
       <input type="text" name="note" placeholder="驳回理由" style="max-width:300px">
       <button class="btn danger" type="submit">驳回</button>
     </form>
@@ -530,7 +530,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
     label: '内容',
     children: [
       { href: '/articles', label: '素材库' },
-      { href: '/review', label: '审核' },
+      { href: '/audit', label: '审核' },
       { href: '/exceptions', label: '异常' },
     ],
   },
@@ -650,7 +650,7 @@ export function articlesPage(data: ArticlesPageData): string {
   const pageSize = Math.max(1, Math.ceil(data.total / Math.max(1, data.pages)));
 
   return layout('素材库', `${nav('/articles')}
-  ${pageHead('素材库', `按状态/来源/时间筛选原始素材；当前筛选 ${data.total.toLocaleString()} 篇，每页 ${pageSize} 篇。`, '<a class="btn" href="/review">待审队列 →</a>')}
+  ${pageHead('素材库', `按状态/来源/时间筛选原始素材；当前筛选 ${data.total.toLocaleString()} 篇，每页 ${pageSize} 篇。`, '<a class="btn" href="/audit">待审队列 →</a>')}
   <div class="toolbar">${tabs}</div>
   <form class="toolbar" method="get" action="/articles" style="gap:8px">
     <input type="hidden" name="group" value="${esc(data.group)}">
@@ -692,7 +692,7 @@ export function articlePage(data: ArticlePageData): string {
   const nodes = data.draft?.nodes.map((node) => `<tr><td>${esc(node.name)}</td><td>${esc(node.nodeType)}</td><td>${esc(node.action)}</td><td class="muted">[${node.claimIndexes.join(', ')}]</td></tr>`).join('') ?? '';
   const findings = data.draft?.findings.map((finding) => `<li>${findingBadge(finding.severity)} ${esc(finding.code)}：${esc(finding.message)}</li>`).join('') ?? '';
   const draftLink = data.draft && data.draft.status === 'pending'
-    ? `<a class="btn" href="/review/${encodeURIComponent(data.draft.id)}">去审阅 →</a>` : '';
+    ? `<a class="btn" href="/audit/${encodeURIComponent(data.draft.id)}">去审阅 →</a>` : '';
 
   return layout('文章详情', `${nav('/articles')}
   <div class="row" style="justify-content:space-between"><h1>${esc(data.title)}</h1><a class="btn" href="/articles">← 文章库</a></div>
@@ -857,7 +857,7 @@ export function adminPage(data: AdminPageData): string {
   <div class="row" style="justify-content:space-between"><h1>运维中心</h1><span class="muted">${esc(data.env.mode)} 模式</span></div>
 
   <h2>运行状态</h2>
-  ${(data.drafts.pending ?? 0) >= data.pendingLimit ? `<div class="card" style="border-color:var(--warn);margin-bottom:10px"><b>已触发背压</b>：待审草稿 ${data.drafts.pending ?? 0} / 上限 ${data.pendingLimit}，worker 已停止起草。请先审核（<a href="/review">审核中心</a>）。</div>` : `<div class="muted" style="margin-bottom:10px">待审草稿 ${data.drafts.pending ?? 0} / 上限 ${data.pendingLimit}（达到上限自动停止起草）</div>`}
+  ${(data.drafts.pending ?? 0) >= data.pendingLimit ? `<div class="card" style="border-color:var(--warn);margin-bottom:10px"><b>已触发背压</b>：待审草稿 ${data.drafts.pending ?? 0} / 上限 ${data.pendingLimit}，worker 已停止起草。请先审核（<a href="/audit">审核中心</a>）。</div>` : `<div class="muted" style="margin-bottom:10px">待审草稿 ${data.drafts.pending ?? 0} / 上限 ${data.pendingLimit}（达到上限自动停止起草）</div>`}
   ${data.paused
     ? `<div class="card" style="border-color:var(--warn);margin-bottom:10px"><b>已暂停</b>：当前任务处理完后不再开始新任务。
          <form method="post" action="/actions/worker/resume" style="display:inline;margin-left:8px"><button class="btn" type="submit">继续处理</button></form></div>`
@@ -972,7 +972,7 @@ export function reviewListPage(data: ReviewListPageData, page = 1): string {
   const pageItems = data.items.slice((current - 1) * pageSize, current * pageSize);
   const rows = pageItems.map((item) => `<tr class="review-row">
     <td><input type="checkbox" name="draftId" value="${esc(item.draftId)}"${item.hasBlock ? ` disabled title="${esc(item.blockReason ?? '存在阻断级预警')}"` : ''}></td>
-    <td><a href="/review/${encodeURIComponent(item.draftId)}" class="review-link">${esc(item.title)}</a></td>
+    <td><a href="/audit/${encodeURIComponent(item.draftId)}" class="review-link">${esc(item.title)}</a></td>
     <td>${esc(item.tier)}</td>
     <td>${item.hasBlock ? '<span class="badge b-block">阻断</span>' : '<span class="badge b-ok">可审</span>'}</td>
     <td class="muted">${esc(formatDateTime(item.createdAt).slice(5))}</td></tr>`).join('')
@@ -987,12 +987,12 @@ export function reviewListPage(data: ReviewListPageData, page = 1): string {
     ? `<div class="card" style="border-color:var(--ok)">修复完成：检查 ${data.repair.examined} 篇，修复 ${data.repair.repaired} 篇，仍有 ${data.repair.stillBlocked} 篇阻断（来源缺失/重复等无法自动修复，需人工驳回或重新生成）。</div>`
     : '';
 
-  return layout('审核中心', `${nav('/review')}
+  return layout('审核中心', `${nav('/audit')}
   ${pageHead('审核中心', `待审 ${data.items.length.toLocaleString()} 篇，可批量 ${(data.items.length - data.items.filter((item) => item.hasBlock).length).toLocaleString()} 篇、阻断 ${data.items.filter((item) => item.hasBlock).length.toLocaleString()} 篇；每页 ${pageSize} 篇，勾选只作用当前页。`, '<a class="btn" href="/articles?group=pending">去素材库 →</a>')}
   ${flash}
   ${rejectFlash}
   ${repairFlash}
-  ${data.jobId ? `<div class="card" id="job-progress">批量处理中… <span id="job-text"></span></div><script>(function(){var id=${JSON.stringify(data.jobId)};var t=setInterval(function(){fetch("/api/jobs/"+id).then(function(r){return r.json()}).then(function(d){document.getElementById("job-text").textContent=d.done+"/"+d.total+"（成功 "+d.ok+"，失败 "+d.failed+"）";if(d.status==="done"){clearInterval(t);document.getElementById("job-progress").textContent="完成："+d.ok+" 成功 / "+d.failed+" 失败，刷新中…";setTimeout(function(){location.href="/review";},800);}});},1000);})();</script>` : ""}
+  ${data.jobId ? `<div class="card" id="job-progress">批量处理中… <span id="job-text"></span></div><script>(function(){var id=${JSON.stringify(data.jobId)};var t=setInterval(function(){fetch("/api/jobs/"+id).then(function(r){return r.json()}).then(function(d){document.getElementById("job-text").textContent=d.done+"/"+d.total+"（成功 "+d.ok+"，失败 "+d.failed+"）";if(d.status==="done"){clearInterval(t);document.getElementById("job-progress").textContent="完成："+d.ok+" 成功 / "+d.failed+" 失败，刷新中…";setTimeout(function(){location.href="/audit";},800);}});},1000);})();</script>` : ""}
   <form method="post" action="/actions/review/bulk-accept" id="bulk-form">
     <div class="row" style="gap:8px;margin:12px 0;align-items:center">
       <button class="btn" type="button" id="select-all">全选本页</button>
@@ -1005,7 +1005,7 @@ export function reviewListPage(data: ReviewListPageData, page = 1): string {
       <tr><th></th><th>标题</th><th>tier</th><th>检查</th><th>创建</th></tr>${rows}
     </table></div>
     <div class="muted" style="margin-top:6px">阻断项不可勾选：勾选框灰色、鼠标悬停可看到具体规则；点标题进入单篇审阅，可驳回或后续重新生成。</div>
-    ${pager('/review', current, pages, data.items.length, pageSize)}
+    ${pager('/audit', current, pages, data.items.length, pageSize)}
   </form>
   <div class="row" style="gap:8px;margin:10px 0;align-items:center">
     <form method="post" action="/actions/review/repair" onsubmit="return confirm('按当前节点与配额重算阻断草稿；不会修改 claims 内容。继续？')">
@@ -1080,7 +1080,7 @@ export function reviewListPage(data: ReviewListPageData, page = 1): string {
                   refreshBtn.hidden=false;
                 } else {
                   hint.textContent='全部成功，刷新中…';
-                  setTimeout(function(){location.href='/review?ok='+d.ok+'&failed='+d.failed;},600);
+                  setTimeout(function(){location.href='/audit?ok='+d.ok+'&failed='+d.failed;},600);
                 }
               }
             });
@@ -1092,7 +1092,7 @@ export function reviewListPage(data: ReviewListPageData, page = 1): string {
         });
     });
     var refreshBtnInit=document.getElementById('job-refresh');
-    if(refreshBtnInit)refreshBtnInit.addEventListener('click',function(){location.href='/review';});
+    if(refreshBtnInit)refreshBtnInit.addEventListener('click',function(){location.href='/audit';});
     refresh();
   })();
   </script>
@@ -1500,7 +1500,7 @@ export function aboutPage(data: AboutPageData): string {
   const features: readonly { title: string; href: string; group: string; body: string }[] = [
     { title: '工作台', href: '/', group: '工作台', body: '今日进度、队列与待办、快捷操作（扫描 / 起草）、最近动态。回答"今天该做什么"。' },
     { title: '素材库', href: '/articles', group: '内容', body: '全部原文（含 4k+ 条 legacy）：6 个分组、来源/时间/triage 筛选、排序、分页；详情含 triage 理由、草稿 claims、来源与事件时间线。' },
-    { title: '审核中心', href: '/review', group: '内容', body: 'AI 草稿在这里过人审：逐篇预览 claims/节点/finding，键盘 j/k/a/r 操作，支持勾选批量通过（异步提交、后台逐篇校验入库、进度与失败回显，不阻塞页面）。' },
+    { title: '审核中心', href: '/audit', group: '内容', body: 'AI 草稿在这里过人审：逐篇预览 claims/节点/finding，键盘 j/k/a/r 操作，支持勾选批量通过（异步提交、后台逐篇校验入库、进度与失败回显，不阻塞页面）。' },
     { title: '主编台', href: '/compose', group: '写作', body: '把知识节点写成文章：选节点 → AI 大纲 → 大纲可编辑 → 生成正文 → 改稿指令生成 vN+1 → 行级 diff → 恢复旧版 → 定稿 → 导出 Markdown。版本只增不改。' },
     { title: '问答链', href: '/qa', group: '写作', body: '把主题 claims 或文章正文抽成 Q-A 链（Q 切要害；A 四段：结论/形式化/论证步/边界），用于选题与审稿，不写文章版本。' },
     { title: '去 AI 味', href: '/deai', group: '写作', body: '独立能力：先用规则做 AI 味体检（框架词/黑话/对仗/宏大叙事/句长均匀/标点痕迹，加权评分），再由模型按命中清单改写；保留事实、数字与引用，主编台正文可一键生成新版本。' },
@@ -1595,7 +1595,7 @@ export function aboutPage(data: AboutPageData): string {
     <tr><th>页面生成时间</th><td class="muted">${esc(formatDateTime(data.generatedAt, { seconds: true }))}</td></tr>
   </table></div>
 
-  <div class="muted" style="margin-top:18px">快捷入口：<a href="/">工作台</a> · <a href="/articles">素材库</a> · <a href="/review">审核</a> · <a href="/compose">主编台</a> · <a href="/operations">运维</a> · <a href="/guide">使用说明</a></div>`);
+  <div class="muted" style="margin-top:18px">快捷入口：<a href="/">工作台</a> · <a href="/articles">素材库</a> · <a href="/audit">审核</a> · <a href="/compose">主编台</a> · <a href="/operations">运维</a> · <a href="/guide">使用说明</a></div>`);
 }
 
 const AI_FLAVOR_LEVEL_LABEL: Record<string, string> = { low: '轻度', medium: '中度', high: '重度' };
