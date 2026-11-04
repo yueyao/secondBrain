@@ -25,9 +25,9 @@ describe('tier-policy v1：claims 配额', () => {
     }
   });
 
-  it('档位区间与生产逻辑一致（patch 25 / standard 15 / accelerated 12 / full 60）', () => {
+  it('档位区间与生产逻辑一致（patch 25 / standard 25 / accelerated 12 / full 60）', () => {
     expect(TIER_CLAIM_LIMITS.patch).toEqual({ min: 1, max: 25 });
-    expect(TIER_CLAIM_LIMITS.standard).toEqual({ min: 1, max: 15 });
+    expect(TIER_CLAIM_LIMITS.standard).toEqual({ min: 1, max: 25 });
     expect(TIER_CLAIM_LIMITS.accelerated).toEqual({ min: 1, max: 12 });
     expect(TIER_CLAIM_LIMITS.full).toEqual({ min: 1, max: 60 });
   });

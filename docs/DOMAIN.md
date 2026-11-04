@@ -126,7 +126,7 @@ apps/*               P5+            入口
 | `long-text-policy` | v1 | `charCount` | `isTooLong`（默认阈值 60,000 字） |
 | `tier-policy` | v1 | `tier`、`claimCount` | `ok / below_min / above_max` |
 
-档位配额：`patch 1-25`、`standard 1-15`、`accelerated 1-12`、`full 1-60`。
+档位配额：`patch 1-25`、`standard 1-25`、`accelerated 1-12`、`full 1-60`。
 
 ---
 

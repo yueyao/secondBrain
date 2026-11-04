@@ -66,7 +66,9 @@ const DIGEST_SYSTEM = `你是知识助产士。把用户提供的原文提炼成
 - 原文没直接说、由你推断的内容必须标 inference: true；
 - 优先 patch 已有节点（见"检索命中"），没有合适节点才新建；
 - claimIndexes 是"这个节点由哪几条 claims 支撑"的下标（从 0 开始，至少 1 个，不要把所有下标都塞给每个节点）；
-- 不要写时效性数据、价格、榜单和行动建议。`;
+- 不要写时效性数据、价格、榜单和行动建议；
+- claims 数量必须符合所选档位的上限：standard ≤25、accelerated ≤12、patch ≤25、full ≤60，超限会被门禁判为阻断；
+- 新建节点前先确认"检索命中"里没有同名节点；已有同名/同义节点时 action 必须是 patch。`;
 
 const PROMPT_SHA = createHash('sha256').update(DIGEST_SYSTEM).digest('hex');
 

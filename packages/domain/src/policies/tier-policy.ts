@@ -8,7 +8,7 @@ export interface ClaimLimits {
 
 export const TIER_CLAIM_LIMITS: Readonly<Record<DraftTier, ClaimLimits>> = {
   patch: { min: 1, max: 25 },
-  standard: { min: 1, max: 15 },
+  standard: { min: 1, max: 25 },
   accelerated: { min: 1, max: 12 },
   full: { min: 1, max: 60 },
 };

@@ -2,6 +2,7 @@
 import type { QueueItemV1, ReviewViewV1 } from '@sb/contracts';
 import { parseDraftId, parseRawPath, type DraftId, type RawPath, type TriageResult } from '@sb/domain';
 import { AppError, type AppContext } from './context';
+import { effectiveBlockingFindings } from './review-policy';
 
 function parseRawPathOk(value: string): RawPath {
   const parsed = parseRawPath(value);
@@ -56,9 +57,7 @@ export async function reviewView(ctx: AppContext, draftId: DraftId): Promise<Rev
   const item = await ctx.store.transaction(async (tx) => tx.rawItems.getByPath(rawPath));
   if (!item) throw new AppError('NOT_FOUND', '原文记录不存在');
 
-  const blockedBy = draft.findings
-    .filter((finding) => finding.severity === 'block')
-    .map((finding) => finding.ruleId);
+  const blockedBy = effectiveBlockingFindings(draft).map((finding) => finding.ruleId);
 
   return {
     schemaVersion: 1,
@@ -514,6 +513,7 @@ export interface ReviewListItemV1 {
   readonly tier: string;
   readonly rationale: string;
   readonly hasBlock: boolean;
+  readonly blockReason: string | null;
   readonly createdAt: string;
 }
 
@@ -523,13 +523,15 @@ export async function pendingReviewList(ctx: AppContext): Promise<readonly Revie
   const byId = new Map(items.map((item) => [item.id, item]));
   return drafts.map((draft) => {
     const item = byId.get(draft.rawItemId);
+    const blocking = effectiveBlockingFindings(draft);
     return {
       draftId: draft.id,
       title: item?.title ?? draft.id,
       rawPath: String(item?.rawPath ?? ''),
       tier: draft.proposal.tier,
       rationale: draft.proposal.rationale,
-      hasBlock: draft.findings.some((finding) => finding.severity === 'block'),
+      hasBlock: blocking.length > 0,
+      blockReason: blocking[0]?.message ?? null,
       createdAt: draft.createdAt,
     };
   }).sort((a, b) => b.createdAt.localeCompare(a.createdAt));

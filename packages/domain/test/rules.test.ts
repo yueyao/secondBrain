@@ -129,7 +129,7 @@ describe('规则：来源链接与配额', () => {
   });
 
   it('r-claim-count：超出为 block，低于下限为 warn，区间内为 null', () => {
-    const tooMany = ruleInput({ tier: 'standard', claims: Array.from({ length: 16 }, (_, i) => claim(`判断 ${i}`)) });
+    const tooMany = ruleInput({ tier: 'standard', claims: Array.from({ length: 26 }, (_, i) => claim(`判断 ${i}`)) });
     expect(claimCountRule.evaluate(tooMany)).toMatchObject({ code: 'CLAIMS_ABOVE_MAX', severity: 'block' });
 
     const tooFew = ruleInput({ tier: 'standard', claims: [] });

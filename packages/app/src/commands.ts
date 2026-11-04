@@ -4,7 +4,6 @@ import {
   decideTriage,
   evaluateAll,
   firstHeading,
-  hasBlock,
   parseFrontmatter,
   parseRawPath,
   transition,
@@ -19,6 +18,7 @@ import {
 import type { DraftRecord, RawItemRecord, ScoredHit } from '@sb/contracts';
 import { AppError, type AppContext } from './context';
 import { nodeFile, renderNewNode, renderPatchedNode } from './render';
+import { effectiveBlockingFindings } from './review-policy';
 
 export interface TriageOutcome {
   readonly rawPath: string;
@@ -150,6 +150,20 @@ export async function draftDigest(ctx: AppContext, rawPath: RawPath): Promise<Dr
     file: doc.file,
   }));
 
+  // 生成结果与现有节点对齐：同名节点不应再 proposal new；patch 目标不存在则按 new 处理。
+  const nodeByName = new Map<string, (typeof existingNodes)[number]>();
+  for (const entry of existingNodes) {
+    nodeByName.set(entry.name, entry);
+    for (const alias of entry.aliases) nodeByName.set(alias, entry);
+  }
+  const normalizedNodes = proposal.nodes.map((node) => {
+    const existing = nodeByName.get(node.name);
+    if (node.action === 'new' && existing) return { ...node, action: 'patch' as const };
+    if (node.action === 'patch' && !existing) return { ...node, action: 'new' as const };
+    return node;
+  });
+  const effectiveProposal = { ...proposal, nodes: normalizedNodes };
+
   const findings = evaluateAll({
     rawPath: String(rawPath),
     eventId: item.eventId,
@@ -157,9 +171,9 @@ export async function draftDigest(ctx: AppContext, rawPath: RawPath): Promise<Dr
     enabledSources: ctx.config.enabledSources,
     charCount: item.charCount,
     longTextThreshold: ctx.config.longTextThreshold,
-    tier: proposal.tier,
-    claims: proposal.claims,
-    nodes: proposal.nodes,
+    tier: effectiveProposal.tier,
+    claims: effectiveProposal.claims,
+    nodes: effectiveProposal.nodes,
     existingNodes,
     items: allItems.map((entry) => ({
       rawPath: String(entry.rawPath),
@@ -170,7 +184,7 @@ export async function draftDigest(ctx: AppContext, rawPath: RawPath): Promise<Dr
   });
 
   const targetHashes: Record<string, string> = {};
-  for (const node of proposal.nodes) {
+  for (const node of effectiveProposal.nodes) {
     if (node.action !== 'patch') continue;
     const doc = existingNodes.find((entry) => entry.name === node.name);
     if (!doc) continue;
@@ -181,7 +195,7 @@ export async function draftDigest(ctx: AppContext, rawPath: RawPath): Promise<Dr
     id: ctx.ids.draftId(),
     targetHashes,
     rawItemId: item.id,
-    proposal,
+    proposal: effectiveProposal,
     findings,
     provider: outcome.provenance.provider,
     model: outcome.provenance.model,
@@ -282,9 +296,10 @@ async function acceptDraft(
   now: string,
   input: { readonly actor: string; readonly note?: string; readonly rebaseFiles?: ReadonlySet<string>; readonly rebaseAll?: boolean },
 ): Promise<DecideResult> {
-  if (hasBlock(draft.findings)) {
+  const blocking = effectiveBlockingFindings(draft);
+  if (blocking.length > 0) {
     throw new AppError('GATE_BLOCKED', '存在阻断级预警，不能入库', {
-      rules: draft.findings.filter((finding) => finding.severity === 'block').map((finding) => finding.ruleId),
+      rules: blocking.map((finding) => finding.ruleId),
     });
   }
 
