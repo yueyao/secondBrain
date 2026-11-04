@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { stringifyFrontmatter } from '@sb/domain';
 import { createHarness, hashPort, type TestHarness } from '@sb/testing';
@@ -143,5 +145,31 @@ describe('知识库体检（只读）', () => {
     const report = await knowledgeHealth(ctx);
     expect(report.orphanNodes).toBe(0);
     expect(report.issues.orphanNodes).not.toContain('长期主义');
+  });
+});
+
+describe('知识库体检：raw 路径含 # 的文件', () => {
+  it('文件名带 # 的 raw 链接不应被误报为缺失，也不应被截断', async () => {
+    await writeNode(harness, 'wiki/concepts/播客节点.md', '播客节点', {
+      body: [
+        '# 播客节点',
+        '',
+        '## 一句话定义',
+        '',
+        '测试播客。',
+        '',
+        '## 核心观点',
+        '',
+        '- 这是一条判断。（来源：[[raw/knowledge/podcast/159 #标题.md]]）',
+        '',
+      ].join('\n'),
+    });
+    // 让 raw 列表包含这个文件（fixtures 里没有，直接写文件让 listRaw 扫描到）
+    const rawFile = path.join(harness.root, 'raw/knowledge/podcast/159 #标题.md');
+    fs.mkdirSync(path.dirname(rawFile), { recursive: true });
+    fs.writeFileSync(rawFile, '---\ntype: raw\n---\n正文', 'utf8');
+
+    const report = await knowledgeHealth(ctxOf(harness));
+    expect(report.issues.missingRawLinks.some((item) => item.source.includes('159 #标题.md'))).toBe(false);
   });
 });

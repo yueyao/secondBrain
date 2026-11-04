@@ -18,7 +18,8 @@ const ISSUE_LIMIT = 100;
 const STALE_DAYS = 180;
 
 const CLAIM_PATTERN = /^- (.+?)（来源：\[\[(raw\/[^\]]+)\]\]/;
-const LINK_PATTERN = /\[\[([^\]|#]+)(?:[#|][^\]]*)?\]\]/g;
+// raw 文件路径里可能带 `#`（如播客 `159 #标题.md`），所以链接解析不能把 # 当锚点截断
+const LINK_PATTERN = /\[\[([^\]]+)\]\]/g;
 
 function sectionOf(body: string, heading: string): string {
   const index = body.indexOf(heading);
@@ -140,6 +141,8 @@ export async function knowledgeHealth(ctx: AppContext): Promise<KnowledgeHealthR
   let staleCount = 0;
   let brokenLinkCount = 0;
   let missingRawCount = 0;
+  const missingRawSeen = new Set<string>();
+  const brokenLinkSeen = new Set<string>();
   let orphanCount = 0;
   // 时间由应用层注入（app 包禁止读当前时钟）
   const now = Date.parse(ctx.clock.now());
@@ -194,19 +197,31 @@ export async function knowledgeHealth(ctx: AppContext): Promise<KnowledgeHealthR
       nodesWithoutDefinition.push(doc.name);
     }
 
-    for (const target of linksOf(doc.body)) {
+    for (const rawLink of linksOf(doc.body)) {
+      const target = (rawLink.split('|')[0] ?? '').trim();
+      if (target === '') continue;
       if (target.startsWith('raw/')) {
-        if (!rawSet.has(target)) {
+        const dedupeKey = `${doc.file}|${target}`;
+        if (!rawSet.has(target) && !missingRawSeen.has(dedupeKey)) {
+          missingRawSeen.add(dedupeKey);
           missingRawCount += 1;
           missingRawLinks.push({ node: doc.name, source: target });
         }
         continue;
       }
-      if (!resolveTarget(target, keySet)) {
-        brokenLinkCount += 1;
-        brokenLinks.push({ node: doc.name, target });
-      } else if (target !== doc.name) {
-        const normalized = normalizeText(target.replace(/^\/+/, ''));
+      // 节点链接可能带锚点：[[节点#小节]]，用锚点前部分解析
+      const nodeTarget = (target.split('#')[0] ?? '').trim();
+      const dedupeKey = `${doc.file}|${nodeTarget}`;
+      if (!resolveTarget(nodeTarget, keySet)) {
+        if (!brokenLinkSeen.has(dedupeKey)) {
+          brokenLinkSeen.add(dedupeKey);
+          brokenLinkCount += 1;
+          brokenLinks.push({ node: doc.name, target });
+        }
+        continue;
+      }
+      if (nodeTarget !== doc.name) {
+        const normalized = normalizeText(nodeTarget.replace(/^\/+/, ''));
         const key = keyToName.get(normalized) ?? keyToName.get(normalized.replace(/\.md$/u, ''));
         if (key !== undefined && key !== doc.name) inbound.set(key, (inbound.get(key) ?? 0) + 1);
       }
