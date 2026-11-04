@@ -558,3 +558,16 @@ describe('审核批量通过（异步）', () => {
     expect(reviewHtml).toContain('已选 0 项');
   });
 });
+
+describe('内联脚本可解析（防止模板字符串换行回归）', () => {
+  it('主要页面脚本语法正确', async () => {
+    for (const path of ['/', '/review', '/compose', '/deai', '/qa', '/nodes', '/articles']) {
+      const html = await (await fetch(`${base}${path}`)).text();
+      const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1] as string);
+      expect(scripts.length, `${path} 应有内联脚本`).toBeGreaterThan(0);
+      for (const script of scripts) {
+        expect(() => new Function(script), `${path} 内联脚本语法错误`).not.toThrow();
+      }
+    }
+  });
+});

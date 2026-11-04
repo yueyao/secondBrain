@@ -1056,7 +1056,7 @@ export function reviewListPage(data: ReviewListPageData, page = 1): string {
                 var refreshBtn=document.getElementById('job-refresh');
                 if(fails.length>0){
                   failureBox.hidden=false;
-                  failureBox.textContent=fails.slice(0,8).map(function(f){return f.draftId+'：'+f.reason;}).join('\n');
+                  failureBox.textContent=fails.slice(0,8).map(function(f){return f.draftId+'：'+f.reason;}).join('\\n');
                   hint.textContent='失败项仍在待审；常见原因是存在阻断级预警，或草稿数据本身不完整。';
                   refreshBtn.hidden=false;
                 } else {
