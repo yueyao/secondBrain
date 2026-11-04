@@ -267,16 +267,22 @@ export function createServer(runtime: Runtime): http.Server {
         const allDocs = runtime.ctx.search.allDocs();
         const counts: Record<string, number> = { all: allDocs.length, concept: 0, topic: 0, person: 0 };
         for (const doc of allDocs) counts[doc.nodeType] = (counts[doc.nodeType] ?? 0) + 1;
-        return sendHtml(res, nodesPage(await listWikiNodes(runtime.ctx, { type, q }), type, q, counts, await nodeStats(runtime.ctx), top));
+        const page = Number(url3.searchParams.get('page') ?? '1');
+        return sendHtml(res, nodesPage(await listWikiNodes(runtime.ctx, { type, q }), type, q, counts, await nodeStats(runtime.ctx), top, page));
       }
       if (req.method === 'GET' && path.startsWith('/nodes/')) {
         const file = decodeURIComponent(path.slice('/nodes/'.length));
         const node = await wikiNodeDetail(runtime.ctx, file);
         if (!node) return sendHtml(res, errorPage('节点不存在'), 404);
-        return sendHtml(res, nodePage(node));
+        const urlNode = new URL(req.url ?? '/', 'http://localhost');
+        return sendHtml(res, nodePage(node, { page: Number(urlNode.searchParams.get('page') ?? '1') }));
       }
       if (req.method === 'GET' && path === '/claims') {
-        return sendHtml(res, claimsPage(await wikiClaims(runtime.ctx)));
+        const urlClaims = new URL(req.url ?? '/', 'http://localhost');
+        return sendHtml(res, claimsPage(await wikiClaims(runtime.ctx), {
+          page: Number(urlClaims.searchParams.get('page') ?? '1'),
+          q: urlClaims.searchParams.get('q') ?? '',
+        }));
       }
       if (req.method === 'GET' && path === '/guide') {
         return sendHtml(res, guidePage());
@@ -365,7 +371,7 @@ export function createServer(runtime: Runtime): http.Server {
       if (req.method === 'GET' && path === '/topics') {
         const urlTopics = new URL(req.url ?? '/', 'http://localhost');
         const q = urlTopics.searchParams.get('q') ?? '';
-        return sendHtml(res, topicsPage(await topicMap(runtime.ctx, { q })));
+        return sendHtml(res, topicsPage(await topicMap(runtime.ctx, { q }), { page: Number(urlTopics.searchParams.get('page') ?? '1') }));
       }
       if (req.method === 'GET' && path === '/qa') {
         const urlQa = new URL(req.url ?? '/', 'http://localhost');
@@ -624,7 +630,7 @@ export function createServer(runtime: Runtime): http.Server {
           accepted: Number(url2.searchParams.get('ok') ?? '0'),
           failed: Number(url2.searchParams.get('failed') ?? '0'),
           jobId: url2.searchParams.get('job') ?? '',
-        }));
+        }, Number(url2.searchParams.get('page') ?? '1')));
       }
       if (req.method === 'POST' && path === '/actions/review/bulk-accept') {
         const params = await readFormParams(req);

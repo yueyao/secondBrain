@@ -484,3 +484,23 @@ describe('问答链页（只读工具）', () => {
     }
   });
 });
+
+describe('长列表收敛（分页/折叠）', () => {
+  it('/claims 有分页条，不再全量渲染', async () => {
+    const response = await fetch(`${base}/claims`);
+    const html = await response.text();
+    expect(response.status).toBe(200);
+    expect(html).toContain('pager');
+    expect(html).toContain('条 / 共');
+    expect(html).toContain('筛选判断句');
+  });
+
+  it('/nodes 枢纽图折叠、节点清单有分页', async () => {
+    const response = await fetch(`${base}/nodes`);
+    const html = await response.text();
+    expect(response.status).toBe(200);
+    expect(html).toContain('展开知识枢纽图');
+    expect(html).toContain('节点清单');
+    expect(html).toContain('pager-meta');
+  });
+});

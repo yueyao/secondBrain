@@ -32,113 +32,163 @@ function formatLogLine(line: string): string {
 }
 
 const CSS = `
-:root{--bg:#0a0b0d;--panel:#101216;--paper:#15181d;--ink:#e8eaed;--dim:#8b939e;--line:#23272e;--accent:#5eead4;--warn:#e3b341;--bad:#ef5f6b;--ok:#3fb950}
+:root{
+  --paper:#f2eee5;--panel:#fbf9f3;--ink:#1d1b17;--dim:#6b655a;--line:#d9d2c3;--line-soft:#e9e3d6;
+  --accent:#a33b2b;--accent-deep:#8c2f22;--ok:#3f6b4a;--warn:#9a6b1e;--bad:#a33b2b;
+  --mono:ui-monospace,SFMono-Regular,Menlo,"Cascadia Code",monospace;
+  --serif:"Songti SC","Noto Serif CJK SC","Source Han Serif SC","STSong",Georgia,serif;
+  --sans:"PingFang SC","Hiragino Sans GB","Noto Sans CJK SC",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--ink);font:15px/1.65 ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0}
-.wrap{margin:0 auto;max-width:1400px;padding:24px 32px 72px}
-.nav{display:flex;align-items:center;gap:6px;padding:8px 0 10px;border-bottom:1px solid var(--line);margin-bottom:18px;position:relative;z-index:20}
-.nav-brand{color:var(--ink);font-weight:700;font-size:18px;letter-spacing:-.02em;text-decoration:none;padding:6px 10px;white-space:nowrap}
+html{background:var(--paper)}
+body{background:var(--paper);color:var(--ink);font:15px/1.7 var(--sans);margin:0;-webkit-font-smoothing:antialiased}
+.wrap{margin:0 auto;max-width:1180px;padding:22px 28px 88px}
+a{color:var(--ink);text-decoration:none;border-bottom:1px solid rgba(29,27,23,.25)}
+a:hover{color:var(--accent);border-bottom-color:var(--accent);text-decoration:none}
+p{margin:8px 0}
+::selection{background:#e8d9c6;color:var(--ink)}
+
+/* 顶部：像编辑部刊头，而不是 SaaS 导航 */
+.nav{display:flex;align-items:center;gap:14px;padding:12px 0 12px;border-bottom:2px solid var(--ink);margin-bottom:24px;position:sticky;top:0;background:var(--paper);z-index:40}
+.nav-brand{display:inline-flex;align-items:center;gap:10px;color:var(--ink);font:600 22px/1 var(--serif);letter-spacing:-.01em;border:0;padding:2px 0;white-space:nowrap}
+.nav-brand:hover{color:var(--ink)}
+.seal{display:inline-grid;place-items:center;width:27px;height:27px;background:var(--accent);color:#fbf9f3;font:600 14px/1 var(--serif);border-radius:2px;box-shadow:inset 0 0 0 1px rgba(251,249,243,.35)}
 .nav-groups{display:flex;align-items:center;gap:2px;flex-wrap:wrap}
-.nav-item{display:inline-flex;align-items:center;gap:3px;color:var(--dim);padding:7px 11px;border-radius:6px;font-size:14.5px;text-decoration:none;white-space:nowrap;background:none;border:0;font:inherit;cursor:pointer}
-.nav-item:hover{color:var(--ink);background:var(--panel)}
-.nav-item.active{color:var(--accent);background:var(--panel);box-shadow:inset 0 -2px 0 var(--accent)}
+.nav-item{display:inline-flex;align-items:center;gap:4px;color:var(--dim);padding:7px 10px;border:0;background:none;font:500 14px/1.2 var(--sans);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent}
+.nav-item:hover{color:var(--ink);border-bottom-color:var(--line)}
+.nav-item.active{color:var(--ink);border-bottom-color:var(--accent)}
 .nav-group{position:relative}
 .nav-group>summary{list-style:none}
 .nav-group>summary::-webkit-details-marker{display:none}
-.nav-group>summary::after{content:'▾';font-size:10px;opacity:.55;margin-left:1px}
-.nav-group[open]>summary{color:var(--ink);background:var(--panel)}
-.nav-menu{position:absolute;top:calc(100% + 6px);left:0;min-width:190px;display:flex;flex-direction:column;gap:2px;padding:8px;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.45);z-index:30}
-.nav-menu a{color:var(--dim);padding:7px 10px;border-radius:5px;font-size:14px;text-decoration:none;white-space:nowrap}
+.nav-group>summary::after{content:'▾';font-size:9px;opacity:.45;margin-left:2px}
+.nav-group[open]>summary{color:var(--ink);border-bottom-color:var(--accent)}
+.nav-menu{position:absolute;top:calc(100% + 12px);left:0;min-width:188px;display:flex;flex-direction:column;gap:1px;padding:8px;background:var(--panel);border:1px solid var(--ink);box-shadow:5px 5px 0 rgba(29,27,23,.12);z-index:50}
+.nav-menu a{color:var(--dim);padding:7px 9px;font-size:13.5px;border:0;white-space:nowrap}
 .nav-menu a:hover{color:var(--ink);background:var(--paper)}
 .nav-menu a.active{color:var(--accent)}
 .nav-right{margin-left:auto;display:flex;align-items:center;gap:8px}
-.nav a[href="/"]{color:var(--ink)}
-#worker-light{color:var(--dim);font-size:12.5px;padding:20px 12px 4px;white-space:nowrap}
-#pending-badge{background:none;border:1px solid var(--line);color:var(--ink);font-size:11px;padding:2px 6px;margin:0 10px}
-.refresh-bar{display:none;position:sticky;top:0;background:#1b1a10;color:var(--warn);border-bottom:1px solid #3d361a;padding:7px 16px;cursor:pointer;z-index:11;text-align:center;font-size:12.5px}
-h1{font-size:34px;font-weight:650;letter-spacing:-.03em;margin:0 0 10px}
-h2{font-size:14px;font-weight:600;color:var(--dim);margin:40px 0 12px;letter-spacing:.01em;text-transform:none}
-p{margin:8px 0}
-a{color:var(--accent);text-decoration:none}
-a:hover{text-decoration:underline}
-.muted{color:var(--dim);font-size:13.5px}
+#worker-light{color:var(--dim);font-size:11.5px;padding:0 6px;white-space:nowrap}
+#pending-badge{background:none;border:1px solid var(--line);color:var(--ink);font-size:11px;padding:1px 5px;margin:0 6px;border-radius:0}
+.refresh-bar{display:none;position:sticky;top:0;background:#f5edda;color:var(--warn);border-bottom:1px solid var(--line);padding:7px 16px;cursor:pointer;z-index:60;text-align:center;font-size:12px}
+
+/* 标题：衬线字承担页面气质 */
+h1{font:600 33px/1.22 var(--serif);letter-spacing:-.015em;margin:0 0 8px;color:var(--ink)}
+h2{font:600 16px/1.4 var(--serif);color:var(--ink);margin:34px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--line);letter-spacing:.01em}
+h3{font:600 15px/1.4 var(--sans);margin:18px 0 6px}
+.muted{color:var(--dim);font-size:13px}
+.empty{padding:7px 0 9px;color:var(--dim);font-size:13px;border-bottom:1px solid var(--line-soft)}
+.mono{font:12.5px/1.6 var(--mono);color:var(--dim)}
 .row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start;margin:0}
-.row:has(.stat){gap:0;border:1px solid var(--line);border-radius:8px;background:var(--panel);overflow:hidden;margin:12px 0}
-.stat{flex:1 1 140px;padding:18px 22px;border-right:1px solid var(--line);background:var(--panel)}
+
+/* 统计：做成一条“账本边栏”，不是一排圆角卡片 */
+.row:has(.stat){gap:0;border-top:1px solid var(--ink);border-bottom:1px solid var(--ink);background:transparent;margin:14px 0 18px;overflow:hidden}
+.stat{flex:1 1 130px;padding:14px 18px 12px;border-right:1px solid var(--line);background:transparent}
 .row:has(.stat) .stat:last-child{border-right:0}
-.stat b{display:block;font-size:32px;font-weight:600;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1.15}
-.stat span{display:block;font-size:12.5px;color:var(--dim);margin-top:4px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:18px 20px;margin:12px 0}
+.stat b{display:block;font:600 30px/1.1 var(--serif);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat span{display:block;font-size:11.5px;color:var(--dim);margin-top:3px;letter-spacing:.03em}
+
+/* 内容块：直角、细线，靠留白分层 */
+.card{background:transparent;border:1px solid var(--line);border-radius:0;padding:16px 18px;margin:12px 0}
+.card>h2:first-child,.card>h3:first-child{margin-top:0}
 table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-th{font-size:12.5px;color:var(--dim);font-weight:500;text-align:left;padding:10px 12px;border-bottom:1px solid var(--line)}
-td{padding:11px 12px;font-size:14.5px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:top}
+th{font:500 11.5px/1.4 var(--sans);color:var(--dim);letter-spacing:.05em;text-align:left;padding:8px 10px;border-bottom:1px solid var(--ink)}
+td{padding:9px 10px;font-size:13.5px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+tbody tr:hover td{background:rgba(29,27,23,.025)}
 tr:last-child td{border-bottom:0}
 th:nth-child(n+3),td:nth-child(n+3){text-align:right}
-.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--dim);margin-right:7px;vertical-align:middle}
-.bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden;margin:8px 0}
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--dim);margin-right:7px;vertical-align:middle}
+.bar{height:6px;border-radius:0;background:var(--line);overflow:hidden;margin:8px 0}
 .bar>i{display:block;height:100%;background:var(--accent)}
-.throughput{display:flex;gap:6px;align-items:flex-end;height:72px;margin-top:10px}
-.throughput .col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:6px}
-.throughput .v{background:var(--accent);width:100%;border-radius:2px 2px 0 0;min-height:2px}
-.throughput .d{font-size:11.5px;color:var(--dim)}
-.badge{display:inline-block;font-size:12px;padding:2px 8px;border-radius:3px;border:1px solid var(--line);color:#b7c0cc;background:var(--paper);white-space:nowrap}
-.b-ok{color:var(--ok);border-color:rgba(63,185,80,.35)}
-.b-warn{color:var(--warn);border-color:rgba(227,179,65,.35)}
-.b-block{color:var(--bad);border-color:rgba(239,95,107,.35)}
-.btn{display:inline-block;background:transparent;border:1px solid var(--line);color:var(--ink);padding:8px 15px;border-radius:5px;font:inherit;font-size:14px;cursor:pointer;text-decoration:none}
-.btn:hover{border-color:var(--accent);color:var(--accent);text-decoration:none}
-input,select{background:var(--paper);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:8px 11px;font:inherit;font-size:14px}
-input:focus,select:focus,.btn:focus-visible,a:focus-visible{outline:1px solid var(--accent);outline-offset:1px}
-pre{background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:12px;overflow:auto;font-size:12.5px;color:#c7d0da}
-ul,ol{margin:8px 0;padding-left:20px}
-li{margin:5px 0}
-code{font-size:12.5px;color:var(--accent)}
-.btn[disabled]{opacity:.4;cursor:not-allowed}
-.btn[disabled]:hover{border-color:var(--line);color:var(--ink)}
-.prose{font-size:15.5px;line-height:1.85}
-.prose h2{font-size:21px;color:var(--ink);margin:26px 0 10px;font-weight:650;letter-spacing:-.01em}
-.prose h3{font-size:17px;color:var(--ink);margin:20px 0 8px;font-weight:600}
+.throughput{display:flex;gap:4px;align-items:flex-end;height:64px;margin-top:8px}
+.throughput .col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:5px}
+.throughput .v{background:var(--ink);width:100%;min-height:2px}
+.throughput .d{font:10.5px/1 var(--mono);color:var(--dim)}
+
+/* 标签：不用胶囊，用“校对标记” */
+.badge{display:inline-block;font-size:11.5px;line-height:1.5;padding:0 1px;border:0;border-bottom:1px solid var(--line);color:var(--dim);background:none;white-space:nowrap}
+.b-ok{color:var(--ok);border-bottom-color:rgba(63,107,74,.4)}
+.b-warn{color:var(--warn);border-bottom-color:rgba(154,107,30,.4)}
+.b-block{color:var(--bad);border-bottom-color:rgba(163,59,43,.4)}
+.b-blue{color:var(--ink);border-bottom-color:var(--ink)}
+.btn{display:inline-block;background:transparent;border:1px solid var(--ink);color:var(--ink);padding:7px 13px;border-radius:2px;font:500 13.5px/1.4 var(--sans);cursor:pointer;text-decoration:none;border-bottom-width:1px}
+.btn:hover{background:var(--ink);color:var(--paper);border-color:var(--ink);text-decoration:none}
+.btn[disabled]{opacity:.35;cursor:not-allowed}
+.btn[disabled]:hover{background:transparent;color:var(--ink)}
+input,select,textarea{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:2px;padding:7px 10px;font:14px/1.5 var(--sans)}
+input:focus,select:focus,textarea:focus,.btn:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+pre{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--ink);border-radius:0;padding:12px;overflow:auto;font:12.5px/1.7 var(--mono);color:var(--ink)}
+ul,ol{margin:8px 0;padding-left:20px}li{margin:5px 0}
+code{font:12.5px/1.4 var(--mono);color:var(--accent-deep)}
+.prose{font-size:15.5px;line-height:1.85;max-width:72ch}
+.prose h2{font-size:20px;color:var(--ink);margin:26px 0 10px;border:0;padding:0}
+.prose h3{font-size:16.5px;color:var(--ink);margin:20px 0 8px}
 .prose p{margin:10px 0}
 .prose ul{margin:8px 0;padding-left:22px}
-.prose a{border-bottom:1px dotted rgba(94,234,212,.4)}
-.diff{font:13px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace}
-.diff th,.diff td{text-align:left!important;padding:3px 10px;white-space:pre-wrap;word-break:break-word;vertical-align:top}
-.diff th{font-size:11.5px;color:var(--dim);text-transform:none}
+.diff{font:12.5px/1.65 var(--mono)}
+.diff th,.diff td{text-align:left!important;padding:3px 9px;white-space:pre-wrap;word-break:break-word;vertical-align:top}
+.diff th{font-size:10.5px;color:var(--dim);letter-spacing:.04em}
 .diff td:first-child{width:22px;text-align:center!important}
-.diff td:nth-child(2),.diff td:nth-child(3){width:56px;color:var(--dim);text-align:right!important;font-variant-numeric:tabular-nums}
-.diff-add{background:rgba(63,185,80,.10)}
-.diff-add td:first-child,.diff-add td:last-child{color:#9be3a8}
-.diff-del{background:rgba(239,95,107,.10)}
-.diff-del td:first-child,.diff-del td:last-child{color:#f0a6ac}
-.diff-same td:last-child{color:#9aa3ae}
-.feature-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin:14px 0}
-.feature{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px 18px}
-.feature h3{font-size:16px;font-weight:600;margin:0 0 8px;color:var(--ink)}
-.feature p{margin:0;font-size:13.5px;color:var(--dim);line-height:1.75}
-.feature .chip{display:inline-block;font-size:11.5px;color:var(--accent);border:1px solid rgba(94,234,212,.3);border-radius:3px;padding:1px 7px;margin-bottom:9px}
+.diff td:nth-child(2),.diff td:nth-child(3){width:56px;color:var(--dim);text-align:right!important}
+.diff-add{background:rgba(63,107,74,.10)}
+.diff-add td:first-child,.diff-add td:last-child{color:#2f5a3c}
+.diff-del{background:rgba(163,59,43,.09)}
+.diff-del td:first-child,.diff-del td:last-child{color:#8c2f22}
+.diff-same td:last-child{color:var(--dim)}
+.feature-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1px;margin:14px 0;border-top:1px solid var(--line);border-left:1px solid var(--line)}
+.feature{background:var(--panel);padding:16px 18px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);border-radius:0}
+.feature h3{font:600 15px/1.4 var(--serif);margin:0 0 6px;color:var(--ink)}
+.feature p{margin:0;font-size:13px;color:var(--dim);line-height:1.7}
+.feature .chip{display:inline-block;font-size:11px;color:var(--dim);margin-bottom:7px;letter-spacing:.04em}
 .feature a{font-size:12.5px}
-.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:14px 0}
-.step{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px 16px}
-.step b{display:block;color:var(--ink);margin-bottom:5px;font-size:14px}
-.step span{font-size:13px;color:var(--dim);line-height:1.65;display:block}
-.step i{position:absolute;top:10px;right:12px;font-style:normal;font-size:11px;color:var(--accent);opacity:.7}
-.defs{margin:6px 0 0}
-.defs>div{display:grid;grid-template-columns:180px 1fr;gap:12px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;margin:14px 0;border:1px solid var(--line)}
+.step{position:relative;background:var(--panel);padding:14px 16px;border:0}
+.step b{display:block;color:var(--ink);margin-bottom:4px;font-size:13.5px}
+.step span{font-size:12.5px;color:var(--dim);line-height:1.65;display:block}
+.step i{position:absolute;top:10px;right:12px;font:normal 11px var(--mono);color:var(--accent)}
+.defs{margin:4px 0 0}
+.defs>div{display:grid;grid-template-columns:180px 1fr;gap:12px;padding:10px 0;border-bottom:1px solid var(--line-soft)}
 .defs>div:last-child{border-bottom:0}
-.defs b{font-size:14px;font-weight:600}
-.defs span{font-size:13.5px;color:var(--dim);line-height:1.7}
+.defs b{font-size:13.5px;font-weight:600}
+.defs span{font-size:13px;color:var(--dim);line-height:1.7}
+
+/* 分页：统一的账本页码 */
+.pager{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:16px 0 4px}
+.pager .btn{padding:5px 10px;font-size:12.5px}
+.pager .btn[aria-disabled="true"]{opacity:.35;pointer-events:none}
+.pager .pager-meta{color:var(--dim);font-size:12px;margin-left:auto}
+.pager .pager-pages{display:flex;gap:4px;flex-wrap:wrap}
+.pager .pager-pages a,.pager .pager-pages span{display:inline-grid;place-items:center;min-width:26px;height:26px;padding:0 5px;border:1px solid var(--line);font:12px var(--mono);color:var(--dim);border-bottom-width:1px}
+.pager .pager-pages .current{border-color:var(--ink);color:var(--ink)}
+
+/* 页头和筛选条 */
+.page-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:14px}
+.page-head h1{margin:0}
+.page-head .page-sub{color:var(--dim);font-size:13px;margin-top:4px;max-width:72ch}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:12px 0;padding:10px 0;border-top:1px solid var(--line-soft);border-bottom:1px solid var(--line-soft)}
+.toolbar .spacer{flex:1}
+details.disclosure{border:1px solid var(--line);background:transparent;padding:0;margin:12px 0}
+details.disclosure>summary{cursor:pointer;padding:9px 12px;font-size:13px;color:var(--dim);list-style:none}
+details.disclosure>summary::-webkit-details-marker{display:none}
+details.disclosure>summary::before{content:'+ ';font-family:var(--mono);color:var(--accent)}
+details.disclosure[open]>summary::before{content:'– '}
+details.disclosure>summary:hover{color:var(--ink)}
+details.disclosure>.disclosure-body{padding:0 12px 12px}
+
 @media(max-width:900px){
-  .wrap{padding:14px}
-  .nav{flex-wrap:wrap;gap:2px}
-  .nav-brand{padding:4px 6px 4px 2px}
+  .wrap{padding:14px 14px 64px}
+  .nav{flex-wrap:wrap;gap:4px;position:static;padding:10px 0}
+  .nav-brand{font-size:20px}
   .nav-group{position:static}
   .nav-menu{position:static;margin:4px 0 6px;box-shadow:none;min-width:0;background:var(--paper)}
-  .nav-right{width:100%;margin-left:0;padding:2px 4px 0}
-  #worker-light{padding:2px 6px}
-  #pending-badge{margin:0 4px}
-  h1{font-size:22px}
+  .nav-right{width:100%;margin-left:0}
+  #worker-light{padding:2px 4px}
+  h1{font-size:26px}
+  .stat b{font-size:24px}
+  .card table{display:block;overflow-x:auto;white-space:nowrap}
+  .pager .pager-meta{margin-left:0}
 }
-`;
+`;;
 
 
 function layout(title: string, body: string): string {
@@ -152,7 +202,7 @@ function layout(title: string, body: string): string {
   function show(text){var bar=document.getElementById('refresh-bar');if(!bar)return;bar.textContent=text;bar.style.display='block';bar.onclick=function(){location.reload();};}
   function render(d){
     var light=document.getElementById('worker-light');
-    if(light&&d.workerPhase){var m={drafting:'起草中',ingesting:'扫描中',sleeping:'等待中',paused:'已暂停',starting:'启动中',stopping:'停止中'};var dot={'drafting':'#5eead4','ingesting':'#e3b341','sleeping':'#6b7280','paused':'#e3b341','stopping':'#ef5f6b'}[d.workerPhase]||'#6b7280';light.innerHTML='<span class="dot" style="background:'+dot+'"></span>worker: '+(m[d.workerPhase]||d.workerPhase);}
+    if(light&&d.workerPhase){var m={drafting:'起草中',ingesting:'扫描中',sleeping:'等待中',paused:'已暂停',starting:'启动中',stopping:'停止中'};var dot={'drafting':'#a33b2b','ingesting':'#9a6b1e','sleeping':'#8a8478','paused':'#9a6b1e','stopping':'#a33b2b'}[d.workerPhase]||'#6b7280';light.innerHTML='<span class="dot" style="background:'+dot+'"></span>worker: '+(m[d.workerPhase]||d.workerPhase);}
     var badge=document.getElementById('pending-badge');
     if(badge&&typeof d.pendingDrafts==='number'){badge.textContent='待审 '+d.pendingDrafts;}
   }
@@ -294,7 +344,7 @@ export function dashboard(data: DashboardData): string {
 export function reviewPage(view: ReviewViewV1, hits: readonly ScoredHit[] = [], query = ''): string {
   const level = view.actions.accept ? (view.findings.some((f) => f.severity === 'warn') ? 'warn' : 'ok') : 'block';
   const findings = view.findings.map((finding) => `<div class="card" style="margin:6px 0;border-color:${
-    finding.severity === 'block' ? '#5a2b31' : finding.severity === 'warn' ? '#5a4a1e' : '#24512c'}">
+    finding.severity === 'block' ? 'var(--bad)' : finding.severity === 'warn' ? 'var(--warn)' : 'var(--ok)'}">
       ${findingBadge(finding.severity)} ${esc(finding.message)}
       <div class="mono">${esc(finding.ruleId)}</div></div>`).join('')
     || '<div class="muted">无预警</div>';
@@ -491,10 +541,10 @@ function nav(active = ''): string {
     return `<details class="nav-group"><summary class="nav-item${groupActive(group) ? ' active' : ''}">${esc(group.label)}</summary><div class="nav-menu">${children}</div></details>`;
   }).join('');
   return `<div class="nav">
-    <a class="nav-brand" href="/">secondBrain</a>
+    <a class="nav-brand" href="/"><span class="seal">藏</span>secondBrain</a>
     <div class="nav-groups">${items}</div>
     <span class="nav-right">
-      <span id="worker-light" style="color:#9aa3b2;font-size:12.5px;white-space:nowrap">worker: --</span>
+      <span id="worker-light" style="color:var(--dim);font-size:12px;white-space:nowrap">worker: --</span>
       <span id="pending-badge" class="badge b-warn" style="margin-left:8px">待审 0</span>
     </span>
   </div>`;
@@ -535,7 +585,7 @@ export function articlesPage(data: ArticlesPageData): string {
   };
 
   const tabs = GROUP_TABS.map(([key, label]) =>
-    `<a class="btn" style="${key === data.group ? 'background:#1f6feb;color:#fff' : ''}" href="/articles${qs({ group: key })}">${label} <span class="muted">${data.groupCounts[key] ?? 0}</span></a>`,
+    `<a class="btn" style="${key === data.group ? 'background:var(--ink);color:var(--paper)' : ''}" href="/articles${qs({ group: key })}">${label} <span class="muted">${data.groupCounts[key] ?? 0}</span></a>`,
   ).join('');
 
   const sourceOptions = ['all', ...data.sources]
@@ -556,13 +606,12 @@ export function articlesPage(data: ArticlesPageData): string {
     <td class="muted">${esc(formatDate(item.updatedAt))}</td></tr>`).join('')
     || '<tr><td colspan="6" class="muted">没有匹配的文章</td></tr>';
 
-  const prev = data.page > 1 ? `<a class="btn" href="/articles${qs({ page: data.page - 1 })}">← 上一页</a>` : '';
-  const next = data.page < data.pages ? `<a class="btn" href="/articles${qs({ page: data.page + 1 })}">下一页 →</a>` : '';
+  const pageSize = Math.max(1, Math.ceil(data.total / Math.max(1, data.pages)));
 
   return layout('素材库', `${nav('/articles')}
-  <div class="row" style="justify-content:space-between"><h1>素材库</h1><span class="muted">${data.total.toLocaleString()} 篇 · 第 ${data.page}/${data.pages} 页</span></div>
-  <div class="row" style="gap:6px;margin:12px 0;flex-wrap:wrap">${tabs}</div>
-  <form class="row" method="get" action="/articles" style="gap:8px;margin-bottom:12px;flex-wrap:wrap">
+  ${pageHead('素材库', `按状态/来源/时间筛选原始素材；当前筛选 ${data.total.toLocaleString()} 篇，每页 ${pageSize} 篇。`, '<a class="btn" href="/review">待审队列 →</a>')}
+  <div class="toolbar">${tabs}</div>
+  <form class="toolbar" method="get" action="/articles" style="gap:8px">
     <input type="hidden" name="group" value="${esc(data.group)}">
     <select name="source">${sourceOptions}</select>
     <select name="days">${dayOptions}</select>
@@ -572,10 +621,10 @@ export function articlesPage(data: ArticlesPageData): string {
     <button class="btn" type="submit">筛选</button>
     <a class="btn" href="/articles">重置</a>
   </form>
-  <div class="card" style="padding:4px 0"><table>
+  <div class="card table-wrap"><table>
     <tr><th>标题</th><th>来源</th><th>状态</th><th>triage</th><th>字数</th><th>更新</th></tr>${rows}
   </table></div>
-  <div class="row" style="justify-content:space-between;margin-top:12px">${prev}<span></span>${next}</div>`);
+  ${pager('/articles', data.page, data.pages, data.total, pageSize, { group: data.group, source: data.source, days: data.days, triage: data.triage, sort: data.sort, q: data.query })}`);
 }
 
 export interface ArticlePageData {
@@ -716,7 +765,7 @@ export function adminPage(data: AdminPageData): string {
          <div class="muted">${esc(formatDateTime(repo.head.date))} · ${esc(repo.head.author)}</div>`
       : '<span class="muted">—</span>';
     const fetchNote = repo.fetchError !== null
-      ? `<div class="muted" style="color:#f0a6ac">fetch 失败：${esc(repo.fetchError)}</div>`
+      ? `<div class="muted" style="color:var(--bad)">fetch 失败：${esc(repo.fetchError)}</div>`
       : '';
     return `<div class="card" style="margin:8px 0">
       <div class="row" style="justify-content:space-between;align-items:center">
@@ -760,16 +809,16 @@ export function adminPage(data: AdminPageData): string {
          ? `<div class="card" style="margin-top:10px"><div><b>正在起草：</b>${esc(worker.title)}${elapsed !== null ? `（已 ${elapsed} 秒）` : ''}</div>
             <div class="muted">${esc(worker.rawPath ?? '')}</div></div>`
          : '<div class="card muted" style="margin-top:10px">当前没有正在起草的文章</div>'}
-       ${worker.stale ? '<div class="card" style="margin-top:10px;border-color:#a33">⚠️ worker 状态超过 10 分钟未更新，可能未运行</div>' : ''}`
+       ${worker.stale ? '<div class="card" style="margin-top:10px;border-color:var(--bad)">⚠️ worker 状态超过 10 分钟未更新，可能未运行</div>' : ''}`
     : '<div class="card muted">没有 worker 状态（worker 可能未启动）</div>';
 
   return layout('运维中心', `${nav('/operations')}
   <div class="row" style="justify-content:space-between"><h1>运维中心</h1><span class="muted">${esc(data.env.mode)} 模式</span></div>
 
   <h2>运行状态</h2>
-  ${(data.drafts.pending ?? 0) >= data.pendingLimit ? `<div class="card" style="border-color:#e3b341;margin-bottom:10px"><b>已触发背压</b>：待审草稿 ${data.drafts.pending ?? 0} / 上限 ${data.pendingLimit}，worker 已停止起草。请先审核（<a href="/review">审核中心</a>）。</div>` : `<div class="muted" style="margin-bottom:10px">待审草稿 ${data.drafts.pending ?? 0} / 上限 ${data.pendingLimit}（达到上限自动停止起草）</div>`}
+  ${(data.drafts.pending ?? 0) >= data.pendingLimit ? `<div class="card" style="border-color:var(--warn);margin-bottom:10px"><b>已触发背压</b>：待审草稿 ${data.drafts.pending ?? 0} / 上限 ${data.pendingLimit}，worker 已停止起草。请先审核（<a href="/review">审核中心</a>）。</div>` : `<div class="muted" style="margin-bottom:10px">待审草稿 ${data.drafts.pending ?? 0} / 上限 ${data.pendingLimit}（达到上限自动停止起草）</div>`}
   ${data.paused
-    ? `<div class="card" style="border-color:#e3b341;margin-bottom:10px"><b>已暂停</b>：当前任务处理完后不再开始新任务。
+    ? `<div class="card" style="border-color:var(--warn);margin-bottom:10px"><b>已暂停</b>：当前任务处理完后不再开始新任务。
          <form method="post" action="/actions/worker/resume" style="display:inline;margin-left:8px"><button class="btn" type="submit">继续处理</button></form></div>`
     : `<div class="card" style="margin-bottom:10px">自动处理中。
          <form method="post" action="/actions/worker/pause" style="display:inline;margin-left:8px"><button class="btn" type="submit">暂停（完成当前任务后）</button></form></div>`}
@@ -873,8 +922,12 @@ export interface ReviewListPageData {
   readonly jobId: string;
 }
 
-export function reviewListPage(data: ReviewListPageData): string {
-  const rows = data.items.map((item) => `<tr class="review-row">
+export function reviewListPage(data: ReviewListPageData, page = 1): string {
+  const pageSize = 25;
+  const pages = Math.max(1, Math.ceil(data.items.length / pageSize));
+  const current = Math.min(pages, Math.max(1, Math.trunc(page)));
+  const pageItems = data.items.slice((current - 1) * pageSize, current * pageSize);
+  const rows = pageItems.map((item) => `<tr class="review-row">
     <td><input type="checkbox" name="draftId" value="${esc(item.draftId)}"></td>
     <td><a href="/review/${encodeURIComponent(item.draftId)}" class="review-link">${esc(item.title)}</a></td>
     <td>${esc(item.tier)}</td>
@@ -883,10 +936,10 @@ export function reviewListPage(data: ReviewListPageData): string {
     || '<tr><td colspan="5" class="muted">没有待审草稿</td></tr>';
 
   const flash = data.accepted > 0 || data.failed > 0
-    ? `<div class="card" style="border-color:#3fb950">批量结果：成功 ${data.accepted} 篇${data.failed > 0 ? `，失败 ${data.failed} 篇（失败项仍在待审，见日志）` : ''}</div>` : '';
+    ? `<div class="card" style="border-color:var(--ok)">批量结果：成功 ${data.accepted} 篇${data.failed > 0 ? `，失败 ${data.failed} 篇（失败项仍在待审，见日志）` : ''}</div>` : '';
 
   return layout('审核中心', `${nav('/review')}
-  <div class="row" style="justify-content:space-between"><h1>审核中心</h1><span class="muted">${data.items.length} 篇待审</span></div>
+  ${pageHead('审核中心', `待审 ${data.items.length.toLocaleString()} 篇；每页 ${pageSize} 篇，勾选只作用当前页。`, '<a class="btn" href="/articles?group=pending">去素材库 →</a>')}
   ${flash}
   ${data.jobId ? `<div class="card" id="job-progress">批量处理中… <span id="job-text"></span></div><script>(function(){var id=${JSON.stringify(data.jobId)};var t=setInterval(function(){fetch("/api/jobs/"+id).then(function(r){return r.json()}).then(function(d){document.getElementById("job-text").textContent=d.done+"/"+d.total+"（成功 "+d.ok+"，失败 "+d.failed+"）";if(d.status==="done"){clearInterval(t);document.getElementById("job-progress").textContent="完成："+d.ok+" 成功 / "+d.failed+" 失败，刷新中…";setTimeout(function(){location.href="/review";},800);}});},1000);})();</script>` : ""}
   <form method="post" action="/actions/review/bulk-accept" id="bulk-form">
@@ -896,9 +949,10 @@ export function reviewListPage(data: ReviewListPageData): string {
       <button class="btn" type="submit" onclick="return confirm('将逐篇通过选中的草稿并写入 wiki，确定？')">批量通过</button>
       <span class="muted">键盘：j/k 移动，Enter 打开，a 勾选，r 取消</span>
     </div>
-    <div class="card" style="padding:4px 0"><table>
+    <div class="card table-wrap" style="padding:4px 0"><table>
       <tr><th></th><th>标题</th><th>tier</th><th>检查</th><th>创建</th></tr>${rows}
     </table></div>
+    ${pager('/review', current, pages, data.items.length, pageSize)}
   </form>
   <script>
   (function(){
@@ -915,14 +969,31 @@ export function reviewListPage(data: ReviewListPageData): string {
 }
 
 
-export function claimsPage(rows: readonly { draftId: string; text: string; inference: boolean; source: string }[]): string {
-  const items = rows.map((row) => `<li>${esc(row.text)}${row.inference ? ' <span class="badge b-warn">推断</span>' : ''}
+export function claimsPage(
+  rows: readonly { draftId: string; text: string; inference: boolean; source: string }[],
+  options: { readonly page?: number; readonly q?: string } = {},
+): string {
+  const pageSize = 25;
+  const q = (options.q ?? '').trim();
+  const needle = q.toLowerCase();
+  const filtered = needle === ''
+    ? rows
+    : rows.filter((row) => row.text.toLowerCase().includes(needle) || row.source.toLowerCase().includes(needle) || row.draftId.toLowerCase().includes(needle));
+  const pages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const page = Math.min(pages, Math.max(1, Math.trunc(options.page ?? 1)));
+  const slice = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const items = slice.map((row) => `<li>${esc(row.text)}${row.inference ? ' <span class="badge b-warn">推断</span>' : ''}
     <div class="muted">来源：${esc(row.source)} · 草稿 ${esc(row.draftId)}</div></li>`).join('')
-    || '<li class="muted">还没有已入库的 claims</li>';
+    || '<li class="muted">没有匹配的 claims</li>';
   return layout('claims', `${nav('/claims')}
-  <h1>已入库 claims（${rows.length}）</h1>
-  <div class="muted">来自已通过审核并入库的草稿。每个 claim 都带来源原文与所属草稿。</div>
-  <div class="card"><ol>${items}</ol></div>`);
+  ${pageHead('已入库 claims', `来自已通过审核并入库的草稿；每个 claim 都带来源原文与所属草稿。当前筛选 ${filtered.length.toLocaleString()} 条（扫描上限内共 ${rows.length.toLocaleString()} 条）。`)}
+  <form class="toolbar" method="get" action="/claims">
+    <input type="text" name="q" value="${esc(q)}" placeholder="筛选判断句 / 来源 / 草稿" style="min-width:320px">
+    <button class="btn" type="submit">筛选</button>
+    ${q === '' ? '' : '<a class="btn" href="/claims">清除</a>'}
+  </form>
+  <div class="card"><ol>${items}</ol></div>
+  ${pager('/claims', page, pages, filtered.length, pageSize, q === '' ? {} : { q })}`);
 }
 
 export function guidePage(): string {
@@ -943,16 +1014,20 @@ export function guidePage(): string {
 }
 
 
-export function nodesPage(rows: readonly { name: string; file: string; nodeType: string; claimedCount?: never; claimCount: number; sourceCount: number; aliases: readonly string[] }[], type: string, query: string, counts: Record<string, number>, stats: { total: number; totalClaims: number; bins: readonly { label: string; count: number }[]; byType: readonly { type: string; count: number; claims: number }[] }, top: number): string {
+export function nodesPage(rows: readonly { name: string; file: string; nodeType: string; claimedCount?: never; claimCount: number; sourceCount: number; aliases: readonly string[] }[], type: string, query: string, counts: Record<string, number>, stats: { total: number; totalClaims: number; bins: readonly { label: string; count: number }[]; byType: readonly { type: string; count: number; claims: number }[] }, top: number, page = 1): string {
   const tabs = ([['all', '全部'], ['concept', '概念'], ['topic', '主题'], ['person', '人物']] as const)
-    .map(([key, label]) => `<a class="btn" style="${key === type ? 'background:#1f6feb;color:#fff' : ''}" href="/nodes?type=${key}&q=${encodeURIComponent(query)}">${label} <span class="muted">${counts[key] ?? 0}</span></a>`).join('');
-  const listRows = rows.slice(0, 60);
+    .map(([key, label]) => `<a class="btn" style="${key === type ? 'background:var(--ink);color:var(--paper)' : ''}" href="/nodes?type=${key}&q=${encodeURIComponent(query)}">${label} <span class="muted">${counts[key] ?? 0}</span></a>`).join('');
+  const pageSize = 50;
+  const pages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const current = Math.min(pages, Math.max(1, Math.trunc(page)));
+  const offset = (current - 1) * pageSize;
+  const listRows = rows.slice(offset, offset + pageSize);
   const maxListClaims = Math.max(1, ...listRows.map((row) => row.claimCount));
-  const rowsHtml = listRows.map((row, index) => `<div style="display:grid;grid-template-columns:28px minmax(0,1fr) 90px 56px;gap:10px;align-items:center;padding:7px 4px;border-bottom:1px solid rgba(255,255,255,.045)">
-    <span class="muted" style="text-align:right">${index + 1}</span>
+  const rowsHtml = listRows.map((row, index) => `<div style="display:grid;grid-template-columns:34px minmax(0,1fr) minmax(50px,72px) 52px;gap:10px;align-items:center;padding:7px 2px;border-bottom:1px solid var(--line-soft)">
+    <span class="muted mono" style="text-align:right">${offset + index + 1}</span>
     <span style="min-width:0"><a href="/nodes/${encodeURIComponent(row.file)}">${esc(row.name)}</a>${row.aliases.length > 0 ? ` <span class="muted">（${row.aliases.map((a) => esc(a)).join('、')}）</span>` : ''}</span>
-    <span style="display:flex;align-items:center;gap:8px"><span style="flex:1;height:5px;background:var(--line);border-radius:3px;overflow:hidden"><i style="display:block;height:100%;width:${(row.claimCount / maxListClaims) * 100}%;background:var(--accent)"></i></span></span>
-    <span style="text-align:right;font-variant-numeric:tabular-nums">${row.claimCount}</span>
+    <span style="display:flex;align-items:center;gap:8px"><span style="flex:1;height:3px;background:var(--line-soft);overflow:hidden"><i style="display:block;height:100%;width:${(row.claimCount / maxListClaims) * 100}%;background:rgba(163,59,43,.5)"></i></span></span>
+    <span class="mono" style="text-align:right;font-variant-numeric:tabular-nums">${row.claimCount}</span>
   </div>`).join('') || '<div class="muted">没有匹配的节点</div>';
   const maxBubbles = Math.min(200, rows.length);
   const hubs = rows.slice(0, maxBubbles);
@@ -979,14 +1054,14 @@ export function nodesPage(rows: readonly { name: string; file: string; nodeType:
     }
     if (ok) placed.push({ x, y, r, row, index });
   }
-  const COLORS: Record<string, string> = { concept: '#5eead4', topic: '#e3b341', person: '#8f9bb3' };
+  const COLORS: Record<string, string> = { concept: '#8a6a52', topic: '#a33b2b', person: '#5f6f58' };
   const bubbles = placed.map((bubble) => {
-    const color = COLORS[bubble.row.nodeType] ?? '#8b939e';
+    const color = COLORS[bubble.row.nodeType] ?? '#8a6a52';
     const fontSize = bubble.r >= 16 ? 11 : bubble.r >= 10 ? 9 : 8;
     const maxChars = Math.max(1, Math.floor((bubble.r * 1.5) / fontSize));
     const label = bubble.row.name.slice(0, maxChars);
     return `<a href="/nodes/${encodeURIComponent(bubble.row.file)}" class="node-bubble" data-index="${bubble.index}" style="${bubble.index >= visibleTop ? 'display:none' : ''}"><title>${esc(bubble.row.name)} · ${bubble.row.claimCount} claims</title>
-      <circle cx="${bubble.x.toFixed(1)}" cy="${bubble.y.toFixed(1)}" r="${bubble.r.toFixed(1)}" fill="${color}" fill-opacity="0.22" stroke="${color}" stroke-opacity="0.7"></circle>
+      <circle cx="${bubble.x.toFixed(1)}" cy="${bubble.y.toFixed(1)}" r="${bubble.r.toFixed(1)}" fill="${color}" fill-opacity="0.18" stroke="${color}" stroke-opacity="0.65"></circle>
       <text x="${bubble.x.toFixed(1)}" y="${(bubble.y + fontSize * 0.36).toFixed(1)}" text-anchor="middle" font-size="${fontSize}" fill="var(--ink)">${esc(label)}</text>
     </a>`;
   }).join('');
@@ -1013,31 +1088,37 @@ export function nodesPage(rows: readonly { name: string; file: string; nodeType:
     </script>`;
 
   return layout('知识节点', `${nav('/nodes')}
-  <h1>知识节点（${stats.total}）</h1>
-  <div class="muted">共 ${stats.totalClaims.toLocaleString()} 条 claims · 横轴为每个节点的 claims 数，纵轴为节点数量</div>
-  <div class="card" style="margin-top:12px">${chart}
-    <div class="row" style="gap:18px;margin-top:12px">${stats.byType.map((entry) => `<span class="muted">${esc(entry.type)}：${entry.count} 节点 · ${entry.claims} claims</span>`).join('')}</div>
+  ${pageHead(`知识节点`, `共 ${stats.total.toLocaleString()} 个节点 · ${stats.totalClaims.toLocaleString()} 条 claims。列表按 claims 数排序，每页 ${pageSize} 个；枢纽图是同一批节点的另一种看法。`)}
+  ${disclosure(`展开知识枢纽图（气泡图，当前 Top ${visibleTop} / ${hubs.length}）`, `<div class="card">${chart}<div class="row" style="gap:18px;margin-top:12px">${stats.byType.map((entry) => `<span class="muted">${esc(entry.type)}：${entry.count} 节点 · ${entry.claims} claims</span>`).join('')}</div></div>`)}
+  <div class="toolbar">${tabs}<span class="spacer"></span>
+    <form method="get" action="/nodes" class="row" style="gap:6px;align-items:center">
+      <input type="hidden" name="type" value="${esc(type)}"><input name="q" value="${esc(query)}" placeholder="搜索节点名">
+      <button class="btn" type="submit">筛选</button>
+    </form>
   </div>
-  <div class="row" style="gap:6px;margin:12px 0">${tabs}</div>
-  <form class="row" method="get" action="/nodes" style="gap:8px;margin-bottom:12px">
-    <input type="hidden" name="type" value="${esc(type)}"><input name="q" value="${esc(query)}" placeholder="搜索节点名">
-    <button class="btn" type="submit">筛选</button></form>
-  <h2>枢纽榜单（按 claims 数，前 ${Math.min(60, rows.length)} / ${rows.length}）</h2>
-  <div class="card" style="padding:6px 10px">${rowsHtml}</div>`);
+  <h2>节点清单（${rows.length.toLocaleString()} 个）</h2>
+  <div class="card" style="padding:6px 10px">${rowsHtml}</div>
+  ${pager('/nodes', current, pages, rows.length, pageSize, { type, q: query })}
+  `);
 }
 
-export function nodePage(node: { name: string; file: string; nodeType: string; aliases: readonly string[]; definition: string; claims: readonly { text: string; source: string }[]; related: readonly string[] }): string {
-  const claims = node.claims.map((claim) => `<li>${esc(claim.text)}<div class="muted">来源：<a href="/articles/${encodeURIComponent(claim.source)}">${esc(claim.source)}</a></div></li>`).join('') || '<li class="muted">暂无 claims</li>';
+export function nodePage(node: { name: string; file: string; nodeType: string; aliases: readonly string[]; definition: string; claims: readonly { text: string; source: string }[]; related: readonly string[] }, options: { readonly page?: number } = {}): string {
+  const pageSize = 15;
+  const pages = Math.max(1, Math.ceil(node.claims.length / pageSize));
+  const page = Math.min(pages, Math.max(1, Math.trunc(options.page ?? 1)));
+  const slice = node.claims.slice((page - 1) * pageSize, page * pageSize);
+  const claims = slice.map((claim) => `<li>${esc(claim.text)}<div class="muted">来源：<a href="/articles/${encodeURIComponent(claim.source)}">${esc(claim.source)}</a></div></li>`).join('') || '<li class="muted">暂无 claims</li>';
   const related = node.related.map((name) => `<span class="badge">${esc(name)}</span>`).join(' ') || '<span class="muted">无</span>';
+  const meta = `${esc(node.file)} · ${esc(node.nodeType)}${node.aliases.length > 0 ? ` · 别名：${node.aliases.map((a) => esc(a)).join('、')}` : ''}`;
   return layout(node.name, `${nav('/nodes')}
-  <div class="row" style="justify-content:space-between"><h1>${esc(node.name)}</h1><a class="btn" href="/nodes">← 节点</a></div>
-  <div class="muted">${esc(node.file)} · ${esc(node.nodeType)}${node.aliases.length > 0 ? ` · 别名：${node.aliases.map((a) => esc(a)).join('、')}` : ''}</div>
-  <h2>定义（${node.claims.length} 条 claims）</h2>
+  ${pageHead(node.name, meta, `<a class="btn" href="/qa?source=topic:${encodeURIComponent(node.name)}">问答链</a><a class="btn" href="/nodes">← 节点</a>`)}
+  <h2>定义</h2>
   <div class="card">${esc(node.definition) || '<span class="muted">无定义</span>'}</div>
-  <h2>观点</h2><div class="card"><ol>${claims}</ol></div>
+  <h2>观点（${node.claims.length} 条 claims）</h2>
+  <div class="card"><ol>${claims}</ol></div>
+  ${pager(`/nodes/${encodeURIComponent(node.file)}`, page, pages, node.claims.length, pageSize)}
   <h2>相关概念</h2><div class="card">${related}</div>`);
 }
-
 
 export function composePage(data: { articles: readonly { id: string; title: string; theme: string; nodeIds: readonly string[]; status: string; outline: string | null; updatedAt: string }[]; nodes: readonly { name: string; claimCount: number }[] }): string {
   const list = data.articles.map((article) => `<tr><td><a href="/compose/${encodeURIComponent(article.id)}">${esc(article.title)}</a></td><td>${esc(article.theme || '—')}</td><td>${article.nodeIds.length}</td><td>${esc(article.status)}</td><td class="muted">${article.outline ? '有大纲' : '未生成'}</td><td class="muted">${esc(formatDate(article.updatedAt))}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">还没有文章，先创建一篇</td></tr>';
@@ -1431,13 +1512,13 @@ export function deAiPage(data: DeAiPageData): string {
   ] as const).map(([value, label]) => `<option value="${value}"${data.style === value ? ' selected' : ''}>${label}</option>`).join('');
 
   const errorCard = data.error
-    ? `<div class="card" style="border-color:rgba(239,95,107,.5)"><b style="color:#f0a6ac">处理失败：</b>${esc(data.error)}</div>`
+    ? `<div class="card" style="border-color:var(--bad)"><b style="color:var(--bad)">处理失败：</b>${esc(data.error)}</div>`
     : '';
 
   const before = data.before ? aiFlavorReportCard(data.before, 'AI 味体检') : '';
   const after = data.after && data.rewritten
     ? `<h2>改写后</h2>${data.after ? aiFlavorReportCard(data.after, '改写后体检') : ''}
-       <div class="card" style="border-color:rgba(63,185,80,.35)">
+       <div class="card" style="border-color:var(--ok)">
          <div class="row" style="justify-content:space-between;align-items:center;margin-bottom:8px">
            <b>改写结果</b>
            <span class="muted">模型：${esc(data.model ?? '—')} · 成本：${data.cost === null ? '—' : `$${data.cost.toFixed(4)}`}</span>
@@ -1499,18 +1580,23 @@ function qualityRows(checks: readonly { readonly label: string; readonly status:
 }
 
 function healthList(items: readonly string[]): string {
-  return items.length === 0
-    ? '<span class="muted">无</span>'
-    : items.slice(0, 60).map((item) => `<span class="badge" style="margin:0 6px 6px 0">${esc(item)}</span>`).join('');
+  if (items.length === 0) return '<span class="muted">无</span>';
+  const visible = items.slice(0, 12).map((item) => `<span class="badge" style="margin:0 6px 6px 0">${esc(item)}</span>`).join('');
+  const rest = items.slice(12);
+  if (rest.length === 0) return visible;
+  return `${visible}${disclosure(`查看其余 ${rest.length} 个`, rest.map((item) => `<span class="badge" style="margin:0 6px 6px 0">${esc(item)}</span>`).join(''))}`;
 }
 
 /** 知识库体检页（只读）：统计 + 问题列表 + 处理建议。 */
 export function healthPage(data: KnowledgeHealthReport): string {
   const stat = (value: string, label: string): string => `<div class="stat"><b>${value}</b><span>${label}</span></div>`;
-  const issueTable = (rows: readonly string[], headers: readonly string[], empty: string): string =>
-    rows.length === 0
-      ? `<div class="card muted">${esc(empty)}</div>`
-      : `<div class="card" style="padding:4px 0"><table><tr>${headers.map((header) => `<th>${esc(header)}</th>`).join('')}</tr>${rows.join('')}</table></div>`;
+  const issueTable = (rows: readonly string[], headers: readonly string[], empty: string): string => {
+    if (rows.length === 0) return `<div class="empty">${esc(empty)}</div>`;
+    const table = (subset: readonly string[]): string =>
+      `<table><tr>${headers.map((header) => `<th>${esc(header)}</th>`).join('')}</tr>${subset.join('')}</table>`;
+    const rest = rows.slice(5);
+    return `<div class="card" style="padding:4px 0">${table(rows.slice(0, 5))}</div>${rest.length === 0 ? '' : disclosure(`展开其余 ${rest.length} 条`, table(rest))}`;
+  };
   const limitHint = (count: number): string =>
     count > KNOWLEDGE_HEALTH_ISSUE_LIMIT ? `<div class="muted">仅显示前 ${KNOWLEDGE_HEALTH_ISSUE_LIMIT} 条（共 ${count} 条）。</div>` : '';
 
@@ -1522,9 +1608,7 @@ export function healthPage(data: KnowledgeHealthReport): string {
   const staleRows = data.issues.staleNodes.map((item) => `<tr><td>${esc(item.node)}</td><td class="muted">${esc(formatDate(item.updatedAt))}</td></tr>`);
 
   return layout('知识库体检', `${nav('/kb-health')}
-  <div class="row" style="justify-content:space-between"><h1>知识库体检</h1><a class="btn" href="/nodes">去节点页 →</a></div>
-  <div class="muted" style="max-width:900px">只读检查，不会修改知识库。参考 llm-wiki 的 lint、SciCrucible 的健康检查与我们的数据模型（claims / 节点 / raw 来源 / 文章）。
-  生成时间：${esc(formatDateTime(data.generatedAt, { seconds: true }))}。</div>
+  ${pageHead('知识库体检', `只读检查，不会修改知识库；参考 llm-wiki 的 lint、SciCrucible 的健康检查与我们的数据模型（claims / 节点 / raw 来源 / 文章）。生成于 ${esc(formatDateTime(data.generatedAt, { seconds: true }))}。`, '<a class="btn" href="/nodes">去节点页 →</a>')}
 
   <div class="row" style="margin:18px 0">
     ${stat(data.nodes.toLocaleString(), '知识节点')}
@@ -1580,11 +1664,15 @@ export function healthPage(data: KnowledgeHealthReport): string {
 }
 
 /** 主题地图（MOC）页：把 node_type=topic 的主题节点汇总成可导航索引。 */
-export function topicsPage(data: TopicMapV1): string {
+export function topicsPage(data: TopicMapV1, options: { readonly page?: number } = {}): string {
   const truncate = (text: string, max: number): string => (text.length > max ? `${text.slice(0, max)}…` : text);
   const nodeHref = (file: string): string => `/nodes/${encodeURIComponent(file)}`;
 
-  const topicRows = data.topics.map((row) => {
+  const pageSize = 15;
+  const pages = Math.max(1, Math.ceil(data.topics.length / pageSize));
+  const page = Math.min(pages, Math.max(1, Math.trunc(options.page ?? 1)));
+  const pageRows = data.topics.slice((page - 1) * pageSize, page * pageSize);
+  const topicRows = pageRows.map((row) => {
     const articleLinks = row.articles.length === 0
       ? '<span class="muted">—</span>'
       : row.articles.map((article) => `<a class="badge b-blue" href="/compose/${esc(article.id)}">${esc(truncate(article.title, 18))}</a>`).join(' ');
@@ -1617,9 +1705,7 @@ export function topicsPage(data: TopicMapV1): string {
       : rows.slice(0, max).map((row) => `<span class="badge" style="margin:0 6px 6px 0">${esc(row.name)}${row.claims > 0 ? ` · ${row.claims}` : ''}</span>`).join('') + (rows.length > max ? `<span class="muted">…等 ${rows.length} 个</span>` : '');
 
   return layout('主题地图', `${nav('/topics')}
-  <div class="row" style="justify-content:space-between"><h1>主题地图</h1><a class="btn" href="/kb-health">看知识体检 →</a></div>
-  <div class="muted" style="max-width:900px">MOC（Map of Content）：把 vault 中 <code>node_type: topic</code> 的主题节点汇总成索引。每个主题页负责"入口 + 边界 + 判断 + 相关概念/人物"，
-  这里只做导航与缺口统计，不修改知识库。生成时间：${esc(formatDateTime(data.generatedAt, { seconds: true }))}。</div>
+  ${pageHead('主题地图', `MOC（Map of Content）：把 vault 中 node_type: topic 的主题节点汇总成索引；每个主题页负责“入口 + 边界 + 判断 + 相关概念/人物”。只做导航与缺口统计，不修改知识库。生成于 ${esc(formatDateTime(data.generatedAt, { seconds: true }))}。`, '<a class="btn" href="/kb-health">看知识体检 →</a>')}
 
   <form method="get" action="/topics" class="row" style="margin:14px 0;gap:8px">
     <input type="text" name="q" value="${esc(data.q)}" placeholder="筛选主题：名称 / 定义 / 相关概念" style="max-width:360px">
@@ -1638,10 +1724,11 @@ export function topicsPage(data: TopicMapV1): string {
   </div>
 
   <h2>主题清单</h2>
-  <div class="card" style="padding:4px 0"><table>
+  <div class="card table-wrap"><table>
     <tr><th>主题</th><th>一句话定义</th><th>claims</th><th>概念</th><th>人物</th><th>入链</th><th>文章</th><th>更新</th></tr>
     ${topicRows || '<tr><td colspan="8" class="muted">没有匹配的主题</td></tr>'}
   </table></div>
+  ${pager('/topics', page, pages, data.topics.length, pageSize, data.q === '' ? {} : { q: data.q })}
 
   <h2>文章覆盖</h2>
   <div class="muted">文章通过 nodeIds 挂到主题节点；「未挂主题」的文章说明它还没有进入任何 MOC 入口。</div>
@@ -1655,17 +1742,17 @@ export function topicsPage(data: TopicMapV1): string {
     <div class="card" style="flex:1;min-width:280px">
       <b>有料但未成文（${data.totals.withoutArticles}）</b>
       <div class="muted" style="margin:6px 0">claims 已积累、但还没有文章引用；通常是最值得先写的主题。括号内为 claims 数。</div>
-      ${chipList(unwritten, 24)}
+      ${chipList(unwritten, 16)}
     </div>
     <div class="card" style="flex:1;min-width:280px">
       <b>无 claims 主题（${data.totals.withoutClaims}）</b>
       <div class="muted" style="margin:6px 0">只有入口、没有判断；可能是占位或需要补内容。</div>
-      ${chipList(emptyTopics, 24)}
+      ${chipList(emptyTopics, 16)}
     </div>
     <div class="card" style="flex:1;min-width:280px">
       <b>无来源主题（${sourceless.length}）</b>
       <div class="muted" style="margin:6px 0">「来源」小节为空；主题页里的判断将缺少可回溯证据。</div>
-      ${chipList(sourceless, 24)}
+      ${chipList(sourceless, 16)}
     </div>
   </div>
 
@@ -1704,7 +1791,7 @@ export function qaPage(data: QaPageData): string {
     .join('');
 
   const errorCard = data.error
-    ? `<div class="card" style="border-color:rgba(239,95,107,.5)"><b style="color:#f0a6ac">生成失败：</b>${esc(data.error)}</div>`
+    ? `<div class="card" style="border-color:var(--bad)"><b style="color:var(--bad)">生成失败：</b>${esc(data.error)}</div>`
     : '';
   const resultCard = data.result
     ? `<h2>问答链 ·《${esc(data.result.sourceTitle)}》</h2>
@@ -1732,4 +1819,48 @@ export function qaPage(data: QaPageData): string {
     </form>
   </div>
   ${resultCard}`);
+}
+
+/** 统一页头：标题 + 说明 + 右侧操作。 */
+function pageHead(title: string, subtitle: string, actions = ''): string {
+  return `<div class="page-head"><div><h1>${esc(title)}</h1>${subtitle === '' ? '' : `<div class="page-sub">${subtitle}</div>`}</div>${actions === '' ? '' : `<div class="row" style="gap:8px;align-items:center">${actions}</div>`}</div>`;
+}
+
+/** 统一分页条：保留筛选参数，只改 page；页数窗口为当前 ±2。 */
+function pager(
+  path: string,
+  page: number,
+  pages: number,
+  total: number,
+  pageSize: number,
+  params: Readonly<Record<string, string | number>> = {},
+): string {
+  const safePage = Number.isFinite(page) ? Math.max(1, Math.trunc(page)) : 1;
+  const safePages = Math.max(1, Math.trunc(pages));
+  const href = (target: number): string => {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (String(value) !== '') query.set(key, String(value));
+    }
+    query.set('page', String(target));
+    return `${path}?${query.toString()}`;
+  };
+  const from = total === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const to = Math.min(total, safePage * pageSize);
+  const windowStart = Math.max(1, safePage - 2);
+  const windowEnd = Math.min(safePages, safePage + 2);
+  const numbers: string[] = [];
+  for (let index = windowStart; index <= windowEnd; index += 1) {
+    numbers.push(index === safePage
+      ? `<span class="current" aria-current="page">${index}</span>`
+      : `<a href="${esc(href(index))}">${index}</a>`);
+  }
+  const prev = safePage > 1 ? `<a class="btn" href="${esc(href(safePage - 1))}">← 上一页</a>` : '<span class="btn" aria-disabled="true">← 上一页</span>';
+  const next = safePage < safePages ? `<a class="btn" href="${esc(href(safePage + 1))}">下一页 →</a>` : '<span class="btn" aria-disabled="true">下一页 →</span>';
+  return `<div class="pager">${prev}<div class="pager-pages">${numbers.join('')}</div>${next}<span class="pager-meta">第 ${from}–${to} 条 / 共 ${total.toLocaleString()} 条 · 第 ${safePage}/${safePages} 页</span></div>`;
+}
+
+/** 折叠块：用于次要列表，避免页面一次铺开。 */
+function disclosure(summary: string, body: string): string {
+  return `<details class="disclosure"><summary>${esc(summary)}</summary><div class="disclosure-body">${body}</div></details>`;
 }
