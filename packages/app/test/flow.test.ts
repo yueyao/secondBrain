@@ -134,6 +134,22 @@ describe('应用层：完整流程', () => {
     expect(after).toContain('（来源：[[raw/knowledge/cubox/mock-2026-10-01 反脆弱的第二条证据.md]]）');
   });
 
+  it('patch 目标用别名也能解析到同一节点文件', async () => {
+    const ctx = ctxOf(harness);
+    await ingestAndTriage(ctx);
+    const { draftId } = await draftDigest(ctx, await findRaw(harness, '反脆弱的第二条证据'));
+    // 把 patch 目标的 name 换成该节点的别名，模拟模型输出别名的情况
+    const draft = await ctx.store.transaction(async (tx) => tx.drafts.get(draftId));
+    if (!draft) throw new Error('draft missing');
+    const nodes = draft.proposal.nodes.map((node) => (node.action === 'patch' ? { ...node, name: 'antifragile' } : node));
+    await ctx.store.transaction(async (tx) => tx.drafts.updateReview(draftId, { ...draft.proposal, nodes }, draft.findings, draft.targetHashes));
+
+    const result = await decideReview(ctx, draftId, 'accept', { actor: 'owner' });
+    expect(result.ok).toBe(true);
+    const content = await harness.vault.readNode('wiki/concepts/反脆弱.md');
+    expect(content).toContain('（来源：[[raw/knowledge/cubox/mock-2026-10-01 反脆弱的第二条证据.md]]）');
+  });
+
   it('全新概念走 new 分支并生成节点文件', async () => {
     const ctx = ctxOf(harness);
     await ingestAndTriage(ctx);

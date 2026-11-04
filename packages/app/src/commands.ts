@@ -5,6 +5,7 @@ import {
   evaluateAll,
   fitTierForClaims,
   firstHeading,
+  normalizeText,
   parseFrontmatter,
   parseRawPath,
   transition,
@@ -188,7 +189,7 @@ export async function draftDigest(ctx: AppContext, rawPath: RawPath): Promise<Dr
   const targetHashes: Record<string, string> = {};
   for (const node of effectiveProposal.nodes) {
     if (node.action !== 'patch') continue;
-    const doc = existingNodes.find((entry) => entry.name === node.name);
+    const doc = findDocByNameOrAlias(existingNodes, node.name);
     if (!doc) continue;
     targetHashes[doc.file] = ctx.hash.sha256(await ctx.vault.readNode(doc.file));
   }
@@ -533,8 +534,13 @@ function claimsForNode(node: { readonly claimIndexes: readonly number[] }, claim
   return picked.length > 0 ? picked : claims;
 }
 
+function findDocByNameOrAlias(docs: readonly { name: string; aliases: readonly string[]; file: string }[], name: string) {
+  const normalized = normalizeText(name);
+  return docs.find((entry) => normalizeText(entry.name) === normalized || entry.aliases.some((alias) => normalizeText(alias) === normalized)) ?? null;
+}
+
 function targetFile(ctx: AppContext, name: string): string {
-  const doc = ctx.search.allDocs().find((entry) => entry.name === name);
+  const doc = findDocByNameOrAlias(ctx.search.allDocs(), name);
   if (!doc) throw new AppError('UNKNOWN_NODE', `并入目标不存在：${name}`);
   return doc.file;
 }
