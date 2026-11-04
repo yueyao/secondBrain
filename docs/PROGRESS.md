@@ -1833,3 +1833,33 @@ pnpm run check
 ```
 
 部署后核验：`/operations`、`/compose`、`/compose/<id>`、`/about`、`/review` 页面均无 `T` 时间，时间显示为北京时间。
+
+
+---
+
+## 六十一、展示时间补充：worker 日志里的 ISO 时间（2026-11-04）
+
+### 61.1 问题
+
+页面主体时间已去 T，但运维页「worker 日志（最近 12 行）」直接展示 JSON 日志原文，行内 `"at":"2026-11-03T23:49:xxZ"` 仍带 T 且是 UTC。
+
+### 61.2 修正
+
+- 新增 `formatLogLine`：先 HTML 转义，再把行内所有 ISO 时间（`YYYY-MM-DDTHH:mm:ss[.sss]Z?`）替换成北京时间 `YYYY-MM-DD HH:mm:ss`，其余日志内容原样保留；
+- worker 日志区改用该格式化函数；JSON 日志的其它字段不受影响。
+
+### 61.3 决策
+
+| 编号 | 决策 | 理由 |
+|---|---|---|
+| D77 | 展示时间的格式化覆盖"日志文本内部的 ISO 时间"，统一走同一个 formatter | 日志是排障时最常看的时间来源；不统一处理会再次出现"页面别处没 T、日志里有 T"的割裂 |
+
+### 61.4 验证
+
+```
+pnpm run check
+ Test Files  36 passed (36)
+      Tests  331 passed (331)
+```
+
+部署后核验：`/operations` 页面中 `YYYY-MM-DDTHH:mm` 出现次数为 0（含 worker 日志区）。

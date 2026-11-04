@@ -11,6 +11,14 @@ const esc = (value: unknown): string =>
 
 const LEVEL: Record<string, string> = { block: '阻断', warn: '注意', ok: '通过' };
 
+/** 日志行里的 ISO 时间（worker JSON 日志的 at 字段）在展示时转成本地时间，保留其余内容。 */
+function formatLogLine(line: string): string {
+  return esc(line).replace(
+    /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z?/gu,
+    (match) => esc(formatDateTime(match, { seconds: true })),
+  );
+}
+
 const CSS = `
 :root{--bg:#0a0b0d;--panel:#101216;--paper:#15181d;--ink:#e8eaed;--dim:#8b939e;--line:#23272e;--accent:#5eead4;--warn:#e3b341;--bad:#ef5f6b;--ok:#3fb950}
 *{box-sizing:border-box}
@@ -821,7 +829,7 @@ export function adminPage(data: AdminPageData): string {
   </div>
 
   <h2>worker 日志（最近 12 行）</h2>
-  <div class="card"><pre>${data.logs.length === 0 ? '（无法读取日志，可能权限不足）' : data.logs.map((line) => esc(line)).join('\n')}</pre></div>
+  <div class="card"><pre>${data.logs.length === 0 ? '（无法读取日志，可能权限不足）' : data.logs.map((line) => formatLogLine(line)).join('\n')}</pre></div>
 
   <h2>快捷操作</h2>
   <div class="card"><div class="row">
