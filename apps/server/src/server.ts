@@ -51,7 +51,7 @@ import {
   adminSummary,
   overview,
   pendingReviewList,
-  wikiClaims,
+  wikiClaimsFromIndex,
   listWikiNodes,
   wikiNodeDetail,
   nodeStats,
@@ -279,7 +279,7 @@ export function createServer(runtime: Runtime): http.Server {
       }
       if (req.method === 'GET' && path === '/claims') {
         const urlClaims = new URL(req.url ?? '/', 'http://localhost');
-        return sendHtml(res, claimsPage(await wikiClaims(runtime.ctx), {
+        return sendHtml(res, claimsPage(wikiClaimsFromIndex(runtime.ctx), {
           page: Number(urlClaims.searchParams.get('page') ?? '1'),
           q: urlClaims.searchParams.get('q') ?? '',
         }));

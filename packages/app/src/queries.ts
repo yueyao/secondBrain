@@ -558,23 +558,29 @@ export async function committedClaims(ctx: AppContext, limit = 500): Promise<rea
 
 
 /** 从 wiki 节点 Markdown 反向解析 claims（已入库知识）。 */
-export async function wikiClaims(ctx: AppContext, limit = 2000): Promise<readonly ClaimRowV1[]> {
-  const files = await ctx.vault.listNodes();
+/**
+ * 从内存搜索索引读取全量 claims（不在页面层设 2000 条扫描上限）。
+ * 搜索索引已持有所有 wiki 节点正文，避免逐文件读盘；分页/筛选由读模型完成。
+ */
+export function wikiClaimsFromIndex(ctx: AppContext): readonly ClaimRowV1[] {
   const rows: ClaimRowV1[] = [];
-  for (const file of files) {
-    let content: string;
-    try {
-      content = await ctx.vault.readNode(file);
-    } catch {
-      continue;
-    }
-    for (const line of content.split('\n')) {
+  for (const doc of ctx.search.allDocs()) {
+    for (const line of doc.body.split('\n')) {
       if (!line.startsWith('- ')) continue;
       const match = line.match(/^- (.+?)（来源：\[\[(raw\/[^\]]+)\]\]/);
       if (!match) continue;
-      rows.push({ draftId: file, text: match[1] as string, inference: line.includes('（推断）'), source: match[2] as string });
-      if (rows.length >= limit) return rows;
+      rows.push({ draftId: doc.file, text: match[1] as string, inference: line.includes('（推断）'), source: match[2] as string });
     }
+  }
+  return rows;
+}
+
+/** @deprecated 保留旧接口给外部调用；新代码用 wikiClaimsFromIndex（全量、无读盘）。 */
+export async function wikiClaims(ctx: AppContext, limit = 2000): Promise<readonly ClaimRowV1[]> {
+  const rows: ClaimRowV1[] = [];
+  for (const row of wikiClaimsFromIndex(ctx)) {
+    rows.push(row);
+    if (rows.length >= limit) return rows;
   }
   return rows;
 }

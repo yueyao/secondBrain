@@ -493,6 +493,8 @@ describe('长列表收敛（分页/折叠）', () => {
     expect(html).toContain('pager');
     expect(html).toContain('条 / 共');
     expect(html).toContain('筛选判断句');
+    expect(html).toContain('全量');
+    expect(html).not.toContain('扫描上限');
   });
 
   it('/nodes 枢纽图折叠、节点清单有分页', async () => {

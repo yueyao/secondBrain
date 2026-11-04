@@ -160,6 +160,7 @@ code{font:12.5px/1.4 var(--mono);color:var(--accent-deep)}
 .pager .pager-pages{display:flex;gap:4px;flex-wrap:wrap}
 .pager .pager-pages a,.pager .pager-pages span{display:inline-grid;place-items:center;min-width:26px;height:26px;padding:0 5px;border:1px solid var(--line);font:12px var(--mono);color:var(--dim);border-bottom-width:1px}
 .pager .pager-pages .current{border-color:var(--ink);color:var(--ink)}
+.pager .pager-pages .pager-gap{border:0;min-width:auto;color:var(--dim);padding:0 2px}
 
 /* 页头和筛选条 */
 .page-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;border-bottom:2px solid var(--ink);padding-bottom:10px;margin-bottom:14px}
@@ -986,7 +987,7 @@ export function claimsPage(
     <div class="muted">来源：${esc(row.source)} · 草稿 ${esc(row.draftId)}</div></li>`).join('')
     || '<li class="muted">没有匹配的 claims</li>';
   return layout('claims', `${nav('/claims')}
-  ${pageHead('已入库 claims', `来自已通过审核并入库的草稿；每个 claim 都带来源原文与所属草稿。当前筛选 ${filtered.length.toLocaleString()} 条（扫描上限内共 ${rows.length.toLocaleString()} 条）。`)}
+  ${pageHead('已入库 claims', `来自已通过审核并入库的草稿；每个 claim 都带来源原文与所属草稿。当前筛选 ${filtered.length.toLocaleString()} 条（全量 ${rows.length.toLocaleString()} 条，来自搜索索引；用筛选缩小范围）。`)}
   <form class="toolbar" method="get" action="/claims">
     <input type="text" name="q" value="${esc(q)}" placeholder="筛选判断句 / 来源 / 草稿" style="min-width:320px">
     <button class="btn" type="submit">筛选</button>
@@ -1850,10 +1851,17 @@ function pager(
   const windowStart = Math.max(1, safePage - 2);
   const windowEnd = Math.min(safePages, safePage + 2);
   const numbers: string[] = [];
-  for (let index = windowStart; index <= windowEnd; index += 1) {
-    numbers.push(index === safePage
-      ? `<span class="current" aria-current="page">${index}</span>`
-      : `<a href="${esc(href(index))}">${index}</a>`);
+  const pageLink = (index: number): string => index === safePage
+    ? `<span class="current" aria-current="page">${index}</span>`
+    : `<a href="${esc(href(index))}">${index}</a>`;
+  if (windowStart > 1) {
+    numbers.push(pageLink(1));
+    if (windowStart > 2) numbers.push('<span class="pager-gap">…</span>');
+  }
+  for (let index = windowStart; index <= windowEnd; index += 1) numbers.push(pageLink(index));
+  if (windowEnd < safePages) {
+    if (windowEnd < safePages - 1) numbers.push('<span class="pager-gap">…</span>');
+    numbers.push(pageLink(safePages));
   }
   const prev = safePage > 1 ? `<a class="btn" href="${esc(href(safePage - 1))}">← 上一页</a>` : '<span class="btn" aria-disabled="true">← 上一页</span>';
   const next = safePage < safePages ? `<a class="btn" href="${esc(href(safePage + 1))}">下一页 →</a>` : '<span class="btn" aria-disabled="true">下一页 →</span>';
