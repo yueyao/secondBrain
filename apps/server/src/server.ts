@@ -73,12 +73,14 @@ import {
   evaluateWritingContract,
   auditArticleCitations,
   topicMap,
+  qaTopic,
+  qaArticle,
 } from '@sb/app';
 import type { DeAiStyle } from '@sb/contracts';
 import { analyzeAiFlavor, parseDraftId, parseRawPath, type DraftId, type RawPath } from '@sb/domain';
 import type { Runtime } from './runtime';
 import { collectRepoStatus, isValidRemoteUrl, pullRepo, pushRepo, readRepoOverrides, repoDescriptors, setRepoRemote, writeRepoOverrides } from './repos';
-import { aboutPage, adminPage, deAiPage, healthPage, topicsPage, articlePage, articlesPage, claimsPage, composeArticlePage, composeDiffPage, composePage, dashboard, errorPage, guidePage, nodePage, nodesPage, reviewListPage, reviewPage, searchPage, usagePage } from './views';
+import { aboutPage, adminPage, deAiPage, healthPage, qaPage, topicsPage, articlePage, articlesPage, claimsPage, composeArticlePage, composeDiffPage, composePage, dashboard, errorPage, guidePage, nodePage, nodesPage, reviewListPage, reviewPage, searchPage, usagePage } from './views';
 
 function redirect(res: http.ServerResponse, location: string): void {
   res.writeHead(303, { location });
@@ -364,6 +366,55 @@ export function createServer(runtime: Runtime): http.Server {
         const urlTopics = new URL(req.url ?? '/', 'http://localhost');
         const q = urlTopics.searchParams.get('q') ?? '';
         return sendHtml(res, topicsPage(await topicMap(runtime.ctx, { q })));
+      }
+      if (req.method === 'GET' && path === '/qa') {
+        const urlQa = new URL(req.url ?? '/', 'http://localhost');
+        const map = await topicMap(runtime.ctx);
+        const countRaw = Number(urlQa.searchParams.get('count') ?? '6');
+        return sendHtml(res, qaPage({
+          topics: map.topics.map((topic) => ({ name: topic.name, claims: topic.claims })),
+          articles: map.articles.map((article) => ({ id: article.id, title: article.title })),
+          result: null,
+          error: null,
+          selected: urlQa.searchParams.get('source') ?? '',
+          focus: urlQa.searchParams.get('focus') ?? '',
+          count: Number.isFinite(countRaw) ? Math.min(10, Math.max(3, Math.trunc(countRaw))) : 6,
+        }));
+      }
+      if (req.method === 'POST' && path === '/actions/qa') {
+        const form = await readForm(req);
+        const source = form.source ?? '';
+        const countRaw = Number(form.count ?? '6');
+        const count = Number.isFinite(countRaw) ? countRaw : 6;
+        const focus = form.focus ?? '';
+        try {
+          const result = source.startsWith('topic:')
+            ? await qaTopic(runtime.ctx, runtime.qa, source.slice('topic:'.length), { count, focus })
+            : source.startsWith('article:')
+              ? await qaArticle(runtime.ctx, runtime.qa, source.slice('article:'.length), { count, focus })
+              : await Promise.reject(new Error('请选择主题或文章'));
+          const map = await topicMap(runtime.ctx);
+          return sendHtml(res, qaPage({
+            topics: map.topics.map((topic) => ({ name: topic.name, claims: topic.claims })),
+            articles: map.articles.map((article) => ({ id: article.id, title: article.title })),
+            result,
+            error: null,
+            selected: source,
+            focus,
+            count: Math.min(10, Math.max(3, Math.trunc(count))),
+          }));
+        } catch (error) {
+          const map = await topicMap(runtime.ctx);
+          return sendHtml(res, qaPage({
+            topics: map.topics.map((topic) => ({ name: topic.name, claims: topic.claims })),
+            articles: map.articles.map((article) => ({ id: article.id, title: article.title })),
+            result: null,
+            error: error instanceof Error ? error.message : String(error),
+            selected: source,
+            focus,
+            count: 6,
+          }));
+        }
       }
       if (req.method === 'GET' && path === '/kb-health') {
         return sendHtml(res, healthPage(await knowledgeHealth(runtime.ctx)));

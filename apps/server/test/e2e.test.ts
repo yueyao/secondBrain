@@ -201,6 +201,15 @@ describe('主编台 Compose（AI 大纲 + 正文版本链）', () => {
     const article = await runtime.ctx.store.transaction(async (tx) => tx.articles.get(id));
     expect(article?.status).toBe('review');
     expect(article?.currentVersionId).toBe(`${id}-v1`);
+
+    // 问答链：mock 下直接基于正文生成 Q-A 链
+    const qa = await post('/actions/qa', { source: `article:${id}`, count: '4', focus: '' });
+    expect(qa.status).toBe(200);
+    const qaHtml = await qa.text();
+    expect(qaHtml).toContain('问答链 ·《');
+    expect(qaHtml).toContain('Q1.');
+    expect(qaHtml).toContain('边界');
+    expect(qaHtml).toContain('结论');
   });
 
   it('再次生成正文生成 v2（版本只增不改）', async () => {
@@ -416,7 +425,7 @@ describe('导航信息架构（一级分组 + 二级菜单）', () => {
     for (const label of ['工作台', '内容', '知识', '写作', '运维', '帮助']) {
       expect(home).toContain(label);
     }
-    for (const href of ['/articles', '/review', '/exceptions', '/nodes', '/topics', '/claims', '/kb-health', '/search', '/compose', '/deai', '/operations', '/usage', '/guide', '/about']) {
+    for (const href of ['/articles', '/review', '/exceptions', '/nodes', '/topics', '/claims', '/kb-health', '/search', '/compose', '/deai', '/qa', '/operations', '/usage', '/guide', '/about']) {
       expect(home).toContain(`href="${href}"`);
     }
     // 首页：工作台 active；主编台：写作分组 active
@@ -459,6 +468,18 @@ describe('主题地图页（只读）', () => {
     const html = await response.text();
     expect(response.status).toBe(200);
     for (const keyword of ['主题地图', '主题清单', '文章覆盖', '缺口提示', '有料但未成文', '无 claims 主题', '无来源主题', '筛选']) {
+      expect(html).toContain(keyword);
+    }
+  });
+});
+
+
+describe('问答链页（只读工具）', () => {
+  it('GET /qa 可打开并给出来源选择与生成表单', async () => {
+    const response = await fetch(`${base}/qa`);
+    const html = await response.text();
+    expect(response.status).toBe(200);
+    for (const keyword of ['问答链', '生成问答链', '聚焦', '选题与审稿工具', '不写入文章版本']) {
       expect(html).toContain(keyword);
     }
   });

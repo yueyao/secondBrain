@@ -83,6 +83,14 @@ export const policies = {
     maxOutputTokens: 8_000,
     expectedClaims: 10,
   },
+  qa: {
+    task: 'qa' as AgentTask,
+    requires: { contextTokens: 60_000, structuredOutput: false, toolCalls: false },
+    profileOrder: ['strong', 'mid'],
+    maxInputTokens: 250_000,
+    maxOutputTokens: 8_000,
+    expectedClaims: 10,
+  },
 } satisfies Record<AgentTask, TaskPolicy>;
 
 const RAW = (() => {

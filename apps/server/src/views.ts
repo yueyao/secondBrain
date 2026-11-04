@@ -8,6 +8,7 @@ import {
   KNOWLEDGE_HEALTH_ISSUE_LIMIT,
   type CitationAuditReport,
   type KnowledgeHealthReport,
+  type QaChainV1,
   type QualityStatus,
   type TopicMapV1,
   type TopicRowV1,
@@ -457,6 +458,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
     children: [
       { href: '/compose', label: '主编台' },
       { href: '/deai', label: '去 AI 味' },
+      { href: '/qa', label: '问答链' },
     ],
   },
   {
@@ -1186,7 +1188,7 @@ export function composeArticlePage(data: {
     : '<div class="card muted">生成正文后，这里会显示「写作契约」与「审引清单」检查结果。</div>';
 
   return layout('主编台 · 文章', `${nav('/compose')}
-  <div class="row" style="justify-content:space-between;align-items:center"><h1>${esc(data.title)}</h1><div class="row" style="gap:8px;align-items:center"><a class="btn" href="/compose">← 主编台</a>${actions}</div></div>
+  <div class="row" style="justify-content:space-between;align-items:center"><h1>${esc(data.title)}</h1><div class="row" style="gap:8px;align-items:center"><a class="btn" href="/qa?source=article:${encodeURIComponent(data.id)}">问答链</a><a class="btn" href="/compose">← 主编台</a>${actions}</div></div>
   <div class="muted">${esc(data.theme || '未设主题')} · <span class="badge${data.status === 'final' ? ' b-ok' : ''}">${esc(statusLabel)}</span> · 更新 ${esc(formatDateTime(data.updatedAt))}</div>
 
   <h2>大纲</h2>
@@ -1277,6 +1279,7 @@ export function aboutPage(data: AboutPageData): string {
     { title: '素材库', href: '/articles', group: '内容', body: '全部原文（含 4k+ 条 legacy）：6 个分组、来源/时间/triage 筛选、排序、分页；详情含 triage 理由、草稿 claims、来源与事件时间线。' },
     { title: '审核中心', href: '/review', group: '内容', body: 'AI 草稿在这里过人审：逐篇预览 claims/节点/finding，键盘 j/k/a/r 操作，支持勾选批量通过（服务端逐篇校验、二次确认、结果回显）。' },
     { title: '主编台', href: '/compose', group: '写作', body: '把知识节点写成文章：选节点 → AI 大纲 → 大纲可编辑 → 生成正文 → 改稿指令生成 vN+1 → 行级 diff → 恢复旧版 → 定稿 → 导出 Markdown。版本只增不改。' },
+    { title: '问答链', href: '/qa', group: '写作', body: '把主题 claims 或文章正文抽成 Q-A 链（Q 切要害；A 四段：结论/形式化/论证步/边界），用于选题与审稿，不写文章版本。' },
     { title: '去 AI 味', href: '/deai', group: '写作', body: '独立能力：先用规则做 AI 味体检（框架词/黑话/对仗/宏大叙事/句长均匀/标点痕迹，加权评分），再由模型按命中清单改写；保留事实、数字与引用，主编台正文可一键生成新版本。' },
     { title: '知识节点', href: '/nodes', group: '知识', body: '已入库知识的结构化视图：Top N 枢纽气泡图（面积 ∝ claims 数）、类型筛选、搜索；节点详情含定义、claims、来源原文与相关概念。' },
     { title: '主题地图', href: '/topics', group: '知识', body: '把 118 个 topic 节点（一句话定义、收录边界、核心判断、相关概念/人物、来源）汇总成 MOC 索引：主题 claims 数、入链、文章覆盖、有料未成文与无 claims 缺口。' },
@@ -1586,7 +1589,7 @@ export function topicsPage(data: TopicMapV1): string {
       ? '<span class="muted">—</span>'
       : row.articles.map((article) => `<a class="badge b-blue" href="/compose/${esc(article.id)}">${esc(truncate(article.title, 18))}</a>`).join(' ');
     return `<tr>
-      <td><a href="${nodeHref(row.file)}"><b>${esc(row.name)}</b></a></td>
+      <td><a href="${nodeHref(row.file)}"><b>${esc(row.name)}</b></a> <a class="muted" href="/qa?source=topic:${encodeURIComponent(row.name)}" title="生成问答链">问答</a></td>
       <td class="muted" style="max-width:420px">${esc(truncate(row.definition || '（暂无定义）', 90))}</td>
       <td>${row.claims > 0 ? `<span class="badge b-ok">${row.claims}</span>` : '<span class="badge b-warn">0</span>'}</td>
       <td class="muted">${row.relatedConcepts.length}</td>
@@ -1676,4 +1679,57 @@ export function topicsPage(data: TopicMapV1): string {
       <li>本页只读；增删主题与合并节点仍走审核/编辑流程。</li>
     </ol>
   </div>`);
+}
+
+export interface QaPageData {
+  readonly topics: readonly { readonly name: string; readonly claims: number }[];
+  readonly articles: readonly { readonly id: string; readonly title: string }[];
+  readonly result: QaChainV1 | null;
+  readonly error: string | null;
+  readonly selected: string;
+  readonly focus: string;
+  readonly count: number;
+}
+
+/** 问答链页（只读工具）：选主题/文章 → 模型生成 Q-A 链，不写文章版本。 */
+export function qaPage(data: QaPageData): string {
+  const topicOptions = data.topics
+    .map((topic) => `<option value="topic:${esc(topic.name)}"${data.selected === `topic:${topic.name}` ? ' selected' : ''}>${esc(topic.name)}（${topic.claims} claims）</option>`)
+    .join('');
+  const articleOptions = data.articles
+    .map((article) => `<option value="article:${esc(article.id)}"${data.selected === `article:${article.id}` ? ' selected' : ''}>${esc(article.title)}</option>`)
+    .join('');
+  const countOptions = [4, 6, 8, 10]
+    .map((value) => `<option value="${value}"${data.count === value ? ' selected' : ''}>${value} 个问题</option>`)
+    .join('');
+
+  const errorCard = data.error
+    ? `<div class="card" style="border-color:rgba(239,95,107,.5)"><b style="color:#f0a6ac">生成失败：</b>${esc(data.error)}</div>`
+    : '';
+  const resultCard = data.result
+    ? `<h2>问答链 ·《${esc(data.result.sourceTitle)}》</h2>
+  <div class="muted">来源：${data.result.sourceKind === 'topic' ? '主题节点' : '文章正文'} · ${data.result.questionCount} 个问题 · 材料 claims ${data.result.materialClaims} 个 · 模型 ${esc(data.result.provenance.model)} · 成本 $${data.result.cost.toFixed(4)} · 生成于 ${esc(formatDateTime(data.result.generatedAt))}</div>
+  <div class="card" style="line-height:1.9">${renderArticleMarkdown(data.result.markdown)}</div>
+  <div class="muted" style="margin-top:8px">问答链只用于选题/审稿，不会修改文章或知识库；提示词参考 ljg-qa（Q 切要害、A 四段：结论/形式化/论证步/边界）。</div>`
+    : '';
+
+  return layout('问答链', `${nav('/qa')}
+  <div class="row" style="justify-content:space-between"><h1>问答链</h1><a class="btn" href="/compose">去主编台 →</a></div>
+  <div class="muted" style="max-width:900px">把主题节点的 claims 或文章正文抽成 Q-A 链：问题要切要害（为什么成立、代价、边界），每个回答必须落到「结论 / 形式化 / 论证步 / 边界」四段。
+  这是选题与审稿工具，不写入文章版本，也不改知识库。</div>
+  ${errorCard}
+  <div class="card">
+    <form method="post" action="/actions/qa">
+      <div class="row" style="gap:12px;flex-wrap:wrap;align-items:center">
+        <label>来源 <select name="source" style="max-width:420px">
+          ${topicOptions === '' ? '' : `<optgroup label="主题节点">${topicOptions}</optgroup>`}
+          ${articleOptions === '' ? '' : `<optgroup label="文章正文">${articleOptions}</optgroup>`}
+        </select></label>
+        <label>数量 <select name="count">${countOptions}</select></label>
+        <label style="flex:1;min-width:260px">聚焦（可选）<input type="text" name="focus" value="${esc(data.focus)}" placeholder="例如：只问代价和边界" style="width:100%"></label>
+        <button class="btn" type="submit" onclick="return confirm('调用模型生成问答链，可能产生费用。继续？')">生成问答链</button>
+      </div>
+    </form>
+  </div>
+  ${resultCard}`);
 }

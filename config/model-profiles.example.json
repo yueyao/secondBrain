@@ -5,69 +5,187 @@
       "id": "cheap",
       "provider": "openai-compatible",
       "model": "small-2026-01",
-      "capabilities": { "contextTokens": 32000, "structuredOutput": true, "toolCalls": false, "languages": ["zh"], "sensitivity": ["public", "restricted"] },
-      "pricing": { "inPerMTokens": 0, "outPerMTokens": 0 },
-      "limits": { "maxConcurrency": 8, "requestsPerMinute": 120 },
-      "health": { "enabled": true, "fallbackTo": [] }
+      "capabilities": {
+        "contextTokens": 32000,
+        "structuredOutput": true,
+        "toolCalls": false,
+        "languages": [
+          "zh"
+        ],
+        "sensitivity": [
+          "public",
+          "restricted"
+        ]
+      },
+      "pricing": {
+        "inPerMTokens": 0,
+        "outPerMTokens": 0
+      },
+      "limits": {
+        "maxConcurrency": 8,
+        "requestsPerMinute": 120
+      },
+      "health": {
+        "enabled": true,
+        "fallbackTo": []
+      }
     },
     {
       "id": "strong",
       "provider": "openai-compatible",
       "model": "large-2026-01",
-      "capabilities": { "contextTokens": 128000, "structuredOutput": true, "toolCalls": true, "languages": ["zh", "en"], "sensitivity": ["public", "restricted"] },
-      "pricing": { "inPerMTokens": 0, "outPerMTokens": 0 },
-      "limits": { "maxConcurrency": 4, "requestsPerMinute": 60 },
-      "health": { "enabled": true, "fallbackTo": ["mid"] }
+      "capabilities": {
+        "contextTokens": 128000,
+        "structuredOutput": true,
+        "toolCalls": true,
+        "languages": [
+          "zh",
+          "en"
+        ],
+        "sensitivity": [
+          "public",
+          "restricted"
+        ]
+      },
+      "pricing": {
+        "inPerMTokens": 0,
+        "outPerMTokens": 0
+      },
+      "limits": {
+        "maxConcurrency": 4,
+        "requestsPerMinute": 60
+      },
+      "health": {
+        "enabled": true,
+        "fallbackTo": [
+          "mid"
+        ]
+      }
     },
     {
       "id": "mid",
       "provider": "openai-compatible",
       "model": "mid-2026-01",
-      "capabilities": { "contextTokens": 128000, "structuredOutput": true, "toolCalls": true, "languages": ["zh"], "sensitivity": ["public", "restricted"] },
-      "pricing": { "inPerMTokens": 0, "outPerMTokens": 0 },
-      "limits": { "maxConcurrency": 6, "requestsPerMinute": 90 },
-      "health": { "enabled": true, "fallbackTo": [] }
+      "capabilities": {
+        "contextTokens": 128000,
+        "structuredOutput": true,
+        "toolCalls": true,
+        "languages": [
+          "zh"
+        ],
+        "sensitivity": [
+          "public",
+          "restricted"
+        ]
+      },
+      "pricing": {
+        "inPerMTokens": 0,
+        "outPerMTokens": 0
+      },
+      "limits": {
+        "maxConcurrency": 6,
+        "requestsPerMinute": 90
+      },
+      "health": {
+        "enabled": true,
+        "fallbackTo": []
+      }
     }
   ],
   "policies": {
     "triage": {
-      "requires": { "contextTokens": 8000, "structuredOutput": true, "toolCalls": false },
-      "profileOrder": ["cheap"],
+      "requires": {
+        "contextTokens": 8000,
+        "structuredOutput": true,
+        "toolCalls": false
+      },
+      "profileOrder": [
+        "cheap"
+      ],
       "maxInputTokens": 2000,
       "maxOutputTokens": 500,
       "expectedClaims": 3
     },
     "digest": {
-      "requires": { "contextTokens": 60000, "structuredOutput": true, "toolCalls": true },
-      "profileOrder": ["strong", "mid"],
+      "requires": {
+        "contextTokens": 60000,
+        "structuredOutput": true,
+        "toolCalls": true
+      },
+      "profileOrder": [
+        "strong",
+        "mid"
+      ],
       "maxInputTokens": 60000,
       "maxOutputTokens": 4000,
       "expectedClaims": 8
     },
     "review-rewrite": {
-      "requires": { "contextTokens": 60000, "structuredOutput": true, "toolCalls": true },
-      "profileOrder": ["strong", "mid"],
+      "requires": {
+        "contextTokens": 60000,
+        "structuredOutput": true,
+        "toolCalls": true
+      },
+      "profileOrder": [
+        "strong",
+        "mid"
+      ],
       "maxInputTokens": 60000,
       "maxOutputTokens": 4000,
       "expectedClaims": 8
     },
     "decide": {
-      "requires": { "contextTokens": 60000, "structuredOutput": true, "toolCalls": true },
-      "profileOrder": ["strong", "mid"],
+      "requires": {
+        "contextTokens": 60000,
+        "structuredOutput": true,
+        "toolCalls": true
+      },
+      "profileOrder": [
+        "strong",
+        "mid"
+      ],
       "maxInputTokens": 60000,
       "maxOutputTokens": 3000,
       "expectedClaims": 5
     },
     "compose": {
-      "requires": { "contextTokens": 60000, "structuredOutput": false, "toolCalls": false },
-      "profileOrder": ["strong", "mid"],
+      "requires": {
+        "contextTokens": 60000,
+        "structuredOutput": false,
+        "toolCalls": false
+      },
+      "profileOrder": [
+        "strong",
+        "mid"
+      ],
       "maxInputTokens": 120000,
       "maxOutputTokens": 8000,
       "expectedClaims": 12
     },
     "deai": {
-      "requires": { "contextTokens": 60000, "structuredOutput": false, "toolCalls": false },
-      "profileOrder": ["strong", "mid"],
+      "requires": {
+        "contextTokens": 60000,
+        "structuredOutput": false,
+        "toolCalls": false
+      },
+      "profileOrder": [
+        "strong",
+        "mid"
+      ],
+      "maxInputTokens": 250000,
+      "maxOutputTokens": 8000,
+      "expectedClaims": 10
+    },
+    "qa": {
+      "requires": {
+        "contextTokens": 60000,
+        "structuredOutput": false,
+        "toolCalls": false
+      },
+      "profileOrder": [
+        "strong",
+        "mid"
+      ],
       "maxInputTokens": 250000,
       "maxOutputTokens": 8000,
       "expectedClaims": 10

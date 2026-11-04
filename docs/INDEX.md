@@ -28,6 +28,7 @@
 | [docs/adr/0008-automation.md](docs/adr/0008-automation.md) | 服务端自动流水线：server+worker 双进程、tick 语义、timer | 自动化流程变化时 |
 | [docs/adr/0009-articles.md](docs/adr/0009-articles.md) | 文章模型与发布流程：版本链、状态机、diff、定稿与导出 | 文章状态/版本语义/导出格式变化时 |
 | [docs/adr/0010-deai.md](docs/adr/0010-deai.md) | 去 AI 味能力：检测规则与权重、改写硬约束、独立页与版本集成 | 检测规则/评分/改写约束变化时 |
+| [docs/adr/0011-qa.md](docs/adr/0011-qa.md) | 问答链能力：QaPort、qa 任务、四段结构契约、独立 /qa 页 | 问答链契约/形态/入口变化时 |
 
 ## 阅读路径
 

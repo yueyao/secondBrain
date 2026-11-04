@@ -9,12 +9,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { recoverPending, type AppContext, type ProfilePricing } from '@sb/app';
-import type { AgentPort, ComposePort, ComposeRequest, DeAiPort, DeAiRequest, DigestRequest } from '@sb/contracts';
+import type { AgentPort, ComposePort, ComposeRequest, DeAiPort, DeAiRequest, DigestRequest, QaPort, QaRequest } from '@sb/contracts';
 import { parseDraftId, stringifyFrontmatter } from '@sb/domain';
 import { FsVault } from '@sb/adapters-vault';
 import { migrate, SqliteStore } from '@sb/adapters-sqlite';
 import { MemorySearch } from '@sb/adapters-search-memory';
-import { LEGACY_RAW, MOCK_NODES, MOCK_RAW, MockAgent, MockComposer, MockDeAi } from '@sb/testing';
+import { LEGACY_RAW, MOCK_NODES, MOCK_RAW, MockAgent, MockComposer, MockDeAi, MockQa } from '@sb/testing';
 import {
   AgentRunner,
   BudgetLedger,
@@ -22,9 +22,11 @@ import {
   MemoryCompletionCache,
   parseModelPolicy,
   DeAiRunner,
+  QaRunner,
   type ComposePromptSpec,
   type DeAiPromptSpec,
   type PromptSpec,
+  type QaPromptSpec,
 } from '@sb/agent-runtime';
 import { OpenAICompatibleProvider } from '@sb/adapters-agent-openai';
 
@@ -43,6 +45,7 @@ export interface Runtime {
   readonly store: SqliteStore;
   readonly search: MemorySearch;
   readonly mode: AgentMode;
+  readonly qa: QaPort;
   readonly dataDir: string;
   readonly vaultRoot: string;
   close(): Promise<void>;
@@ -206,10 +209,46 @@ export function deAiPrompt(): DeAiPromptSpec {
   };
 }
 
+const QA_SYSTEM = `你是“信息提问机”，把材料抽成一串 Q-A 链，让读者顺着问题复现作者的推理，而不是读摘要。
+规则：
+1. 问题（Q）要切要害：问“为什么成立”“代价是什么”“与另一种做法差在哪”“在哪里失效”，不要问“什么是 X”这类教科书问题；
+2. Q 链按论证依赖排序：后一个问题由前一个答案自然引出，不按原文段落顺序罗列；
+3. 每个回答（A）严格四段：
+   - **结论**：一句话；
+   - **形式化**：用文字 + 简单符号把关系压成一行（如 A = B + C、旧: X → 新: Y），不要写成数学论文；
+   - **论证步**：说明结论是怎么从材料里推出来的；
+   - **边界**：指出结论不成立的条件、反例或材料缺口；
+4. 引用材料里的判断时，保留原有的“（来源：[[raw/...]]）”标记；不得编造材料没有的事实、数据、人名或引用；
+5. 只输出 Markdown：每个问题用“### Q1. 问题”，答案按上述四段；不要输出额外解释或代码块。
+`;
+
+function renderQaInput(request: QaRequest): string {
+  const kind = request.sourceKind === 'topic' ? '主题节点' : '文章';
+  return [
+    `来源：${kind}《${request.sourceTitle}》`,
+    `问题数量：${request.questionCount.min}-${request.questionCount.max} 个`,
+    ...(request.focus ? [`聚焦要求：${request.focus}`] : []),
+    '',
+    '材料：',
+    request.sourceText,
+  ].join('\n');
+}
+
+export function qaPrompt(): QaPromptSpec {
+  return {
+    id: 'qa',
+    version: 1,
+    sha256: createHash('sha256').update(QA_SYSTEM).digest('hex'),
+    system: QA_SYSTEM,
+    render: renderQaInput,
+  };
+}
+
 interface AgentBuild {
   readonly agent: AgentPort;
   readonly composer: ComposePort;
   readonly deAi: DeAiPort;
+  readonly qa: QaPort;
   readonly mode: AgentMode;
   readonly pricing: Readonly<Record<string, ProfilePricing>>;
 }
@@ -221,6 +260,7 @@ function buildAgent(): AgentBuild {
       agent: new MockAgent(),
       composer: new MockComposer(),
       deAi: new MockDeAi(),
+      qa: new MockQa(),
       mode: 'mock',
       pricing: {},
     };
@@ -275,10 +315,19 @@ function buildAgent(): AgentBuild {
     prompt: deAiPrompt(),
   });
 
+  const qa = new QaRunner({
+    provider,
+    profiles: parsed.value.profiles,
+    policies: parsed.value.policies,
+    budget,
+    clock: systemClock,
+    prompt: qaPrompt(),
+  });
+
   const pricing: Record<string, ProfilePricing> = {};
   for (const profile of parsed.value.profiles) pricing[profile.id] = profile.pricing;
 
-  return { agent, composer, deAi, mode: 'cloud', pricing };
+  return { agent, composer, deAi, qa, mode: 'cloud', pricing };
 }
 
 export async function createRuntime(options: RuntimeOptions): Promise<Runtime> {
@@ -335,6 +384,7 @@ export async function createRuntime(options: RuntimeOptions): Promise<Runtime> {
     store,
     search,
     mode: built.mode,
+    qa: built.qa,
     dataDir,
     vaultRoot,
     async close() {

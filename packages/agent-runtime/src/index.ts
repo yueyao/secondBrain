@@ -6,4 +6,5 @@ export * from './cache';
 export * from './runner';
 export * from './compose-runner';
 export * from './deai-runner';
+export * from './qa-runner';
 export * from './config';

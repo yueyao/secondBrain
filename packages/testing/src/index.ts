@@ -3,4 +3,5 @@ export * from './fixtures';
 export * from './mock-agent';
 export * from './mock-composer';
 export * from './mock-deai';
+export * from './mock-qa';
 export * from './harness';
