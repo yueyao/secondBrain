@@ -39,6 +39,7 @@ export type RawEvent =
   | { readonly type: 'LEASE_LOST' }
   | { readonly type: 'REVIEW_OPEN'; readonly findings: readonly Finding[] }
   | { readonly type: 'REOPEN_FOR_REVIEW'; readonly findings: readonly Finding[] }
+  | { readonly type: 'REFRESH_FINDINGS'; readonly findings: readonly Finding[] }
   | { readonly type: 'ACCEPT'; readonly actor: string }
   | { readonly type: 'REJECT'; readonly reason: string; readonly auto?: boolean }
   | { readonly type: 'REQUEST_CHANGES'; readonly note: string }
@@ -72,6 +73,7 @@ export const EVENT_TYPES: readonly RawEventType[] = [
   'LEASE_LOST',
   'REVIEW_OPEN',
   'REOPEN_FOR_REVIEW',
+  'REFRESH_FINDINGS',
   'ACCEPT',
   'REJECT',
   'REQUEST_CHANGES',
@@ -94,7 +96,7 @@ export const ALLOWED_TRANSITIONS: Readonly<Record<RawStateKind, readonly RawEven
   queued: ['DRAFT_START', 'DEFER'],
   drafting: ['DRAFT_OK', 'DRAFT_FAIL', 'DRAFT_REFUSAL', 'LEASE_LOST'],
   draft_ready: ['REVIEW_OPEN', 'SUPERSEDE', 'EXPIRE'],
-  in_review: ['ACCEPT', 'REJECT', 'REQUEST_CHANGES', 'DEFER', 'EXPIRE'],
+  in_review: ['ACCEPT', 'REJECT', 'REQUEST_CHANGES', 'REFRESH_FINDINGS', 'DEFER', 'EXPIRE'],
   changes_requested: ['DRAFT_START'],
   approved: ['COMMIT_INTENT'],
   committing: ['COMMIT_OK', 'COMMIT_FAIL'],
@@ -237,6 +239,8 @@ export function transition(
 
     case 'in_review':
       switch (event.type) {
+        case 'REFRESH_FINDINGS':
+          return ok({ ...from, findings: event.findings });
         case 'ACCEPT': {
           if (hasBlock(from.findings)) {
             return err(

@@ -20,7 +20,7 @@ import {
 import type { DraftRecord, RawItemRecord, ScoredHit } from '@sb/contracts';
 import { AppError, type AppContext } from './context';
 import { nodeFile, renderNewNode, renderPatchedNode } from './render';
-import { effectiveBlockingFindings } from './review-policy';
+import { effectiveBlockingFindings, effectiveFindings } from './review-policy';
 
 export interface TriageOutcome {
   readonly rawPath: string;
@@ -300,6 +300,7 @@ async function acceptDraft(
   input: { readonly actor: string; readonly note?: string; readonly rebaseFiles?: ReadonlySet<string>; readonly rebaseAll?: boolean },
 ): Promise<DecideResult> {
   const blocking = effectiveBlockingFindings(draft);
+  const transitionFindings = effectiveFindings(draft);
   if (blocking.length > 0) {
     throw new AppError('GATE_BLOCKED', '存在阻断级预警，不能入库', {
       rules: blocking.map((finding) => finding.ruleId),
@@ -317,10 +318,14 @@ async function acceptDraft(
     let state: RawState = item.state;
     if (state.kind === 'rolled_back') {
       // 人工重试：把之前的失败态重新打开到审阅；目标若已变化，由 commit 阶段按 append-only 重基处理。
-      state = unwrap(transition(state, { type: 'REOPEN_FOR_REVIEW', findings: draft.findings }, { now }));
+      state = unwrap(transition(state, { type: 'REOPEN_FOR_REVIEW', findings: transitionFindings }, { now }));
     }
     if (state.kind === 'draft_ready') {
-      state = unwrap(transition(state, { type: 'REVIEW_OPEN', findings: draft.findings }, { now }));
+      state = unwrap(transition(state, { type: 'REVIEW_OPEN', findings: transitionFindings }, { now }));
+    }
+    if (state.kind === 'in_review') {
+      // 状态里可能残留生成时的旧 findings；ACCEPT 前按当前策略刷新，避免"预检通过但状态机仍拦"。
+      state = unwrap(transition(state, { type: 'REFRESH_FINDINGS', findings: transitionFindings }, { now }));
     }
     state = unwrap(transition(state, { type: 'ACCEPT', actor: input.actor }, { now }));
     const swapped = await tx.rawItems.compareAndSwapVersion(item.id, item.version, state);
@@ -567,7 +572,7 @@ async function rejectDraft(
   await ctx.store.transaction(async (tx) => {
     let state = rawItem.state;
     if (state.kind === 'draft_ready') {
-      state = unwrap(transition(state, { type: 'REVIEW_OPEN', findings: draft.findings }, { now }));
+      state = unwrap(transition(state, { type: 'REVIEW_OPEN', findings: effectiveFindings(draft) }, { now }));
     }
     state = unwrap(transition(state, { type: 'REJECT', reason: input.note ?? '未填写理由' }, { now }));
     const swapped = await tx.rawItems.compareAndSwapVersion(rawItem.id, rawItem.version, state);

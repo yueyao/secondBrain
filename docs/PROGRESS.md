@@ -2599,3 +2599,35 @@ D112：预检失败不创建空转 job（全部不可入库时直接 400），�
 ### 83.4 验证
 
 40 文件 / 367 例；生产重试"2 正常 + 1 未知 id"应返回 `ineligible=1`，正常 2 篇仍成功。
+
+
+---
+
+## 八十四、预检通过但 ACCEPT 仍报阻断：状态机 findings 未刷新（2026-11-04）
+
+### 84.1 现象
+
+用户连续三次批量 22 篇，`ok=0 failed=22`，原因全是 `存在阻断级预警，不能入库`；但审核页显示只有 16 篇阻断，且同一批 draft 调 `/actions/review/preflight` 返回 `ok=22`。
+
+### 84.2 根因
+
+旧 `r-claim-count` block 还留在两个地方：
+- draft 的 `findings`（列表/预检用 effective 视图，已忽略）；
+- raw state 的 `findings`（状态机 ACCEPT 仍用原始 findings 判断 `hasBlock`）。
+
+accept 时把 draft.findings 写进 raw state，状态机于是仍报阻断——形成"预检通过、ACCEPT 拦截"的裂脑。
+
+### 84.3 修复
+
+- 新增 `effectiveFindings`：旧配额 block 降级为 `warn`（消息注明按当前配额可入库）；
+- accept 的 `REVIEW_OPEN / REOPEN_FOR_REVIEW` 都写入 effective findings；
+- 状态机新增 `REFRESH_FINDINGS`（in_review → in_review），ACCEPT 前按当前策略刷新 raw state findings；
+- 新增 review-policy 用例。
+
+### 84.4 决策
+
+D113：**门禁判断与状态机必须使用同一份 effective findings**；不能让"预检/列表"和"状态机"各算一套。
+
+### 84.5 验证
+
+`pnpm run check` 41 文件 / **368 例**；部署后重试此前失败的 22 篇中任一篇应成功或给出真实阻断原因。
