@@ -8,7 +8,7 @@
  *
  * 不改 claims 内容、不改来源、不改状态；修复后仍受门禁约束。
  */
-import { evaluateAll, fitTierForClaims } from '@sb/domain';
+import { evaluateAll, fitTierForClaims, type RawPath } from '@sb/domain';
 import type { AppContext } from './context';
 import { effectiveBlockingFindings } from './review-policy';
 
@@ -45,7 +45,8 @@ export async function repairPendingDrafts(ctx: AppContext): Promise<RepairReport
 
   for (const draft of pending) {
     const effectiveBefore = effectiveBlockingFindings(draft);
-    if (effectiveBefore.length === 0) continue;
+    const hasMissingSource = draft.proposal.claims.some((claim) => !knownRawPaths.has(String(claim.source)));
+    if (effectiveBefore.length === 0 && !hasMissingSource) continue;
     examined += 1;
     try {
       const item = itemById.get(draft.rawItemId);
@@ -58,7 +59,15 @@ export async function repairPendingDrafts(ctx: AppContext): Promise<RepairReport
         if (node.action === 'patch' && !existing) return { ...node, action: 'new' as const };
         return node;
       });
-      const proposal = { ...draft.proposal, tier, nodes };
+      const repairedClaims = draft.proposal.claims.map((claim) => {
+        const source = String(claim.source);
+        if (knownRawPaths.has(source)) return claim;
+        const base = source.split('/').pop() ?? source;
+        const matched = [...knownRawPaths].find((path) => path.split('/').pop() === base)
+          ?? [...knownRawPaths].find((path) => path.endsWith(`/${base}`));
+        return { ...claim, source: (matched ?? String(item.rawPath)) as RawPath };
+      });
+      const proposal = { ...draft.proposal, tier, nodes, claims: repairedClaims };
 
       const targetHashes: Record<string, string> = {};
       for (const node of nodes) {
