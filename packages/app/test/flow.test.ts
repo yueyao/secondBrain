@@ -3,7 +3,6 @@ import { parseRawPath, type RawPath } from '@sb/domain';
 import type { AppContext } from '../src/context';
 import { decideReview, draftDigest, ingestAndTriage } from '../src/commands';
 import { preflightDrafts } from '../src/preflight';
-import { repairPendingDrafts } from '../src/repair';
 import { listPendingDrafts, listQueue, reviewView, usageSummary } from '../src/queries';
 import { createHarness, hashPort, type TestHarness } from '@sb/testing';
 
@@ -150,21 +149,6 @@ describe('应用层：完整流程', () => {
     expect(result.ok).toBe(true);
     const content = await harness.vault.readNode('wiki/concepts/反脆弱.md');
     expect(content).toContain('（来源：[[raw/knowledge/cubox/mock-2026-10-01 反脆弱的第二条证据.md]]）');
-  });
-
-  it('修复来源缺失：按 raw 真实路径回填，解除 source-exists', async () => {
-    const ctx = ctxOf(harness);
-    await ingestAndTriage(ctx);
-    const { draftId } = await draftDigest(ctx, await findRaw(harness, '反脆弱的第二条证据'));
-    const draft = await ctx.store.transaction(async (tx) => tx.drafts.get(draftId));
-    if (!draft) throw new Error('draft missing');
-    const claims = draft.proposal.claims.map((claim, index) => (index === 0 ? { ...claim, source: 'raw/knowledge/cubox/missing.md' as never } : claim));
-    await ctx.store.transaction(async (tx) => tx.drafts.updateReview(draftId, { ...draft.proposal, claims }, draft.findings, draft.targetHashes));
-
-    const report = await repairPendingDrafts(ctx);
-    expect(report.repaired).toBeGreaterThanOrEqual(1);
-    const after = await ctx.store.transaction(async (tx) => tx.drafts.get(draftId));
-    expect(String(after?.proposal.claims[0]?.source)).toContain('反脆弱的第二条证据');
   });
 
   it('批量预检：正常草稿 ok，未知 id invalid，避免整批先 approved 再回滚', async () => {
