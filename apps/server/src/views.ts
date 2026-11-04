@@ -21,7 +21,19 @@ const esc = (value: unknown): string =>
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
-const LEVEL: Record<string, string> = { block: '阻断', warn: '注意', ok: '通过' };
+const LEVEL: Record<string, string> = { block: '需处理', warn: '注意', ok: '通过' };
+const BLOCK_LABEL: Record<string, string> = {
+  'r-source-exists': '来源缺失',
+  'r-source-already-digested': '重复来源',
+  'r-event-already-digested': '重复事件',
+  'r-new-node-name-taken': '节点同名',
+  'r-patch-target-missing': '目标节点不存在',
+  'r-source-disabled': '来源未启用',
+  'r-claim-count': 'claims 超配额',
+};
+function blockLabel(rule: string | null): string {
+  return rule === null ? '需先处理' : (BLOCK_LABEL[rule] ?? '需先处理');
+}
 
 /** 日志行里的 ISO 时间（worker JSON 日志的 at 字段）在展示时转成本地时间，保留其余内容。 */
 function formatLogLine(line: string): string {
@@ -439,7 +451,7 @@ export function reviewPage(view: ReviewViewV1, hits: readonly ScoredHit[] = [], 
       <input type="text" name="note" placeholder="驳回理由" style="max-width:300px">
       <button class="btn danger" type="submit">驳回</button>
     </form>
-    ${view.actions.accept ? '' : `<div class="muted">被规则阻断：${view.actions.blockedBy.map(esc).join(', ')}</div>`}
+    ${view.actions.accept ? '' : `<div class="muted">需先处理：${view.actions.blockedBy.map(esc).join(', ')}</div>`}
   </div>
   <div class="muted" style="margin-top:10px">
     来源：${esc(view.provenance.provider)} / ${esc(view.provenance.model)} · prompt v${view.provenance.promptVersion}
@@ -957,7 +969,7 @@ vault: ${esc(data.env.vaultRoot)}
 
 
 export interface ReviewListPageData {
-  readonly items: readonly { draftId: string; title: string; rawPath: string; tier: string; rationale: string; hasBlock: boolean; blockReason: string | null; createdAt: string }[];
+  readonly items: readonly { draftId: string; title: string; rawPath: string; tier: string; rationale: string; hasBlock: boolean; blockReason: string | null; blockRule: string | null; createdAt: string }[];
   readonly accepted: number;
   readonly failed: number;
   readonly jobId: string;
@@ -972,23 +984,29 @@ export function reviewListPage(data: ReviewListPageData, page = 1): string {
   const pageItems = data.items.slice((current - 1) * pageSize, current * pageSize);
   const rows = pageItems.map((item) => `<tr class="review-row">
     <td><input type="checkbox" name="draftId" value="${esc(item.draftId)}"${item.hasBlock ? ` disabled title="${esc(item.blockReason ?? '存在阻断级预警')}"` : ''}></td>
-    <td><a href="/audit/${encodeURIComponent(item.draftId)}" class="review-link">${esc(item.title)}</a></td>
+    <td><a href="/audit/${encodeURIComponent(item.draftId)}" class="review-link">${esc(item.title)}</a>${item.hasBlock ? `<div class="muted" style="font-size:12px">${esc(blockLabel(item.blockRule))}：${esc(item.blockReason ?? '')}</div>` : ''}</td>
     <td>${esc(item.tier)}</td>
-    <td>${item.hasBlock ? '<span class="badge b-block">阻断</span>' : '<span class="badge b-ok">可审</span>'}</td>
+    <td>${item.hasBlock ? `<span class="badge b-block">${esc(blockLabel(item.blockRule))}</span>` : '<span class="badge b-ok">可审</span>'}</td>
     <td class="muted">${esc(formatDateTime(item.createdAt).slice(5))}</td></tr>`).join('')
     || '<tr><td colspan="5" class="muted">没有待审草稿</td></tr>';
 
   const flash = data.accepted > 0 || data.failed > 0
     ? `<div class="card" style="border-color:var(--ok)">批量结果：成功 ${data.accepted} 篇${data.failed > 0 ? `，失败 ${data.failed} 篇（失败项仍在待审，见日志）` : ''}</div>` : '';
   const rejectFlash = data.rejected !== null && data.rejected !== undefined
-    ? `<div class="card" style="border-color:var(--warn)">已驳回 ${data.rejected} 篇阻断草稿，不再出现在审核列表。</div>`
+    ? `<div class="card" style="border-color:var(--warn)">已驳回 ${data.rejected} 篇需处理的草稿，不再出现在审核列表。</div>`
     : '';
   const repairFlash = data.repair
-    ? `<div class="card" style="border-color:var(--ok)">修复完成：检查 ${data.repair.examined} 篇，修复 ${data.repair.repaired} 篇，仍有 ${data.repair.stillBlocked} 篇阻断（来源缺失/重复等无法自动修复，需人工驳回或重新生成）。</div>`
+    ? `<div class="card" style="border-color:var(--ok)">修复完成：检查 ${data.repair.examined} 篇，修复 ${data.repair.repaired} 篇，仍有 ${data.repair.stillBlocked} 篇需先处理（来源缺失/重复等无法自动修复，可人工驳回或重新生成）。</div>`
     : '';
 
   return layout('审核中心', `${nav('/audit')}
-  ${pageHead('审核中心', `待审 ${data.items.length.toLocaleString()} 篇，可批量 ${(data.items.length - data.items.filter((item) => item.hasBlock).length).toLocaleString()} 篇、阻断 ${data.items.filter((item) => item.hasBlock).length.toLocaleString()} 篇；每页 ${pageSize} 篇，勾选只作用当前页。`, '<a class="btn" href="/articles?group=pending">去素材库 →</a>')}
+  ${pageHead('审核中心', (() => {
+    const blocked = data.items.filter((item) => item.hasBlock);
+    const groups = new Map<string, number>();
+    for (const item of blocked) groups.set(blockLabel(item.blockRule), (groups.get(blockLabel(item.blockRule)) ?? 0) + 1);
+    const detail = [...groups.entries()].map(([label, count]) => `${label} ${count}`).join('、');
+    return `待审 ${data.items.length.toLocaleString()} 篇，可批量 ${(data.items.length - blocked.length).toLocaleString()} 篇${blocked.length > 0 ? `；需先处理 ${blocked.length} 篇（${detail}）` : ''}。每页 ${pageSize} 篇，勾选只作用当前页。`;
+  })(), '<a class="btn" href="/articles?group=pending">去素材库 →</a>')}
   ${flash}
   ${rejectFlash}
   ${repairFlash}
@@ -1004,15 +1022,15 @@ export function reviewListPage(data: ReviewListPageData, page = 1): string {
     <div class="card table-wrap" style="padding:4px 0"><table>
       <tr><th></th><th>标题</th><th>tier</th><th>检查</th><th>创建</th></tr>${rows}
     </table></div>
-    <div class="muted" style="margin-top:6px">阻断项不可勾选：勾选框灰色、鼠标悬停可看到具体规则；点标题进入单篇审阅，可驳回或后续重新生成。</div>
+    <div class="muted" style="margin-top:6px">「需先处理」的行不可勾选：具体原因已显示在标题下方，也可悬停查看；点标题进入单篇审阅后可驳回或重新生成。</div>
     ${pager('/audit', current, pages, data.items.length, pageSize)}
   </form>
   <div class="row" style="gap:8px;margin:10px 0;align-items:center">
-    <form method="post" action="/actions/review/repair" onsubmit="return confirm('按当前节点与配额重算阻断草稿；不会修改 claims 内容。继续？')">
-      <button class="btn" type="submit">修复可修复阻断</button>
+    <form method="post" action="/actions/review/repair" onsubmit="return confirm('按当前节点与配额重算需处理的草稿；不会修改 claims 内容。继续？')">
+      <button class="btn" type="submit">修复可修复项</button>
     </form>
-    <form method="post" action="/actions/review/reject-blocked" onsubmit="return confirm('把全部阻断草稿驳回？驳回后不再出现在审核列表，且不会写入 wiki。')">
-      <button class="btn" type="submit">驳回全部阻断项</button>
+    <form method="post" action="/actions/review/reject-blocked" onsubmit="return confirm('把全部需处理的草稿驳回？驳回后不再出现在审核列表，且不会写入 wiki。')">
+      <button class="btn" type="submit">驳回全部需处理项</button>
     </form>
     <span class="muted">修复只处理节点动作/配额；来源缺失、重复入库等无法自动修复，可直接驳回。</span>
   </div>
@@ -1076,7 +1094,7 @@ export function reviewListPage(data: ReviewListPageData, page = 1): string {
                 if(fails.length>0){
                   failureBox.hidden=false;
                   failureBox.textContent=fails.slice(0,8).map(function(f){return f.draftId+'：'+f.reason;}).join('\\n');
-                  hint.textContent='失败项仍在待审；常见原因是存在阻断级预警，或草稿数据本身不完整。';
+                  hint.textContent='失败项仍在待审；具体原因见失败列表（来源缺失、重复、目标节点不存在等）。';
                   refreshBtn.hidden=false;
                 } else {
                   hint.textContent='全部成功，刷新中…';

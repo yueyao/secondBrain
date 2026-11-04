@@ -514,6 +514,7 @@ export interface ReviewListItemV1 {
   readonly rationale: string;
   readonly hasBlock: boolean;
   readonly blockReason: string | null;
+  readonly blockRule: string | null;
   readonly createdAt: string;
 }
 
@@ -532,6 +533,7 @@ export async function pendingReviewList(ctx: AppContext): Promise<readonly Revie
       rationale: draft.proposal.rationale,
       hasBlock: blocking.length > 0,
       blockReason: blocking[0]?.message ?? null,
+      blockRule: blocking[0]?.ruleId ?? null,
       createdAt: draft.createdAt,
     };
   }).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
