@@ -2374,3 +2374,31 @@ pnpm run check
 ```
 
 生产执行 repair 后预计可批量数显著上升；来源缺失/重复入库类仍阻断，需人工驳回或重新生成。
+
+
+---
+
+## 七十六、修复服务重跑：patch 目标规则支持别名（2026-11-04）
+
+### 76.1 问题
+
+存量修复后仍有 35 篇 `r-patch-target-missing`：草稿把节点名写成别名（如 `antifragile`），修复器按 name/alias 认出了现有节点并改成 patch，但 `r-patch-target-missing` 规则只看 `node.name`，于是继续阻断——两边对"目标是否存在"的判定不一致。
+
+### 76.2 修复
+
+- `r-patch-target-missing` 改为同时匹配 `name` 与 `aliases`（与 `r-new-node-name-taken` 一致）；
+- 增加别名目标用例；重跑 `repairPendingDrafts` 后这 35 篇会被重算为无阻断。
+
+### 76.3 决策
+
+D104：**"节点是否存在"的判定必须全链路一致**（生成归一化 / 修复 / 规则 / 目标文件解析），否则会出现"修完还被同一规则拦住"的死循环。
+
+### 76.4 验证
+
+```
+pnpm run check
+ Test Files  40 passed (40)
+      Tests  363 passed (363)
+```
+
+重跑 repair 后阻断数应从 49 附近进一步下降；剩余主要是来源路径缺失/重复入库。

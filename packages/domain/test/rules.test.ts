@@ -113,6 +113,11 @@ describe('规则：节点级去重', () => {
       ruleInput({ nodes: [node('反脆弱', 'patch')], existingNodes: [existingNode('反脆弱')] }),
     );
     expect(ok).toBeNull();
+
+    const viaAlias = patchTargetMissingRule.evaluate(
+      ruleInput({ nodes: [node('antifragile', 'patch')], existingNodes: [existingNode('反脆弱', ['antifragile'])] }),
+    );
+    expect(viaAlias).toBeNull();
   });
 });
 

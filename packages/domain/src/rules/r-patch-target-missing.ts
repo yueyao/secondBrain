@@ -8,9 +8,13 @@ export const patchTargetMissingRule: Rule<RuleInput> = {
   defaultSeverity: 'block',
   description: '打算并入的节点不存在时禁止入库（否则会静默变成新建）',
   evaluate(input) {
-    const existingNames = new Set(input.existingNodes.map((node) => normalizeText(node.name)));
+    const existingKeys = new Set<string>();
+    for (const node of input.existingNodes) {
+      existingKeys.add(normalizeText(node.name));
+      for (const alias of node.aliases) existingKeys.add(normalizeText(alias));
+    }
     const missing = (input.nodes as readonly NodeChange[])
-      .filter((node) => node.action === 'patch' && !existingNames.has(normalizeText(node.name)))
+      .filter((node) => node.action === 'patch' && !existingKeys.has(normalizeText(node.name)))
       .map((node) => node.name);
     if (missing.length === 0) return null;
     return makeFinding(
