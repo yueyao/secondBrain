@@ -104,6 +104,13 @@ export interface DraftRepo {
   get(id: DraftId): Promise<DraftRecord | null>;
   listByStatus(status: DraftStatus): Promise<readonly DraftRecord[]>;
   setStatus(id: DraftId, status: DraftStatus): Promise<void>;
+  /** 修复/重算：只更新提案、findings 与目标基线。 */
+  updateReview(
+    id: DraftId,
+    proposal: DraftRecord['proposal'],
+    findings: DraftRecord['findings'],
+    targetHashes: DraftRecord['targetHashes'],
+  ): Promise<void>;
 }
 
 export interface DecisionRepo {

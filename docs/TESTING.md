@@ -20,7 +20,7 @@
 | worker | `apps/worker/test` | 临时 vault + 内存 SQLite | 4 | 自动流水线 tick、背压、暂停语义 |
 | 测试夹具包 | `packages/testing/test` | 临时目录 + 内存 SQLite | 14 | harness 自检 + MockComposer + MockDeAi 确定性输出 |
 
-当前总数：**362 例 / 40 个文件**。
+当前总数：**363 例 / 40 个文件**。
 
 ---
 

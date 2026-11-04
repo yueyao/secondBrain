@@ -961,6 +961,7 @@ export interface ReviewListPageData {
   readonly accepted: number;
   readonly failed: number;
   readonly jobId: string;
+  readonly repair?: { readonly examined: number; readonly repaired: number; readonly stillBlocked: number } | null;
 }
 
 export function reviewListPage(data: ReviewListPageData, page = 1): string {
@@ -978,10 +979,14 @@ export function reviewListPage(data: ReviewListPageData, page = 1): string {
 
   const flash = data.accepted > 0 || data.failed > 0
     ? `<div class="card" style="border-color:var(--ok)">批量结果：成功 ${data.accepted} 篇${data.failed > 0 ? `，失败 ${data.failed} 篇（失败项仍在待审，见日志）` : ''}</div>` : '';
+  const repairFlash = data.repair
+    ? `<div class="card" style="border-color:var(--ok)">修复完成：检查 ${data.repair.examined} 篇，修复 ${data.repair.repaired} 篇，仍有 ${data.repair.stillBlocked} 篇阻断（来源缺失/重复等无法自动修复，需人工驳回或重新生成）。</div>`
+    : '';
 
   return layout('审核中心', `${nav('/review')}
   ${pageHead('审核中心', `待审 ${data.items.length.toLocaleString()} 篇，可批量 ${(data.items.length - data.items.filter((item) => item.hasBlock).length).toLocaleString()} 篇、阻断 ${data.items.filter((item) => item.hasBlock).length.toLocaleString()} 篇；每页 ${pageSize} 篇，勾选只作用当前页。`, '<a class="btn" href="/articles?group=pending">去素材库 →</a>')}
   ${flash}
+  ${repairFlash}
   ${data.jobId ? `<div class="card" id="job-progress">批量处理中… <span id="job-text"></span></div><script>(function(){var id=${JSON.stringify(data.jobId)};var t=setInterval(function(){fetch("/api/jobs/"+id).then(function(r){return r.json()}).then(function(d){document.getElementById("job-text").textContent=d.done+"/"+d.total+"（成功 "+d.ok+"，失败 "+d.failed+"）";if(d.status==="done"){clearInterval(t);document.getElementById("job-progress").textContent="完成："+d.ok+" 成功 / "+d.failed+" 失败，刷新中…";setTimeout(function(){location.href="/review";},800);}});},1000);})();</script>` : ""}
   <form method="post" action="/actions/review/bulk-accept" id="bulk-form">
     <div class="row" style="gap:8px;margin:12px 0;align-items:center">
@@ -996,6 +1001,10 @@ export function reviewListPage(data: ReviewListPageData, page = 1): string {
     </table></div>
     <div class="muted" style="margin-top:6px">阻断项不可勾选：勾选框灰色、鼠标悬停可看到具体规则；点标题进入单篇审阅，可驳回或后续重新生成。</div>
     ${pager('/review', current, pages, data.items.length, pageSize)}
+  </form>
+  <form method="post" action="/actions/review/repair" style="margin:10px 0" onsubmit="return confirm('按当前节点与配额重算阻断草稿；不会修改 claims 内容。继续？')">
+    <button class="btn" type="submit">修复可修复阻断（重算提案/配额）</button>
+    <span class="muted">只修复节点动作与档位配额；来源缺失、重复入库等仍需人工处理。</span>
   </form>
   <div class="job-panel" id="job-panel" hidden>
     <div class="row" style="justify-content:space-between;align-items:center">

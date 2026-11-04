@@ -58,7 +58,7 @@ function fakeTransaction(): Transaction {
       listByState: nope('listByState'),
       listAll: nope('listAll'),
     },
-    drafts: { insert: nope('insert'), get: nope('get'), listByStatus: nope('listByStatus'), setStatus: nope('setStatus') },
+    drafts: { insert: nope('insert'), get: nope('get'), listByStatus: nope('listByStatus'), setStatus: nope('setStatus'), updateReview: nope('updateReview') },
     decisions: { append: nope('append') },
     commits: { append: nope('append') },
     jobs: { enqueue: nope('enqueue'), claimNext: nope('claimNext'), finish: nope('finish') },

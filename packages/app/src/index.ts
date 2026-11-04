@@ -12,3 +12,4 @@ export * from './health';
 export * from './quality';
 export * from './topics';
 export * from './qa';
+export * from './repair';

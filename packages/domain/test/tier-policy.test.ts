@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkClaimCount, TIER_CLAIM_LIMITS } from '../src/policies/tier-policy';
+import { checkClaimCount, fitTierForClaims, TIER_CLAIM_LIMITS } from '../src/policies/tier-policy';
 
 describe('tier-policy v1：claims 配额', () => {
   it('上限：等于上限通过，超过阻断', () => {
@@ -23,6 +23,14 @@ describe('tier-policy v1：claims 配额', () => {
       expect(verdict.min).toBe(1);
       expect(verdict.actual).toBe(0);
     }
+  });
+
+  it('fitTierForClaims：超限时换到可容纳档位，未超限保持不变', () => {
+    expect(fitTierForClaims('standard', 15)).toBe('standard');
+    expect(fitTierForClaims('accelerated', 16)).toBe('standard');
+    expect(fitTierForClaims('standard', 26)).toBe('full');
+    expect(fitTierForClaims('full', 26)).toBe('full');
+    expect(fitTierForClaims('standard', 80)).toBe('standard');
   });
 
   it('档位区间与生产逻辑一致（patch 25 / standard 25 / accelerated 12 / full 60）', () => {

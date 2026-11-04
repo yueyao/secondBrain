@@ -3,6 +3,7 @@ import {
   countJudgmentSentences,
   decideTriage,
   evaluateAll,
+  fitTierForClaims,
   firstHeading,
   parseFrontmatter,
   parseRawPath,
@@ -162,7 +163,8 @@ export async function draftDigest(ctx: AppContext, rawPath: RawPath): Promise<Dr
     if (node.action === 'patch' && !existing) return { ...node, action: 'new' as const };
     return node;
   });
-  const effectiveProposal = { ...proposal, nodes: normalizedNodes };
+  const fittedTier = fitTierForClaims(proposal.tier, proposal.claims.length);
+  const effectiveProposal = { ...proposal, tier: fittedTier, nodes: normalizedNodes };
 
   const findings = evaluateAll({
     rawPath: String(rawPath),

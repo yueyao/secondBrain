@@ -225,6 +225,16 @@ class Drafts {
     return rows.map(rowToDraft);
   }
 
+  async updateReview(
+    id: DraftId,
+    proposal: DraftRecord['proposal'],
+    findings: DraftRecord['findings'],
+    targetHashes: DraftRecord['targetHashes'],
+  ): Promise<void> {
+    this.store.stmt('UPDATE draft SET proposal = ?, findings = ?, target_hashes = ? WHERE id = ?')
+      .run(JSON.stringify(proposal), JSON.stringify(findings), JSON.stringify(targetHashes), String(id));
+  }
+
   async setStatus(id: DraftId, status: DraftStatus): Promise<void> {
     this.store.stmt('UPDATE draft SET status = ? WHERE id = ?').run(status, id);
   }

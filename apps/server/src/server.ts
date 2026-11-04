@@ -40,6 +40,7 @@ async function runLogged(dataDir: string, action: string, fn: () => Promise<stri
 import {
   decideReview,
   reviewDraftTargetFiles,
+  repairPendingDrafts,
   draftDigest,
   ingestAndTriage,
   listPendingDrafts,
@@ -648,12 +649,27 @@ export function createServer(runtime: Runtime): http.Server {
 
       if (req.method === 'GET' && path === '/review') {
         const url2 = new URL(req.url ?? '/', 'http://localhost');
+        const repairedRaw = url2.searchParams.get('repaired');
         return sendHtml(res, reviewListPage({
           items: await pendingReviewList(runtime.ctx),
           accepted: Number(url2.searchParams.get('ok') ?? '0'),
           failed: Number(url2.searchParams.get('failed') ?? '0'),
           jobId: url2.searchParams.get('job') ?? '',
+          repair: repairedRaw === null ? null : {
+            examined: Number(url2.searchParams.get('examined') ?? '0'),
+            repaired: Number(repairedRaw),
+            stillBlocked: Number(url2.searchParams.get('still') ?? '0'),
+          },
         }, Number(url2.searchParams.get('page') ?? '1')));
+      }
+      if (req.method === 'POST' && path === '/actions/review/repair') {
+        const report = await repairPendingDrafts(runtime.ctx);
+        const params = new URLSearchParams({
+          examined: String(report.examined),
+          repaired: String(report.repaired),
+          still: String(report.stillBlocked),
+        });
+        return redirect(res, `/review?${params.toString()}`);
       }
       if (req.method === 'POST' && path === '/actions/review/bulk-accept') {
         const params = await readFormParams(req);

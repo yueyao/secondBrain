@@ -2337,3 +2337,40 @@ pnpm run check
 ```
 
 生产 `/review` 需强制刷新拿到新脚本；全选、取消全选、已选计数、批量提交、进度面板应全部恢复。
+
+
+---
+
+## 七十五、审核 backlog 治理：暂停 worker + 存量草稿修复 + 档位自适应（2026-11-04）
+
+### 75.1 背景
+
+审核积压 266 篇，其中约 100 篇带结构性阻断；worker 队列仍有 2,035 条，持续生成会放大积压。按用户确认的方案执行：先暂停 worker，再修复存量可修复阻断，最后让生成阶段自动适配档位。
+
+### 75.2 交付
+
+| 项 | 改动 |
+|---|---|
+| 暂停 worker | 写入 `state/worker-pause.json`（本已因 pending_limit 暂停，现显式标记 owner 暂停），不再生成新草稿 |
+| 存量修复 | 新增 `@sb/app/repair.ts` 的 `repairPendingDrafts`：对 pending 草稿按当前节点归一化 `new↔patch`、按 claims 数量适配档位、重算 targetHashes 与 findings；只改 proposal/findings/targetHashes，不改 claims 内容与状态 |
+| 持久化 | `DraftRepo` 新增 `updateReview(id, proposal, findings, targetHashes)`，SQLite 实现同一事务更新 |
+| 入口 | 审核页新增「修复可修复阻断（重算提案/配额）」按钮 + `POST /actions/review/repair`，完成后回显检查/修复/仍阻断数量 |
+| 档位自适应 | 新增 `fitTierForClaims`：standard >25 自动升 full（≤60），accelerated >12 自动升 standard；digest 生成阶段先归一化节点再适配档位，未来草稿不再因"档位配额"被阻断 |
+| 测试 | domain 增加 fitTierForClaims 用例；`pnpm run check` 40 文件 / 363 例 |
+
+### 75.3 决策
+
+| 编号 | 决策 | 理由 |
+|---|---|---|
+| D102 | 存量阻断优先"机器可修复的结构问题"自动修复，不做事实改写 | new/patch 错配、档位超限都能从当前节点与配额推导；claims 内容与来源不能自动改 |
+| D103 | 生成阶段按 claims 数量自动选能容纳的档位 | 让模型输出的大小与门禁解耦，避免"生成即阻断"；超出 full 上限（>60）仍阻断 |
+
+### 75.4 验证
+
+```
+pnpm run check
+ Test Files  40 passed (40)
+      Tests  363 passed (363)
+```
+
+生产执行 repair 后预计可批量数显著上升；来源缺失/重复入库类仍阻断，需人工驳回或重新生成。

@@ -14,6 +14,7 @@ export {
 } from './long-text-policy';
 export {
   checkClaimCount,
+  fitTierForClaims,
   TIER_CLAIM_LIMITS,
   type ClaimCountVerdict,
   type ClaimLimits,
