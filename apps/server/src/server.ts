@@ -8,7 +8,7 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
-interface BulkJob { total: number; done: number; ok: number; failed: number; status: 'running' | 'done'; failedIds: string[]; }
+interface BulkJob { total: number; done: number; ok: number; failed: number; status: 'running' | 'done'; failedIds: string[]; failures: Array<{ readonly draftId: string; readonly reason: string }>; }
 const bulkJobs = new Map<string, BulkJob>();
 
 interface OpsRecord { readonly action: string; readonly at: string; readonly ok: boolean; readonly detail: string; }
@@ -39,6 +39,7 @@ async function runLogged(dataDir: string, action: string, fn: () => Promise<stri
 }
 import {
   decideReview,
+  reviewDraftTargetFiles,
   draftDigest,
   ingestAndTriage,
   listPendingDrafts,
@@ -665,25 +666,40 @@ export function createServer(runtime: Runtime): http.Server {
           return redirect(res, '/review?failed=0');
         }
         const jobId = Math.random().toString(36).slice(2, 10);
-        const job: BulkJob = { total: draftIds.length, done: 0, ok: 0, failed: 0, status: 'running', failedIds: [] };
+        const job: BulkJob = { total: draftIds.length, done: 0, ok: 0, failed: 0, status: 'running', failedIds: [], failures: [] };
         bulkJobs.set(jobId, job);
         // 先让本次响应发出去，再在后台串行处理：每次 accept 是一次 git commit，必须串行；
         // 每篇处理完让出事件循环，避免阻塞其他 HTTP 请求。
         setImmediate(() => {
           void (async () => {
+            // 同一批里已经写过的节点：后续草稿允许追加式重基（同批冲突），跨批/外部修改仍拒绝。
+            const touched = new Set<string>();
             for (const rawId of draftIds) {
               const parsed = parseDraftId(rawId);
-              if (parsed.ok) {
-                try {
-                  await decideReview(runtime.ctx, parsed.value, 'accept', { actor: 'owner', note: '批量通过' });
-                  job.ok += 1;
-                } catch {
-                  job.failed += 1;
-                  job.failedIds.push(rawId);
-                }
-              } else {
+              if (!parsed.ok) {
                 job.failed += 1;
                 job.failedIds.push(rawId);
+                job.failures.push({ draftId: rawId, reason: '草稿 id 不合法' });
+                job.done += 1;
+                await new Promise<void>((resolve) => setImmediate(resolve));
+                continue;
+              }
+              let files: readonly string[] = [];
+              try {
+                files = await reviewDraftTargetFiles(runtime.ctx, parsed.value);
+                const rebaseFiles = files.some((file) => touched.has(file)) ? touched : undefined;
+                await decideReview(runtime.ctx, parsed.value, 'accept', {
+                  actor: 'owner', note: '批量通过',
+                  // 批量模式对"目标已变化"的节点做追加式重基（不删除现有内容）；单篇审核仍 fail-closed。
+                  rebaseAll: true,
+                  ...(rebaseFiles === undefined ? {} : { rebaseFiles }),
+                });
+                job.ok += 1;
+                for (const file of files) touched.add(file);
+              } catch (error) {
+                job.failed += 1;
+                job.failedIds.push(rawId);
+                job.failures.push({ draftId: rawId, reason: String((error as Error).message ?? error) });
               }
               job.done += 1;
               await new Promise<void>((resolve) => setImmediate(resolve));

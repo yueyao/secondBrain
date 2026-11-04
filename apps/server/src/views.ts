@@ -198,6 +198,7 @@ details.disclosure>.disclosure-body{padding:0 11px 11px}
 .job-panel .bar{margin:9px 0 7px}
 .job-panel.done{border-color:var(--ok)}
 .review-row.is-queued{opacity:.45}
+.review-row input:disabled{opacity:.35;cursor:not-allowed}
 .review-row.is-queued td{background:rgba(226,88,34,.05)}
 
 /* 一次性入场，不做满屏 hover 动画 */
@@ -968,7 +969,7 @@ export function reviewListPage(data: ReviewListPageData, page = 1): string {
   const current = Math.min(pages, Math.max(1, Math.trunc(page)));
   const pageItems = data.items.slice((current - 1) * pageSize, current * pageSize);
   const rows = pageItems.map((item) => `<tr class="review-row">
-    <td><input type="checkbox" name="draftId" value="${esc(item.draftId)}"></td>
+    <td><input type="checkbox" name="draftId" value="${esc(item.draftId)}"${item.hasBlock ? ' disabled title="存在阻断级预警，不能批量通过"' : ''}></td>
     <td><a href="/review/${encodeURIComponent(item.draftId)}" class="review-link">${esc(item.title)}</a></td>
     <td>${esc(item.tier)}</td>
     <td>${item.hasBlock ? '<span class="badge b-block">阻断</span>' : '<span class="badge b-ok">可审</span>'}</td>
@@ -1000,7 +1001,9 @@ export function reviewListPage(data: ReviewListPageData, page = 1): string {
       <b>批量通过处理中</b><span class="mono" id="job-text">0/0</span>
     </div>
     <div class="bar"><i id="job-bar" style="width:0"></i></div>
-    <div class="muted">后台逐篇入库；页面可以继续滚动/勾选，完成后自动刷新。</div>
+    <div class="muted" id="job-hint">后台逐篇入库；目标节点已变化时按追加式合并（保留现有内容）。页面可以继续滚动/勾选，完成后自动刷新。</div>
+    <div class="mono" id="job-failures" style="margin-top:6px;white-space:pre-wrap;max-height:140px;overflow:auto" hidden></div>
+    <div class="row" style="justify-content:flex-end;margin-top:8px"><button class="btn" type="button" id="job-refresh" hidden>刷新列表</button></div>
   </div>
   <script>
   (function(){
@@ -1021,7 +1024,7 @@ export function reviewListPage(data: ReviewListPageData, page = 1): string {
       submit.disabled=n===0 || submit.dataset.busy==='1';
     }
     document.addEventListener('change',function(e){if(e.target && e.target.name==='draftId')refresh();});
-    document.getElementById('select-all').addEventListener('click',function(){boxes().forEach(function(c){c.checked=true;});refresh();});
+    document.getElementById('select-all').addEventListener('click',function(){boxes().forEach(function(c){if(!c.disabled)c.checked=true;});refresh();});
     document.getElementById('clear-all').addEventListener('click',function(){boxes().forEach(function(c){c.checked=false;});refresh();});
     form.addEventListener('submit',function(e){
       e.preventDefault();
@@ -1045,8 +1048,20 @@ export function reviewListPage(data: ReviewListPageData, page = 1): string {
               if(d.status==='done'){
                 clearInterval(timer);
                 panel.classList.add('done');
-                jobText.textContent='完成：成功 '+d.ok+' / 失败 '+d.failed+'，刷新中…';
-                setTimeout(function(){location.href='/review?ok='+d.ok+'&failed='+d.failed;},600);
+                jobText.textContent='完成：成功 '+d.ok+' / 失败 '+d.failed;
+                var fails=(d.failures||[]);
+                var failureBox=document.getElementById('job-failures');
+                var hint=document.getElementById('job-hint');
+                var refreshBtn=document.getElementById('job-refresh');
+                if(fails.length>0){
+                  failureBox.hidden=false;
+                  failureBox.textContent=fails.slice(0,8).map(function(f){return f.draftId+'：'+f.reason;}).join('\n');
+                  hint.textContent='失败项仍在待审；常见原因是存在阻断级预警，或草稿数据本身不完整。';
+                  refreshBtn.hidden=false;
+                } else {
+                  hint.textContent='全部成功，刷新中…';
+                  setTimeout(function(){location.href='/review?ok='+d.ok+'&failed='+d.failed;},600);
+                }
               }
             });
           },800);
@@ -1056,6 +1071,8 @@ export function reviewListPage(data: ReviewListPageData, page = 1): string {
           window.alert('提交失败：'+err.message);
         });
     });
+    var refreshBtnInit=document.getElementById('job-refresh');
+    if(refreshBtnInit)refreshBtnInit.addEventListener('click',function(){location.href='/review';});
     refresh();
   })();
   </script>

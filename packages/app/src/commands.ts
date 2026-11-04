@@ -242,14 +242,19 @@ export async function decideReview(
   ctx: AppContext,
   draftId: DraftId,
   action: 'accept' | 'reject',
-  input: { readonly actor: string; readonly note?: string },
+  input: { readonly actor: string; readonly note?: string; readonly rebaseFiles?: ReadonlySet<string>; readonly rebaseAll?: boolean },
 ): Promise<DecideResult> {
   const now = ctx.clock.now();
   const draft = await ctx.store.transaction(async (tx) => tx.drafts.get(draftId));
   if (!draft) throw new AppError('NOT_FOUND', `草稿不存在：${draftId}`);
 
   // 之前已批准但未完成提交（崩溃/中断）：直接重放提交
-  if (draft.status === 'approved') return commitApproved(ctx, draftId);
+  if (draft.status === 'approved') {
+    return commitApproved(ctx, draftId, {
+      ...(input.rebaseFiles === undefined ? {} : { rebaseFiles: input.rebaseFiles }),
+      ...(input.rebaseAll === true ? { rebaseAll: true } : {}),
+    });
+  }
   if (draft.status !== 'pending') throw new AppError('INVALID_STATE', `草稿状态为 ${draft.status}`);
 
   return action === 'accept'
@@ -275,7 +280,7 @@ async function acceptDraft(
   draftId: DraftId,
   draft: DraftRecord,
   now: string,
-  input: { readonly actor: string; readonly note?: string },
+  input: { readonly actor: string; readonly note?: string; readonly rebaseFiles?: ReadonlySet<string>; readonly rebaseAll?: boolean },
 ): Promise<DecideResult> {
   if (hasBlock(draft.findings)) {
     throw new AppError('GATE_BLOCKED', '存在阻断级预警，不能入库', {
@@ -307,14 +312,25 @@ async function acceptDraft(
     });
   });
 
-  return commitApproved(ctx, draftId);
+  return commitApproved(ctx, draftId, input.rebaseFiles ? { rebaseFiles: input.rebaseFiles } : {});
+}
+
+/** 批量通过用：读取草稿将要写入的文件列表（用于同批冲突重基）。 */
+export async function reviewDraftTargetFiles(ctx: AppContext, draftId: DraftId): Promise<readonly string[]> {
+  const draft = await ctx.store.transaction(async (tx) => tx.drafts.get(draftId));
+  if (!draft) throw new AppError('NOT_FOUND', `草稿不存在：${draftId}`);
+  return [...new Set(draft.proposal.nodes.map((node) => (node.action === 'new' ? nodeFile(node) : targetFile(ctx, node.name))))];
 }
 
 /**
  * 阶段二：写入 wiki 并提交（幂等）。
  * 可被 accept 调用，也可被启动恢复调用；重复执行不会产生重复 claim 或重复 commit。
  */
-export async function commitApproved(ctx: AppContext, draftId: DraftId): Promise<DecideResult> {
+export async function commitApproved(
+  ctx: AppContext,
+  draftId: DraftId,
+  options: { readonly rebaseFiles?: ReadonlySet<string>; readonly rebaseAll?: boolean } = {},
+): Promise<DecideResult> {
   const now = ctx.clock.now();
   const draft = await ctx.store.transaction(async (tx) => tx.drafts.get(draftId));
   if (!draft) throw new AppError('NOT_FOUND', `草稿不存在：${draftId}`);
@@ -353,18 +369,25 @@ export async function commitApproved(ctx: AppContext, draftId: DraftId): Promise
       const file = node.action === 'new' ? nodeFile(node) : targetFile(ctx, node.name);
       const existing = await readNodeOrNull(ctx, file);
       const nodeClaims = claimsForNode(node, draft.proposal.claims);
-      const content = node.action === 'new'
-        ? renderNewNode(node, nodeClaims, sourcePath, today)
-        : renderPatchedNode(existing ?? '', nodeClaims, sourcePath, today);
+      let content = node.action === 'new'
+        ? (existing === null ? renderNewNode(node, nodeClaims, sourcePath, today) : renderPatchedNode(existing, nodeClaims, sourcePath, today))
+        : (existing === null ? renderNewNode(node, nodeClaims, sourcePath, today) : renderPatchedNode(existing, nodeClaims, sourcePath, today));
 
       if (existing === content) continue; // 已写完
       // 崩溃重放：上一次已经把这些 claim 写进去了，跳过硬性重渲染（避免重复追加）
-      if (node.action === 'patch' && claimsApplied(existing, draft.proposal.claims)) continue;
+      if (claimsApplied(existing, draft.proposal.claims)) continue;
       if (existing !== null) {
         const baseline = draft.targetHashes[file];
-        if (!baseline) throw new AppError('TARGET_MOVED', `缺少目标文件基线，拒绝覆盖：${file}`);
-        if (ctx.hash.sha256(existing) !== baseline) {
-          throw new AppError('TARGET_MOVED', `目标文件在起草后被修改，拒绝覆盖：${file}`);
+        const moved = baseline === undefined || ctx.hash.sha256(existing) !== baseline;
+        if (moved) {
+          // 同一批 accept 中前面的草稿已经改过这个节点：允许"追加式"重基（renderPatchedNode 只追加 claims，不删除旧内容）。
+          const canRebase = options.rebaseAll === true || (options.rebaseFiles?.has(file) ?? false);
+          if (!canRebase) {
+            throw new AppError('TARGET_MOVED', baseline === undefined
+              ? `缺少目标文件基线，拒绝覆盖：${file}`
+              : `目标文件在起草后被修改，拒绝覆盖：${file}`);
+          }
+          content = renderPatchedNode(existing, nodeClaims, sourcePath, today);
         }
       }
       writes.push({ file, content });
