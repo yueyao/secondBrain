@@ -2436,3 +2436,37 @@ pnpm run check
 ```
 
 重新部署后用同一批 3 篇 rolled_back 草稿重跑批量，应能入库；失败会给出新的、真实的原因。
+
+
+---
+
+## 七十八、真实批量提交排查：三类隐藏失败全部修通（2026-11-04）
+
+### 78.1 日志与实测证据
+
+- 事件表显示上一批 4 篇：2 篇 committed、2 篇 rolled_back，原因均为 `TARGET_MOVED: wiki/concepts/世界模型.md`；
+- 随后用 3 篇真实 pending 草稿（同一节点「李丰」）做批量提交测试，全部立即失败：`条目状态 rolled_back，无法批准`；
+- 说明失败不是单点，而是两个隐藏问题叠加：
+  1. 任何一次 accept 失败都会把 raw_item 置为 `rolled_back`，但 `acceptDraft` 只接受 `draft_ready / in_review`，失败草稿永远无法重试；
+  2. `acceptDraft` 最终调用 `commitApproved` 时**没有把 `rebaseAll` 传下去**，所以批量模式的追加式重基实际只在 approved 分支生效，批量仍被 `TARGET_MOVED` 拦。
+
+### 78.2 修复
+
+- 领域状态机新增 `REOPEN_FOR_REVIEW`：`rolled_back → in_review`；accept 时遇到 rolled_back 先重开再入库，且允许重基；
+- `acceptDraft` 的最终 `commitApproved` 调用补上 `rebaseAll`（与 approved 分支一致）；
+- 状态矩阵 18×25 事件、flow 用例覆盖 rebaseAll 行为。
+
+### 78.3 验证
+
+- 同一批 3 篇草稿重跑：`ok=3, failed=0`，全部写入 wiki；
+- `pnpm run check`：40 文件 / **364 例**；
+- 服务器 HEAD `2b38a6f`；worker 保持 paused。
+
+### 78.4 决策
+
+D106：**批量链路必须用真实草稿端到端跑通**；只看单篇用例或 mock 会漏掉"状态机遗留态""选项透传丢失"这类只在批处理路径出现的问题。
+
+### 78.5 当前剩余
+
+- pending 262，可批量 246，阻断 16（source-exists 13、new-node-name 3）；
+- 16 篇需人工修 raw 路径或驳回；其余可正常批量。
