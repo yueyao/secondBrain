@@ -191,6 +191,10 @@ describe('主编台 Compose（AI 大纲 + 正文版本链）', () => {
     expect(detail).toContain('版本历史（1）');
     expect(detail).toContain('AI 初稿');
     expect(detail).toContain('待主编审');
+    // 写作契约与审引清单
+    expect(detail).toContain('写作契约');
+    expect(detail).toContain('审引清单');
+    expect(detail).toContain('审引通过');
     // 正文里的引用渲染成可点开的原文链接
     expect(detail).toContain('/articles/raw%2F');
 
@@ -412,7 +416,7 @@ describe('导航信息架构（一级分组 + 二级菜单）', () => {
     for (const label of ['工作台', '内容', '知识', '写作', '运维', '帮助']) {
       expect(home).toContain(label);
     }
-    for (const href of ['/articles', '/review', '/exceptions', '/nodes', '/claims', '/search', '/compose', '/deai', '/operations', '/usage', '/guide', '/about']) {
+    for (const href of ['/articles', '/review', '/exceptions', '/nodes', '/claims', '/kb-health', '/search', '/compose', '/deai', '/operations', '/usage', '/guide', '/about']) {
       expect(home).toContain(`href="${href}"`);
     }
     // 首页：工作台 active；主编台：写作分组 active
@@ -433,5 +437,17 @@ describe('展示时间（去掉 ISO 的 T、转本地时区）', () => {
     const compose = await (await fetch(`${base}/compose`)).text();
     expect(compose).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
     expect(compose).toMatch(/\d{4}-\d{2}-\d{2}/);
+  });
+});
+
+
+describe('知识库体检页（只读）', () => {
+  it('体检页可打开并给出统计与问题分类', async () => {
+    const response = await fetch(`${base}/kb-health`);
+    const html = await response.text();
+    expect(response.status).toBe(200);
+    for (const keyword of ['知识库体检', '链接健康', '节点完整性', 'claims 健康', '处理建议', '知识节点', 'raw 来源缺失', '孤立节点', '重复 claims']) {
+      expect(html).toContain(keyword);
+    }
   });
 });

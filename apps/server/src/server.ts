@@ -69,12 +69,15 @@ import {
   exportArticleMarkdown,
   deAiText,
   deAiArticleVersion,
+  knowledgeHealth,
+  evaluateWritingContract,
+  auditArticleCitations,
 } from '@sb/app';
 import type { DeAiStyle } from '@sb/contracts';
 import { analyzeAiFlavor, parseDraftId, parseRawPath, type DraftId, type RawPath } from '@sb/domain';
 import type { Runtime } from './runtime';
 import { collectRepoStatus, isValidRemoteUrl, pullRepo, pushRepo, readRepoOverrides, repoDescriptors, setRepoRemote, writeRepoOverrides } from './repos';
-import { aboutPage, adminPage, deAiPage, articlePage, articlesPage, claimsPage, composeArticlePage, composeDiffPage, composePage, dashboard, errorPage, guidePage, nodePage, nodesPage, reviewListPage, reviewPage, searchPage, usagePage } from './views';
+import { aboutPage, adminPage, deAiPage, healthPage, articlePage, articlesPage, claimsPage, composeArticlePage, composeDiffPage, composePage, dashboard, errorPage, guidePage, nodePage, nodesPage, reviewListPage, reviewPage, searchPage, usagePage } from './views';
 
 function redirect(res: http.ServerResponse, location: string): void {
   res.writeHead(303, { location });
@@ -243,7 +246,9 @@ export function createServer(runtime: Runtime): http.Server {
         const id = decodeURIComponent(path.slice('/compose/'.length));
         const detail = await composeArticleView(runtime.ctx, id);
         if (!detail) return sendHtml(res, errorPage('文章不存在'), 404);
-        return sendHtml(res, composeArticlePage(detail));
+        const contract = detail.current !== null ? evaluateWritingContract(detail.current.contentMd) : null;
+        const citationAudit = detail.current !== null ? await auditArticleCitations(runtime.ctx, id) : null;
+        return sendHtml(res, composeArticlePage({ ...detail, contract, citationAudit }));
       }
       if (req.method === 'POST' && path === '/actions/compose/outline') {
         const form = await readForm(req);
@@ -353,6 +358,9 @@ export function createServer(runtime: Runtime): http.Server {
             ...base, before: null, after: null, rewritten: null, model: null, cost: null, error: message,
           }), 400);
         }
+      }
+      if (req.method === 'GET' && path === '/kb-health') {
+        return sendHtml(res, healthPage(await knowledgeHealth(runtime.ctx)));
       }
       if (req.method === 'GET' && path === '/exceptions') {
         return redirect(res, '/articles?group=error');

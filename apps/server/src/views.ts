@@ -1,7 +1,16 @@
 /** 服务端渲染的审核台（无前端框架，手机可用）。 */
 import type { DeAiStyle, QueueItemV1, ReviewViewV1, ScoredHit } from '@sb/contracts';
 import { AI_FLAVOR_RULES, type AiFlavorReport } from '@sb/domain';
-import { formatClock, formatDate, formatDateTime } from '@sb/app';
+import {
+  formatClock,
+  formatDate,
+  formatDateTime,
+  KNOWLEDGE_HEALTH_ISSUE_LIMIT,
+  type CitationAuditReport,
+  type KnowledgeHealthReport,
+  type QualityStatus,
+  type WritingContractReport,
+} from '@sb/app';
 import { webRepoUrl, type RepoStatus } from './repos';
 
 const esc = (value: unknown): string =>
@@ -436,6 +445,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
     children: [
       { href: '/nodes', label: '知识节点' },
       { href: '/claims', label: 'claims' },
+      { href: '/kb-health', label: '体检' },
       { href: '/search', label: '搜索' },
     ],
   },
@@ -1105,6 +1115,10 @@ export function composeArticlePage(data: {
     instruction: string | null; note: string | null; createdAt: string;
   }[];
   current: { versionNo: number; contentMd: string; createdAt: string } | null;
+  /** 写作契约检查（当前版本；无正文时为 null）。 */
+  readonly contract: WritingContractReport | null;
+  /** 审引清单（当前版本；无正文时为 null）。 */
+  readonly citationAudit: CitationAuditReport | null;
 }): string {
   const nodes = data.nodes.map((node) => `<div class="card" style="margin:8px 0">
     <div><b>${esc(node.name)}</b> <span class="badge">${esc(node.nodeType)}</span> <span class="muted">${node.claimCount} claims</span></div>
@@ -1159,6 +1173,15 @@ export function composeArticlePage(data: {
       : '',
   ].filter((entry) => entry !== '').join(' ');
 
+  const qualityPanels = data.current
+    ? `<h2>写作契约（v${data.current.versionNo}）</h2>
+  <div class="card" style="padding:4px 0"><table><tr><th style="width:260px">检查项</th><th style="width:80px">状态</th><th>说明</th></tr>${qualityRows(data.contract?.checks ?? [])}</table></div>
+  <div class="muted">通过 ${data.contract?.passCount ?? 0} · 注意 ${data.contract?.warnCount ?? 0} · 不通过 ${data.contract?.failCount ?? 0}（只做提示，不阻断保存）</div>
+  <h2>审引清单</h2>
+  <div class="card" style="padding:4px 0"><table><tr><th style="width:260px">检查项</th><th style="width:80px">状态</th><th>说明</th></tr>${qualityRows(data.citationAudit?.checks ?? [])}</table></div>
+  <div class="muted">${data.citationAudit !== null ? `引用标记 ${data.citationAudit.markerCount} 处 / 去重来源 ${data.citationAudit.uniqueSources} 个 · ${data.citationAudit.passed ? '审引通过' : '审引存在阻断项'}` : '还没有正文，无法审引'}；引用可点开原文核对，导出前建议逐条确认。</div>`
+    : '<div class="card muted">生成正文后，这里会显示「写作契约」与「审引清单」检查结果。</div>';
+
   return layout('主编台 · 文章', `${nav('/compose')}
   <div class="row" style="justify-content:space-between;align-items:center"><h1>${esc(data.title)}</h1><div class="row" style="gap:8px;align-items:center"><a class="btn" href="/compose">← 主编台</a>${actions}</div></div>
   <div class="muted">${esc(data.theme || '未设主题')} · <span class="badge${data.status === 'final' ? ' b-ok' : ''}">${esc(statusLabel)}</span> · 更新 ${esc(formatDateTime(data.updatedAt))}</div>
@@ -1178,6 +1201,8 @@ export function composeArticlePage(data: {
     <button class="btn" type="submit"${hasOutline ? '' : ' disabled'}>生成正文 v${nextVersionNo}</button>
     <span class="muted" style="margin-left:10px">${hasOutline ? '基于已确认大纲与 claims 生成，文中每个判断都带来源引用' : '请先填写或生成大纲'}</span></form></div>
   ${body}
+
+  ${qualityPanels}
 
   <h2>改稿</h2>
   <div class="card"><form method="post" action="/actions/compose/refine" onsubmit="return confirm('按指令生成 v${nextVersionNo}，可能产生费用。继续？')">
@@ -1252,6 +1277,7 @@ export function aboutPage(data: AboutPageData): string {
     { title: '去 AI 味', href: '/deai', group: '写作', body: '独立能力：先用规则做 AI 味体检（框架词/黑话/对仗/宏大叙事/句长均匀/标点痕迹，加权评分），再由模型按命中清单改写；保留事实、数字与引用，主编台正文可一键生成新版本。' },
     { title: '知识节点', href: '/nodes', group: '知识', body: '已入库知识的结构化视图：Top N 枢纽气泡图（面积 ∝ claims 数）、类型筛选、搜索；节点详情含定义、claims、来源原文与相关概念。' },
     { title: 'claims', href: '/claims', group: '知识', body: '已入库草稿的全部判断句与来源，用来抽查"知识到底沉淀了什么"、追溯每句话的原文出处。' },
+    { title: '知识体检', href: '/kb-health', group: '知识', body: '知识库健康度只读检查：断链、孤立节点、无 claims/无定义节点、无来源判断、重复节点/claims、raw 来源缺失与陈旧节点。' },
     { title: '搜索', href: '/search', group: '知识', body: '站内检索知识库（节点名 / 别名 / 正文），结果可直接打开节点。' },
     { title: '异常', href: '/exceptions', group: '内容', body: '集中查看 failed / blocked / rolled_back / quarantined 等异常原文，按分组筛选，便于排查或重跑。' },
     { title: '运维中心', href: '/operations', group: '运维', body: '系统运行态：今日进度、worker 心跳/阶段、暂停与继续、立即扫描/同步/备份、待审背压配置、吞吐图、最近事件与 worker 日志；以及三个 GitHub 仓库（代码/vault/raw）的地址、HEAD、落后状态与一键更新/切换远端。' },
@@ -1450,4 +1476,98 @@ export function deAiPage(data: DeAiPageData): string {
   <h2>检测项与权重</h2>
   <div class="card" style="padding:4px 0"><table><tr><th>规则</th><th>类别</th><th>权重</th><th>改写建议</th></tr>${rules}</table></div>
   <div class="muted" style="margin-top:14px">说明：这是"降 AI 味"的写作辅助，不承诺通过任何 AI 检测工具；引用、专名、被讨论的词一律不改。</div>`);
+}
+
+const QUALITY_STATUS: Record<QualityStatus, { readonly label: string; readonly cls: string }> = {
+  pass: { label: '通过', cls: 'b-ok' },
+  warn: { label: '注意', cls: 'b-warn' },
+  fail: { label: '不通过', cls: 'b-block' },
+};
+
+function qualityRows(checks: readonly { readonly label: string; readonly status: QualityStatus; readonly detail: string }[]): string {
+  return checks.map((item) => {
+    const style = QUALITY_STATUS[item.status];
+    return `<tr><td>${esc(item.label)}</td><td><span class="badge ${style.cls}">${style.label}</span></td><td class="muted">${esc(item.detail)}</td></tr>`;
+  }).join('') || '<tr><td colspan="3" class="muted">暂无检查项</td></tr>';
+}
+
+function healthList(items: readonly string[]): string {
+  return items.length === 0
+    ? '<span class="muted">无</span>'
+    : items.slice(0, 60).map((item) => `<span class="badge" style="margin:0 6px 6px 0">${esc(item)}</span>`).join('');
+}
+
+/** 知识库体检页（只读）：统计 + 问题列表 + 处理建议。 */
+export function healthPage(data: KnowledgeHealthReport): string {
+  const stat = (value: string, label: string): string => `<div class="stat"><b>${value}</b><span>${label}</span></div>`;
+  const issueTable = (rows: readonly string[], headers: readonly string[], empty: string): string =>
+    rows.length === 0
+      ? `<div class="card muted">${esc(empty)}</div>`
+      : `<div class="card" style="padding:4px 0"><table><tr>${headers.map((header) => `<th>${esc(header)}</th>`).join('')}</tr>${rows.join('')}</table></div>`;
+  const limitHint = (count: number): string =>
+    count > KNOWLEDGE_HEALTH_ISSUE_LIMIT ? `<div class="muted">仅显示前 ${KNOWLEDGE_HEALTH_ISSUE_LIMIT} 条（共 ${count} 条）。</div>` : '';
+
+  const brokenLinkRows = data.issues.brokenLinks.map((item) => `<tr><td>${esc(item.node)}</td><td class="muted">[[${esc(item.target)}]]</td></tr>`);
+  const missingRawRows = data.issues.missingRawLinks.map((item) => `<tr><td>${esc(item.node)}</td><td class="muted">${esc(item.source)}</td></tr>`);
+  const malformedRows = data.issues.claimsWithoutSource.map((item) => `<tr><td>${esc(item.node)}</td><td class="muted">${esc(item.text)}</td></tr>`);
+  const duplicateClaimRows = data.issues.duplicateClaims.map((item) => `<tr><td class="muted">${esc(item.text)}</td><td>${item.nodes.map((node) => esc(node)).join('<br>')}</td></tr>`);
+  const duplicateNodeRows = data.issues.duplicateNodeGroups.map((item) => `<tr><td>${item.names.map((name) => esc(name)).join(' / ')}</td><td class="muted">${item.files.map((file) => esc(file)).join('<br>')}</td></tr>`);
+  const staleRows = data.issues.staleNodes.map((item) => `<tr><td>${esc(item.node)}</td><td class="muted">${esc(formatDate(item.updatedAt))}</td></tr>`);
+
+  return layout('知识库体检', `${nav('/kb-health')}
+  <div class="row" style="justify-content:space-between"><h1>知识库体检</h1><a class="btn" href="/nodes">去节点页 →</a></div>
+  <div class="muted" style="max-width:900px">只读检查，不会修改知识库。参考 llm-wiki 的 lint、SciCrucible 的健康检查与我们的数据模型（claims / 节点 / raw 来源 / 文章）。
+  生成时间：${esc(formatDateTime(data.generatedAt, { seconds: true }))}。</div>
+
+  <div class="row" style="margin:18px 0">
+    ${stat(data.nodes.toLocaleString(), '知识节点')}
+    ${stat(data.claims.toLocaleString(), 'claims')}
+    ${stat(data.brokenLinks.toLocaleString(), '节点断链')}
+    ${stat(data.missingRawLinks.toLocaleString(), 'raw 来源缺失')}
+    ${stat(data.orphanNodes.toLocaleString(), '孤立节点')}
+    ${stat(data.duplicateClaims.toLocaleString(), '重复 claims')}
+    ${stat(data.duplicateNodeGroups.toLocaleString(), '重复节点组')}
+    ${stat(data.staleNodes.toLocaleString(), '陈旧节点')}
+  </div>
+
+  <h2>链接健康</h2>
+  <div class="muted">节点断链（<code>[[目标]]</code> 指向不存在的节点）：</div>
+  ${issueTable(brokenLinkRows, ['节点', '目标'], '没有发现节点断链')}
+  ${limitHint(data.brokenLinks)}
+  <div class="muted" style="margin-top:12px">raw 来源缺失（claims/来源里引用了 raw/ 中不存在的文件）：</div>
+  ${issueTable(missingRawRows, ['节点', '来源'], '没有发现 raw 来源缺失')}
+  ${limitHint(data.missingRawLinks)}
+
+  <h2>节点完整性</h2>
+  <div class="row" style="align-items:flex-start;gap:16px">
+    <div class="card" style="flex:1;min-width:260px"><b>无 claims 节点（${data.nodesWithoutClaims}）</b><div style="margin-top:8px">${healthList(data.issues.nodesWithoutClaims)}</div></div>
+    <div class="card" style="flex:1;min-width:260px"><b>无定义节点（${data.nodesWithoutDefinition}）</b><div style="margin-top:8px">${healthList(data.issues.nodesWithoutDefinition)}</div></div>
+    <div class="card" style="flex:1;min-width:260px"><b>孤立节点（${data.orphanNodes}）</b><div style="margin-top:8px">${healthList(data.issues.orphanNodes)}</div></div>
+  </div>
+  <div class="muted" style="margin-top:12px">重复节点（同名/别名指向多个文件）：</div>
+  ${issueTable(duplicateNodeRows, ['名称', '文件'], '没有发现重复节点')}
+  ${limitHint(data.duplicateNodeGroups)}
+  <div class="muted" style="margin-top:12px">陈旧节点（超过 180 天未更新）：</div>
+  ${issueTable(staleRows, ['节点', '最近更新'], '没有发现陈旧节点')}
+  ${data.nodesMissingUpdatedAt > 0 ? `<div class="muted">另有 ${data.nodesMissingUpdatedAt} 个节点缺少 updated_at 字段。</div>` : ''}
+
+  <h2>claims 健康</h2>
+  <div class="muted">没有来源标记的判断句（应补 <code>（来源：[[raw/...]]）</code>）：</div>
+  ${issueTable(malformedRows, ['节点', '文本'], '没有发现无来源判断')}
+  ${limitHint(data.claimsWithoutSource)}
+  <div class="muted" style="margin-top:12px">重复 claims（同一判断出现在多个节点）：</div>
+  ${issueTable(duplicateClaimRows, ['判断句', '出现节点'], '没有发现重复 claims')}
+  ${limitHint(data.duplicateClaims)}
+
+  <h2>处理建议</h2>
+  <div class="card">
+    <ol>
+      <li>先处理 <b>raw 来源缺失</b>：引用不存在意味着无法回溯，优先补文件或删除该判断。</li>
+      <li>再处理 <b>节点断链</b>：补对应节点，或修正链接到正确名称/别名。</li>
+      <li><b>无 claims / 无定义</b>的节点通常是导入残留，合并到相近节点或补充内容。</li>
+      <li><b>重复节点/claims</b> 优先合并，避免同一判断在多处漂移。</li>
+      <li>孤立节点检查是否漏挂到主题地图，或本来就该删除/归档。</li>
+      <li>体检是只读建议；改动仍走审核/编辑流程，不要直接改状态库。</li>
+    </ol>
+  </div>`);
 }
