@@ -519,10 +519,13 @@ describe('审核批量通过（异步）', () => {
     const draftId = (digest.headers.get('location') ?? '').replace('/review/', '');
     expect(draftId).not.toBe('');
 
+    // 浏览器 FormData 走 multipart，服务端必须能解析到 draftId
+    const form = new FormData();
+    form.append('draftId', draftId);
     const created = await fetch(`${base}/actions/review/bulk-accept`, {
       method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
-      body: new URLSearchParams([['draftId', draftId]]).toString(),
+      headers: { accept: 'application/json' },
+      body: form,
     });
     expect(created.status).toBe(200);
     const job = (await created.json()) as { ok: boolean; jobId: string; total: number };
@@ -539,6 +542,16 @@ describe('审核批量通过（异步）', () => {
     expect(state?.status).toBe('done');
     expect(state?.ok).toBe(1);
     expect(state?.failed).toBe(0);
+
+    const empty = await fetch(`${base}/actions/review/bulk-accept`, {
+      method: 'POST',
+      headers: { accept: 'application/json', 'content-type': 'application/x-www-form-urlencoded' },
+      body: '',
+    });
+    expect(empty.status).toBe(400);
+    const emptyBody = (await empty.json()) as { ok: boolean; error?: { code?: string } };
+    expect(emptyBody.ok).toBe(false);
+    expect(emptyBody.error?.code).toBe('NO_DRAFTS');
 
     const reviewHtml = await (await fetch(`${base}/review`)).text();
     expect(reviewHtml).toContain('批量通过');

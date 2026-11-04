@@ -1028,9 +1028,9 @@ export function reviewListPage(data: ReviewListPageData, page = 1): string {
       var ids=selected().map(function(c){return c.value;});
       if(ids.length===0)return;
       submit.dataset.busy='1';submit.disabled=true;submit.textContent='提交中…';
-      var fd=new FormData();
-      ids.forEach(function(id){fd.append('draftId',id);});
-      fetch('/actions/review/bulk-accept',{method:'POST',body:fd,headers:{accept:'application/json'}})
+      var body=new URLSearchParams();
+      ids.forEach(function(id){body.append('draftId',id);});
+      fetch('/actions/review/bulk-accept',{method:'POST',body:body.toString(),headers:{accept:'application/json','content-type':'application/x-www-form-urlencoded'}})
         .then(function(r){return r.json();})
         .then(function(job){
           if(!job.ok)throw new Error(job.error&&job.error.message?job.error.message:'提交失败');

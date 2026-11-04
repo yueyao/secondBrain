@@ -2181,3 +2181,36 @@ pnpm run check
 ```
 
 生产环境确认 `/review` 页面含 `job-panel` / `sel-count`，提交入口无 `confirm()`；后台 job 仍逐篇入库并记录失败。
+
+
+---
+
+## 七十一、修复审核批量通过"假成功"：multipart 解析（2026-11-04）
+
+### 71.1 根因
+
+浏览器 `FormData` 提交的是 `multipart/form-data`，而 `readFormParams` 只按 `application/x-www-form-urlencoded` 解析，导致 `draftId` 一个都没收到：服务端创建了 `total=0` 的 job，前端显示"完成：成功 0 / 失败 0"，草稿原样留在待审——用户感知为"入库失败"。
+
+### 71.2 修复
+
+- `readFormParams` 增加 multipart 文本字段解析（兼容浏览器 FormData；也保留 urlencoded）；
+- 批量通过端点在 `draftId` 为空时返回 **400 `NO_DRAFTS`**（JSON）或重定向失败提示，不再静默创建空 job；
+- 前端改为显式 `application/x-www-form-urlencoded` 提交（更简单，也不依赖 multipart 解析），并继续处理 `{ok:false,error}` 响应；
+- e2e 改为用 **FormData（multipart）** 提交真实路径，并断言空列表返回 400。
+
+### 71.3 决策
+
+| 编号 | 决策 | 理由 |
+|---|---|---|
+| D95 | "零输入"必须显式失败，不能当作成功 job | 静默成功比报错更危险：用户会以为已入库，实际数据没变；批量入口必须校验 `draftId` 非空 |
+| D96 | 表单解析同时兼容 urlencoded 与 multipart | 浏览器/curl/脚本的默认提交格式不同；入口层统一解析，避免同类问题再次发生 |
+
+### 71.4 验证
+
+```
+pnpm run check
+ Test Files  40 passed (40)
+      Tests  360 passed (360)
+```
+
+生产验证：multipart 提交无效 draftId 现在返回 `total:1`（能被解析），空列表返回 400 `NO_DRAFTS`；不再出现"成功 0 / 失败 0 但草稿未动"。

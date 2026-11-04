@@ -108,10 +108,32 @@ function sendDownload(res: http.ServerResponse, filename: string, content: strin
   res.end(content);
 }
 
+/** 解析 multipart/form-data（浏览器 FormData）里的文本字段；只支持本项目用到的简单字段。 */
+function parseMultipartForm(body: string, boundary: string): URLSearchParams {
+  const params = new URLSearchParams();
+  for (const rawPart of body.split(`--${boundary}`)) {
+    const part = rawPart.replace(/^\r\n/, '').replace(/\r\n$/, '');
+    if (part === '' || part === '--') continue;
+    const headerEnd = part.indexOf('\r\n\r\n');
+    if (headerEnd < 0) continue;
+    const headers = part.slice(0, headerEnd);
+    const name = /name="([^"]+)"/u.exec(headers)?.[1];
+    if (name === undefined) continue;
+    params.append(name, part.slice(headerEnd + 4));
+  }
+  return params;
+}
+
 async function readFormParams(req: http.IncomingMessage): Promise<URLSearchParams> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) chunks.push(chunk as Buffer);
-  return new URLSearchParams(Buffer.concat(chunks).toString('utf8'));
+  const raw = Buffer.concat(chunks).toString('utf8');
+  const contentType = String(req.headers['content-type'] ?? '');
+  if (contentType.includes('multipart/form-data')) {
+    const boundary = /boundary=(?:"([^"]+)"|([^;]+))/u.exec(contentType);
+    if (boundary) return parseMultipartForm(raw, boundary[1] ?? boundary[2] ?? '');
+  }
+  return new URLSearchParams(raw);
 }
 
 async function readForm(req: http.IncomingMessage): Promise<Record<string, string>> {
@@ -635,6 +657,13 @@ export function createServer(runtime: Runtime): http.Server {
       if (req.method === 'POST' && path === '/actions/review/bulk-accept') {
         const params = await readFormParams(req);
         const draftIds = params.getAll('draftId');
+        const wantsJson = (req.headers.accept ?? '').includes('application/json');
+        if (draftIds.length === 0) {
+          if (wantsJson) {
+            return sendJson(res, { ok: false, error: { code: 'NO_DRAFTS', message: '没有收到任何草稿 id（表单格式不匹配）' } }, 400);
+          }
+          return redirect(res, '/review?failed=0');
+        }
         const jobId = Math.random().toString(36).slice(2, 10);
         const job: BulkJob = { total: draftIds.length, done: 0, ok: 0, failed: 0, status: 'running', failedIds: [] };
         bulkJobs.set(jobId, job);
@@ -662,7 +691,6 @@ export function createServer(runtime: Runtime): http.Server {
             job.status = 'done';
           })();
         });
-        const wantsJson = (req.headers.accept ?? '').includes('application/json');
         if (wantsJson) return sendJson(res, { ok: true, jobId, total: job.total });
         return redirect(res, `/review?job=${jobId}`);
       }
