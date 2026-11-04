@@ -650,17 +650,35 @@ export function createServer(runtime: Runtime): http.Server {
       if (req.method === 'GET' && path === '/review') {
         const url2 = new URL(req.url ?? '/', 'http://localhost');
         const repairedRaw = url2.searchParams.get('repaired');
+        const rejectedRaw = url2.searchParams.get('rejected');
         return sendHtml(res, reviewListPage({
           items: await pendingReviewList(runtime.ctx),
           accepted: Number(url2.searchParams.get('ok') ?? '0'),
           failed: Number(url2.searchParams.get('failed') ?? '0'),
           jobId: url2.searchParams.get('job') ?? '',
+          rejected: rejectedRaw === null ? null : Number(rejectedRaw),
           repair: repairedRaw === null ? null : {
             examined: Number(url2.searchParams.get('examined') ?? '0'),
             repaired: Number(repairedRaw),
             stillBlocked: Number(url2.searchParams.get('still') ?? '0'),
           },
         }, Number(url2.searchParams.get('page') ?? '1')));
+      }
+      if (req.method === 'POST' && path === '/actions/review/reject-blocked') {
+        const items = await pendingReviewList(runtime.ctx);
+        let rejected = 0;
+        for (const item of items) {
+          if (!item.hasBlock) continue;
+          const parsed = parseDraftId(item.draftId);
+          if (!parsed.ok) continue;
+          try {
+            await decideReview(runtime.ctx, parsed.value, 'reject', { actor: 'owner', note: '批量驳回阻断项' });
+            rejected += 1;
+          } catch {
+            // 单篇失败不阻断其余；计数只统计成功
+          }
+        }
+        return redirect(res, `/review?rejected=${rejected}`);
       }
       if (req.method === 'POST' && path === '/actions/review/repair') {
         const report = await repairPendingDrafts(runtime.ctx);
