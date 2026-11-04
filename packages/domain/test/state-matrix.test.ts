@@ -38,7 +38,7 @@ const SPEC: Readonly<Record<RawStateKind, Readonly<Partial<Record<RawEventType, 
   committed: {},
   rejected: {},
   deferred: { RETRY: 'queued' },
-  rolled_back: { RETRY: 'queued' },
+  rolled_back: { RETRY: 'queued', REOPEN_FOR_REVIEW: 'in_review' },
   failed: { RETRY: 'queued' },
   blocked: { UNBLOCK: 'queued', ABANDON: 'abandoned' },
   expired: {},
@@ -57,7 +57,7 @@ describe('状态机矩阵', () => {
     }
   });
 
-  it('穷举 18 状态 × 24 事件：只有表内组合可迁移，且目标态正确', () => {
+  it('穷举 18 状态 × 25 事件：只有表内组合可迁移，且目标态正确', () => {
     let checked = 0;
     for (const kind of KINDS) {
       for (const eventType of EVENT_TYPES) {
@@ -83,7 +83,7 @@ describe('状态机矩阵', () => {
       }
     }
     expect(checked).toBe(KINDS.length * EVENT_TYPES.length);
-    expect(checked).toBe(18 * 24);
+    expect(checked).toBe(18 * 25);
   });
 
   it('终态不接受任何事件', () => {

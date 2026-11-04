@@ -100,6 +100,8 @@ export function sampleEvent(type: RawEvent['type']): RawEvent {
       return { type: 'LEASE_LOST' };
     case 'REVIEW_OPEN':
       return { type: 'REVIEW_OPEN', findings: [] };
+    case 'REOPEN_FOR_REVIEW':
+      return { type: 'REOPEN_FOR_REVIEW', findings: [] };
     case 'ACCEPT':
       return { type: 'ACCEPT', actor: 'owner' };
     case 'REJECT':

@@ -310,10 +310,14 @@ async function acceptDraft(
     const item = await tx.rawItems.getByPath(rawPath);
     if (!item) throw new AppError('NOT_FOUND', '原文记录消失');
     if (item.state.kind === 'committed') return;
-    if (item.state.kind !== 'draft_ready' && item.state.kind !== 'in_review') {
+    if (item.state.kind !== 'draft_ready' && item.state.kind !== 'in_review' && item.state.kind !== 'rolled_back') {
       throw new AppError('INVALID_STATE', `条目状态 ${item.state.kind}，无法批准`);
     }
     let state: RawState = item.state;
+    if (state.kind === 'rolled_back') {
+      // 人工重试：把之前的失败态重新打开到审阅；目标若已变化，由 commit 阶段按 append-only 重基处理。
+      state = unwrap(transition(state, { type: 'REOPEN_FOR_REVIEW', findings: draft.findings }, { now }));
+    }
     if (state.kind === 'draft_ready') {
       state = unwrap(transition(state, { type: 'REVIEW_OPEN', findings: draft.findings }, { now }));
     }

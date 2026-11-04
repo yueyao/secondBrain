@@ -38,6 +38,7 @@ export type RawEvent =
   | { readonly type: 'DRAFT_REFUSAL'; readonly reason: string }
   | { readonly type: 'LEASE_LOST' }
   | { readonly type: 'REVIEW_OPEN'; readonly findings: readonly Finding[] }
+  | { readonly type: 'REOPEN_FOR_REVIEW'; readonly findings: readonly Finding[] }
   | { readonly type: 'ACCEPT'; readonly actor: string }
   | { readonly type: 'REJECT'; readonly reason: string; readonly auto?: boolean }
   | { readonly type: 'REQUEST_CHANGES'; readonly note: string }
@@ -70,6 +71,7 @@ export const EVENT_TYPES: readonly RawEventType[] = [
   'DRAFT_REFUSAL',
   'LEASE_LOST',
   'REVIEW_OPEN',
+  'REOPEN_FOR_REVIEW',
   'ACCEPT',
   'REJECT',
   'REQUEST_CHANGES',
@@ -99,7 +101,7 @@ export const ALLOWED_TRANSITIONS: Readonly<Record<RawStateKind, readonly RawEven
   committed: [],
   rejected: [],
   deferred: ['RETRY'],
-  rolled_back: ['RETRY'],
+  rolled_back: ['RETRY', 'REOPEN_FOR_REVIEW'],
   failed: ['RETRY'],
   blocked: ['UNBLOCK', 'ABANDON'],
   expired: [],
@@ -328,6 +330,14 @@ export function transition(
 
     case 'rolled_back':
       switch (event.type) {
+        case 'REOPEN_FOR_REVIEW':
+          return ok({
+            kind: 'in_review',
+            draftId: from.draftId,
+            triage: from.triage,
+            findings: event.findings,
+            openedAt: ctx.now,
+          });
         case 'RETRY': {
           // 取"状态中的尝试次数"与"事件带来的次数"的较大值，避免调用方传小值绕过上限
           const exhausted = retryable(from, Math.max(from.attempts, event.attempts));

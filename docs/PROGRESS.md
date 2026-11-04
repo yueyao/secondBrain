@@ -2402,3 +2402,37 @@ pnpm run check
 ```
 
 重跑 repair 后阻断数应从 49 附近进一步下降；剩余主要是来源路径缺失/重复入库。
+
+
+---
+
+## 七十七、批量通过失败的最后一类：rolled_back 无法重试（2026-11-04）
+
+### 77.1 根因
+
+实际提交 3 篇无阻断草稿，job 立即全失败，原因统一是 `条目状态 rolled_back，无法批准`。
+
+此前任何一次 accept 失败（TARGET_MOVED、commit 异常等）都会把 raw_item 置为 `rolled_back`，但 draft 状态仍是 `pending`：
+- 审核列表继续显示它，且没有 block finding；
+- `acceptDraft` 只允许 `draft_ready` / `in_review`，遇到 `rolled_back` 直接拒绝；
+- 用户看到的就是"没阻断也一直入库失败"。
+
+### 77.2 修复
+
+- 领域状态机新增 `REOPEN_FOR_REVIEW` 事件：`rolled_back → in_review`（保留 triage/findings），并登记到 `EVENT_TYPES`；
+- `acceptDraft` 遇到 `rolled_back` 时先重开到审阅再 ACCEPT；因为是人工重试，commit 阶段允许 append-only 重基，避免再次被同一个 TARGET_MOVED 卡住；
+- 状态矩阵测试更新为 18 状态 × 25 事件；NOT 在恢复流程中自动使用（启动恢复仍严格）。
+
+### 77.3 决策
+
+D105：失败态必须保留"人工重试"路径，且重试不再受上一次 commit 失败原因永久阻塞；重开只发生在显式 accept，不做后台自动重试。
+
+### 77.4 验证
+
+```
+pnpm run check
+ Test Files  40 passed (40)
+      Tests  363 passed (363)
+```
+
+重新部署后用同一批 3 篇 rolled_back 草稿重跑批量，应能入库；失败会给出新的、真实的原因。
