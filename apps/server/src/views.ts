@@ -975,6 +975,7 @@ export interface ReviewListPageData {
   readonly jobId: string;
   readonly repair?: { readonly examined: number; readonly repaired: number; readonly stillBlocked: number } | null;
   readonly rejected?: number | null;
+  readonly autoRejected?: number;
 }
 
 export function reviewListPage(data: ReviewListPageData, page = 1): string {
@@ -992,6 +993,9 @@ export function reviewListPage(data: ReviewListPageData, page = 1): string {
 
   const flash = data.accepted > 0 || data.failed > 0
     ? `<div class="card" style="border-color:var(--ok)">批量结果：成功 ${data.accepted} 篇${data.failed > 0 ? `，失败 ${data.failed} 篇（失败项仍在待审，见日志）` : ''}</div>` : '';
+  const autoRejectFlash = (data.autoRejected ?? 0) > 0
+    ? `<div class="card" style="border-color:var(--warn)">已自动移除 ${data.autoRejected} 篇来源缺失草稿（视为内容不存在，未写入 wiki）。</div>`
+    : '';
   const rejectFlash = data.rejected !== null && data.rejected !== undefined
     ? `<div class="card" style="border-color:var(--warn)">已驳回 ${data.rejected} 篇需处理的草稿，不再出现在审核列表。</div>`
     : '';
@@ -1009,6 +1013,7 @@ export function reviewListPage(data: ReviewListPageData, page = 1): string {
   })(), '<a class="btn" href="/articles?group=pending">去素材库 →</a>')}
   ${flash}
   ${rejectFlash}
+  ${autoRejectFlash}
   ${repairFlash}
   ${data.jobId ? `<div class="card" id="job-progress">批量处理中… <span id="job-text"></span></div><script>(function(){var id=${JSON.stringify(data.jobId)};var t=setInterval(function(){fetch("/api/jobs/"+id).then(function(r){return r.json()}).then(function(d){document.getElementById("job-text").textContent=d.done+"/"+d.total+"（成功 "+d.ok+"，失败 "+d.failed+"）";if(d.status==="done"){clearInterval(t);document.getElementById("job-progress").textContent="完成："+d.ok+" 成功 / "+d.failed+" 失败，刷新中…";setTimeout(function(){location.href="/audit";},800);}});},1000);})();</script>` : ""}
   <form method="post" action="/actions/review/bulk-accept" id="bulk-form">

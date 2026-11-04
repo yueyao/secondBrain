@@ -660,8 +660,23 @@ export function createServer(runtime: Runtime): http.Server {
         const url2 = new URL(req.url ?? '/', 'http://localhost');
         const repairedRaw = url2.searchParams.get('repaired');
         const rejectedRaw = url2.searchParams.get('rejected');
+        // 来源缺失 = 内容不存在：自动驳回，不再进入审核队列。
+        let autoRejected = 0;
+        for (const item of await pendingReviewList(runtime.ctx)) {
+          if (!item.hasBlock || item.blockRule !== 'r-source-exists') continue;
+          const parsed = parseDraftId(item.draftId);
+          if (!parsed.ok) continue;
+          try {
+            await decideReview(runtime.ctx, parsed.value, 'reject', { actor: 'system', note: '来源缺失自动移除' });
+            autoRejected += 1;
+          } catch {
+            // 单篇失败不影响页面
+          }
+        }
+        if (autoRejected > 0) console.log(`[audit] auto-rejected source-missing=${autoRejected}`);
         return sendHtml(res, reviewListPage({
           items: await pendingReviewList(runtime.ctx),
+          autoRejected,
           accepted: Number(url2.searchParams.get('ok') ?? '0'),
           failed: Number(url2.searchParams.get('failed') ?? '0'),
           jobId: url2.searchParams.get('job') ?? '',
