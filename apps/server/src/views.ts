@@ -192,6 +192,13 @@ details.disclosure>summary::before{content:'[+] ';color:var(--accent)}
 details.disclosure[open]>summary::before{content:'[−] '}
 details.disclosure>summary:hover{color:var(--ink)}
 details.disclosure>.disclosure-body{padding:0 11px 11px}
+.job-panel{position:fixed;right:24px;bottom:24px;width:min(360px,calc(100vw - 32px));background:var(--panel);border:1px solid var(--ink);padding:12px 14px;z-index:70;box-shadow:6px 6px 0 rgba(12,26,38,.14)}
+.job-panel[hidden]{display:none}
+.job-panel b{font:600 13px var(--display)}
+.job-panel .bar{margin:9px 0 7px}
+.job-panel.done{border-color:var(--ok)}
+.review-row.is-queued{opacity:.45}
+.review-row.is-queued td{background:rgba(226,88,34,.05)}
 
 /* 一次性入场，不做满屏 hover 动画 */
 @keyframes rise{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
@@ -976,10 +983,11 @@ export function reviewListPage(data: ReviewListPageData, page = 1): string {
   ${flash}
   ${data.jobId ? `<div class="card" id="job-progress">批量处理中… <span id="job-text"></span></div><script>(function(){var id=${JSON.stringify(data.jobId)};var t=setInterval(function(){fetch("/api/jobs/"+id).then(function(r){return r.json()}).then(function(d){document.getElementById("job-text").textContent=d.done+"/"+d.total+"（成功 "+d.ok+"，失败 "+d.failed+"）";if(d.status==="done"){clearInterval(t);document.getElementById("job-progress").textContent="完成："+d.ok+" 成功 / "+d.failed+" 失败，刷新中…";setTimeout(function(){location.href="/review";},800);}});},1000);})();</script>` : ""}
   <form method="post" action="/actions/review/bulk-accept" id="bulk-form">
-    <div class="row" style="gap:8px;margin:12px 0">
-      <button class="btn" type="button" onclick="document.querySelectorAll('input[name=draftId]').forEach(function(c){c.checked=true;})">全选本页</button>
-      <button class="btn" type="button" onclick="document.querySelectorAll('input[name=draftId]').forEach(function(c){c.checked=false;})">取消全选</button>
-      <button class="btn" type="submit" onclick="return confirm('将逐篇通过选中的草稿并写入 wiki，确定？')">批量通过</button>
+    <div class="row" style="gap:8px;margin:12px 0;align-items:center">
+      <button class="btn" type="button" id="select-all">全选本页</button>
+      <button class="btn" type="button" id="clear-all">取消全选</button>
+      <button class="btn" type="submit" id="bulk-submit" disabled>批量通过</button>
+      <span class="mono" id="sel-count">已选 0 项</span>
       <span class="muted">键盘：j/k 移动，Enter 打开，a 勾选，r 取消</span>
     </div>
     <div class="card table-wrap" style="padding:4px 0"><table>
@@ -987,6 +995,70 @@ export function reviewListPage(data: ReviewListPageData, page = 1): string {
     </table></div>
     ${pager('/review', current, pages, data.items.length, pageSize)}
   </form>
+  <div class="job-panel" id="job-panel" hidden>
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <b>批量通过处理中</b><span class="mono" id="job-text">0/0</span>
+    </div>
+    <div class="bar"><i id="job-bar" style="width:0"></i></div>
+    <div class="muted">后台逐篇入库；页面可以继续滚动/勾选，完成后自动刷新。</div>
+  </div>
+  <script>
+  (function(){
+    var form=document.getElementById('bulk-form');
+    if(!form)return;
+    var boxes=function(){return Array.prototype.slice.call(document.querySelectorAll('input[name=draftId]'));};
+    var count=document.getElementById('sel-count');
+    var submit=document.getElementById('bulk-submit');
+    var panel=document.getElementById('job-panel');
+    var jobText=document.getElementById('job-text');
+    var jobBar=document.getElementById('job-bar');
+    var timer=null;
+    function selected(){return boxes().filter(function(c){return c.checked;});}
+    function refresh(){
+      var n=selected().length;
+      count.textContent='已选 '+n+' 项';
+      submit.textContent=n===0?'批量通过':'批量通过（'+n+'）';
+      submit.disabled=n===0 || submit.dataset.busy==='1';
+    }
+    document.addEventListener('change',function(e){if(e.target && e.target.name==='draftId')refresh();});
+    document.getElementById('select-all').addEventListener('click',function(){boxes().forEach(function(c){c.checked=true;});refresh();});
+    document.getElementById('clear-all').addEventListener('click',function(){boxes().forEach(function(c){c.checked=false;});refresh();});
+    form.addEventListener('submit',function(e){
+      e.preventDefault();
+      var ids=selected().map(function(c){return c.value;});
+      if(ids.length===0)return;
+      submit.dataset.busy='1';submit.disabled=true;submit.textContent='提交中…';
+      var fd=new FormData();
+      ids.forEach(function(id){fd.append('draftId',id);});
+      fetch('/actions/review/bulk-accept',{method:'POST',body:fd,headers:{accept:'application/json'}})
+        .then(function(r){return r.json();})
+        .then(function(job){
+          if(!job.ok)throw new Error(job.error&&job.error.message?job.error.message:'提交失败');
+          panel.hidden=false;
+          jobText.textContent='0/'+job.total;
+          boxes().forEach(function(c){c.disabled=true;var tr=c.closest('tr');if(tr)tr.classList.add('is-queued');});
+          timer=setInterval(function(){
+            fetch('/api/jobs/'+job.jobId).then(function(r){return r.json();}).then(function(d){
+              var pct=d.total?Math.round(d.done/d.total*100):100;
+              jobBar.style.width=pct+'%';
+              jobText.textContent=d.done+'/'+d.total+'（成功 '+d.ok+'，失败 '+d.failed+'）';
+              if(d.status==='done'){
+                clearInterval(timer);
+                panel.classList.add('done');
+                jobText.textContent='完成：成功 '+d.ok+' / 失败 '+d.failed+'，刷新中…';
+                setTimeout(function(){location.href='/review?ok='+d.ok+'&failed='+d.failed;},600);
+              }
+            });
+          },800);
+        })
+        .catch(function(err){
+          submit.dataset.busy='';submit.disabled=false;refresh();
+          window.alert('提交失败：'+err.message);
+        });
+    });
+    refresh();
+  })();
+  </script>
   <script>
   (function(){
     var rows=Array.prototype.slice.call(document.querySelectorAll('.review-row'));var i=-1;
@@ -1391,7 +1463,7 @@ export function aboutPage(data: AboutPageData): string {
   const features: readonly { title: string; href: string; group: string; body: string }[] = [
     { title: '工作台', href: '/', group: '工作台', body: '今日进度、队列与待办、快捷操作（扫描 / 起草）、最近动态。回答"今天该做什么"。' },
     { title: '素材库', href: '/articles', group: '内容', body: '全部原文（含 4k+ 条 legacy）：6 个分组、来源/时间/triage 筛选、排序、分页；详情含 triage 理由、草稿 claims、来源与事件时间线。' },
-    { title: '审核中心', href: '/review', group: '内容', body: 'AI 草稿在这里过人审：逐篇预览 claims/节点/finding，键盘 j/k/a/r 操作，支持勾选批量通过（服务端逐篇校验、二次确认、结果回显）。' },
+    { title: '审核中心', href: '/review', group: '内容', body: 'AI 草稿在这里过人审：逐篇预览 claims/节点/finding，键盘 j/k/a/r 操作，支持勾选批量通过（异步提交、后台逐篇校验入库、进度与失败回显，不阻塞页面）。' },
     { title: '主编台', href: '/compose', group: '写作', body: '把知识节点写成文章：选节点 → AI 大纲 → 大纲可编辑 → 生成正文 → 改稿指令生成 vN+1 → 行级 diff → 恢复旧版 → 定稿 → 导出 Markdown。版本只增不改。' },
     { title: '问答链', href: '/qa', group: '写作', body: '把主题 claims 或文章正文抽成 Q-A 链（Q 切要害；A 四段：结论/形式化/论证步/边界），用于选题与审稿，不写文章版本。' },
     { title: '去 AI 味', href: '/deai', group: '写作', body: '独立能力：先用规则做 AI 味体检（框架词/黑话/对仗/宏大叙事/句长均匀/标点痕迹，加权评分），再由模型按命中清单改写；保留事实、数字与引用，主编台正文可一键生成新版本。' },

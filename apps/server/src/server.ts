@@ -8,7 +8,7 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
-interface BulkJob { total: number; done: number; ok: number; failed: number; status: 'running' | 'done'; }
+interface BulkJob { total: number; done: number; ok: number; failed: number; status: 'running' | 'done'; failedIds: string[]; }
 const bulkJobs = new Map<string, BulkJob>();
 
 interface OpsRecord { readonly action: string; readonly at: string; readonly ok: boolean; readonly detail: string; }
@@ -636,19 +636,34 @@ export function createServer(runtime: Runtime): http.Server {
         const params = await readFormParams(req);
         const draftIds = params.getAll('draftId');
         const jobId = Math.random().toString(36).slice(2, 10);
-        const job: BulkJob = { total: draftIds.length, done: 0, ok: 0, failed: 0, status: 'running' };
+        const job: BulkJob = { total: draftIds.length, done: 0, ok: 0, failed: 0, status: 'running', failedIds: [] };
         bulkJobs.set(jobId, job);
-        void (async () => {
-          for (const rawId of draftIds) {
-            const parsed = parseDraftId(rawId);
-            if (parsed.ok) {
-              try { await decideReview(runtime.ctx, parsed.value, 'accept', { actor: 'owner', note: '批量通过' }); job.ok += 1; }
-              catch { job.failed += 1; }
-            } else { job.failed += 1; }
-            job.done += 1;
-          }
-          job.status = 'done';
-        })();
+        // 先让本次响应发出去，再在后台串行处理：每次 accept 是一次 git commit，必须串行；
+        // 每篇处理完让出事件循环，避免阻塞其他 HTTP 请求。
+        setImmediate(() => {
+          void (async () => {
+            for (const rawId of draftIds) {
+              const parsed = parseDraftId(rawId);
+              if (parsed.ok) {
+                try {
+                  await decideReview(runtime.ctx, parsed.value, 'accept', { actor: 'owner', note: '批量通过' });
+                  job.ok += 1;
+                } catch {
+                  job.failed += 1;
+                  job.failedIds.push(rawId);
+                }
+              } else {
+                job.failed += 1;
+                job.failedIds.push(rawId);
+              }
+              job.done += 1;
+              await new Promise<void>((resolve) => setImmediate(resolve));
+            }
+            job.status = 'done';
+          })();
+        });
+        const wantsJson = (req.headers.accept ?? '').includes('application/json');
+        if (wantsJson) return sendJson(res, { ok: true, jobId, total: job.total });
         return redirect(res, `/review?job=${jobId}`);
       }
       if (req.method === 'GET' && path.startsWith('/api/jobs/')) {

@@ -506,3 +506,42 @@ describe('长列表收敛（分页/折叠）', () => {
     expect(html).toContain('pager-meta');
   });
 });
+
+
+describe('审核批量通过（异步）', () => {
+  it('JSON 提交立即返回 jobId，后台完成并逐篇入库', async () => {
+    await post('/actions/ingest', {});
+    const queue = (await (await fetch(`${base}/api/queue`)).json()) as Array<{ rawPath: string; title: string }>;
+    const target = queue.find((item) => item.title.includes('安全边际')) ?? queue[0];
+    expect(target).toBeTruthy();
+    const digest = await post('/actions/digest', { rawPath: target!.rawPath });
+    expect(digest.status).toBe(303);
+    const draftId = (digest.headers.get('location') ?? '').replace('/review/', '');
+    expect(draftId).not.toBe('');
+
+    const created = await fetch(`${base}/actions/review/bulk-accept`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', accept: 'application/json' },
+      body: new URLSearchParams([['draftId', draftId]]).toString(),
+    });
+    expect(created.status).toBe(200);
+    const job = (await created.json()) as { ok: boolean; jobId: string; total: number };
+    expect(job.ok).toBe(true);
+    expect(job.total).toBe(1);
+
+    type JobState = { status: string; done: number; ok: number; failed: number };
+    let state: JobState | null = null;
+    for (let attempt = 0; attempt < 80; attempt += 1) {
+      state = (await (await fetch(`${base}/api/jobs/${job.jobId}`)).json()) as JobState;
+      if (state?.status === 'done') break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    expect(state?.status).toBe('done');
+    expect(state?.ok).toBe(1);
+    expect(state?.failed).toBe(0);
+
+    const reviewHtml = await (await fetch(`${base}/review`)).text();
+    expect(reviewHtml).toContain('批量通过');
+    expect(reviewHtml).toContain('已选 0 项');
+  });
+});
