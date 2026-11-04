@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { parseRawPath, type RawPath } from '@sb/domain';
 import type { AppContext } from '../src/context';
 import { decideReview, draftDigest, ingestAndTriage } from '../src/commands';
+import { preflightDrafts } from '../src/preflight';
 import { listPendingDrafts, listQueue, reviewView, usageSummary } from '../src/queries';
 import { createHarness, hashPort, type TestHarness } from '@sb/testing';
 
@@ -148,6 +149,18 @@ describe('应用层：完整流程', () => {
     expect(result.ok).toBe(true);
     const content = await harness.vault.readNode('wiki/concepts/反脆弱.md');
     expect(content).toContain('（来源：[[raw/knowledge/cubox/mock-2026-10-01 反脆弱的第二条证据.md]]）');
+  });
+
+  it('批量预检：正常草稿 ok，未知 id invalid，避免整批先 approved 再回滚', async () => {
+    const ctx = ctxOf(harness);
+    await ingestAndTriage(ctx);
+    const { draftId } = await draftDigest(ctx, await findRaw(harness, '反脆弱的第二条证据'));
+    const report = await preflightDrafts(ctx, [draftId, 'draft-000000000000']);
+    expect(report.ok).toBe(1);
+    expect(report.invalid).toBe(1);
+    expect(report.blocked).toBe(0);
+    expect(report.rows.find((row) => row.draftId === draftId)?.status).toBe('ok');
+    expect(report.rows.find((row) => row.draftId === 'draft-000000000000')?.status).toBe('invalid');
   });
 
   it('全新概念走 new 分支并生成节点文件', async () => {

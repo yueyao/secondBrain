@@ -40,6 +40,7 @@ async function runLogged(dataDir: string, action: string, fn: () => Promise<stri
 import {
   decideReview,
   reviewDraftTargetFiles,
+  preflightDrafts,
   repairPendingDrafts,
   draftDigest,
   ingestAndTriage,
@@ -672,6 +673,10 @@ export function createServer(runtime: Runtime): http.Server {
           },
         }, Number(url2.searchParams.get('page') ?? '1')));
       }
+      if (req.method === 'POST' && path === '/actions/review/preflight') {
+        const params = await readFormParams(req);
+        return sendJson(res, { ok: true, report: await preflightDrafts(runtime.ctx, params.getAll('draftId')) });
+      }
       if (req.method === 'POST' && path === '/actions/review/reject-blocked') {
         const items = await pendingReviewList(runtime.ctx);
         let rejected = 0;
@@ -707,9 +712,25 @@ export function createServer(runtime: Runtime): http.Server {
           }
           return redirect(res, '/audit?failed=0');
         }
+        // 预检：阻断/目标缺失在创建 job 前就识别，避免先 approved 再回滚污染状态。
+        const preflight = await preflightDrafts(runtime.ctx, draftIds);
+        const eligibleIds = preflight.rows.filter((row) => row.status === 'ok').map((row) => row.draftId);
+        const preFailures = preflight.rows
+          .filter((row) => row.status !== 'ok')
+          .map((row) => ({ draftId: row.draftId, reason: row.reason ?? '不可入库' }));
+        if (eligibleIds.length === 0) {
+          if (wantsJson) {
+            return sendJson(res, { ok: false, error: { code: 'NO_ELIGIBLE', message: '所选草稿全部不可入库', details: preFailures } }, 400);
+          }
+          return redirect(res, `/audit?failed=${preFailures.length}`);
+        }
         const jobId = Math.random().toString(36).slice(2, 10);
         const createdAt = new Date().toISOString();
-        const job: BulkJob = { total: draftIds.length, done: 0, ok: 0, failed: 0, status: 'running', failedIds: [], failures: [], createdAt, updatedAt: createdAt };
+        const job: BulkJob = {
+          total: draftIds.length, done: preFailures.length, ok: 0, failed: preFailures.length,
+          status: 'running', failedIds: preFailures.map((row) => row.draftId), failures: preFailures,
+          createdAt, updatedAt: createdAt,
+        };
         bulkJobs.set(jobId, job);
         console.log(`[bulk] submit job=${jobId} total=${draftIds.length}`);
         // 先让本次响应发出去，再在后台串行处理：每次 accept 是一次 git commit，必须串行；
@@ -718,7 +739,7 @@ export function createServer(runtime: Runtime): http.Server {
           void (async () => {
             // 同一批里已经写过的节点：后续草稿允许追加式重基（同批冲突），跨批/外部修改仍拒绝。
             const touched = new Set<string>();
-            for (const rawId of draftIds) {
+            for (const rawId of eligibleIds) {
               const parsed = parseDraftId(rawId);
               if (!parsed.ok) {
                 job.failed += 1;
@@ -754,7 +775,7 @@ export function createServer(runtime: Runtime): http.Server {
             console.log(`[bulk] done job=${jobId} ok=${job.ok} failed=${job.failed}`);
           })();
         });
-        if (wantsJson) return sendJson(res, { ok: true, jobId, total: job.total });
+        if (wantsJson) return sendJson(res, { ok: true, jobId, total: job.total, ineligible: preFailures.length, preflight });
         return redirect(res, `/audit?job=${jobId}`);
       }
       if (req.method === 'GET' && path === '/api/jobs') {
