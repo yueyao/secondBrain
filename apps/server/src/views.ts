@@ -1628,7 +1628,7 @@ export function topicsPage(data: TopicMapV1): string {
   <div class="row" style="margin:18px 0">
     <div class="stat"><b>${data.totals.topics}</b><span>主题节点</span></div>
     <div class="stat"><b>${data.totals.topicClaims.toLocaleString()}</b><span>主题 claims</span></div>
-    <div class="stat"><b>${data.totals.withArticles}</b><span>已有文章</span></div>
+    <div class="stat"><b>${data.totals.withArticles}</b><span>已被文章覆盖</span></div>
     <div class="stat"><b>${data.totals.withoutArticles}</b><span>未成文主题</span></div>
     <div class="stat"><b>${data.totals.withoutClaims}</b><span>无 claims 主题</span></div>
     <div class="stat"><b>${data.totals.articlesWithoutTopics}</b><span>未挂主题文章</span></div>
