@@ -1794,3 +1794,42 @@ pnpm run check
 ```
 
 部署后核验：所有页面 200，一级分组与二级链接渲染正确，`/compose` 高亮"写作"、`/operations` 高亮"运维"。
+
+
+---
+
+## 六十、展示时间修正：去掉 ISO 的 T、统一本地时区（2026-11-04）
+
+### 60.1 问题
+
+页面上的时间直接对 ISO 字符串做 `slice`，出现两类问题：
+
+1. **带 T**：`素材库/文章详情/版本历史/审核列表/运维事件/worker 状态/仓库 HEAD/关于页` 都显示成 `2026-11-03T15:45`，可读性差；
+2. **时区错**：存储层是 UTC（`...Z`），直接截断展示等于把 UTC 当本地时间（比北京时间慢 8 小时）；导出 Markdown 头部的"导出时间"同样带 T。
+
+### 60.2 修正
+
+- `@sb/app` 新增 `format.ts`（纯函数、Intl 缓存）：
+  - `formatDateTime(value, { seconds?, timeZone? })` → `2026-11-03 23:45`（默认 Asia/Shanghai，跨日正确）；
+  - `formatDate(value)` → `2026-11-03`；`formatClock(value)` → `23:45:02`；
+  - 非法时间原样返回，避免 `Invalid Date`；可显式传 `timeZone`（默认常量 `Asia/Shanghai`）。
+- `views.ts` 所有时间展示改用 formatter（12 处）：素材库、文章详情时间线、运维页最近事件/运维记录/worker 状态更新/仓库 HEAD、审核列表、主编台文章列表、文章详情更新时间与版本历史、关于页生成时间；
+- 导出 Markdown 的"导出时间"改为本地可读格式（`2026-10-30 23:00`）；
+- 存储层、API JSON 仍保持 ISO 8601 UTC（机器格式不变），只有展示层变化；
+- 新增 `format` 5 例单测 + e2e 1 例（页面不得出现 `YYYY-MM-DDTHH:mm`）。
+
+### 60.3 决策
+
+| 编号 | 决策 | 理由 |
+|---|---|---|
+| D76 | 展示时间统一「Asia/Shanghai + 去掉 T」，由 `@sb/app/format` 单点负责；存储仍用 ISO UTC | 全站一致、可测试；存储保持机器可比较/可排序，展示与存储解耦；时区固定符合个人工作台场景，需要跨时区时函数可传 `timeZone` |
+
+### 60.4 验证
+
+```
+pnpm run check
+ Test Files  36 passed (36)
+      Tests  331 passed (331)
+```
+
+部署后核验：`/operations`、`/compose`、`/compose/<id>`、`/about`、`/review` 页面均无 `T` 时间，时间显示为北京时间。

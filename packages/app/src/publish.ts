@@ -15,6 +15,7 @@ import type {
   ArticleVersionRecord,
 } from '@sb/contracts';
 import { AppError, type AppContext } from './context';
+import { formatDateTime } from './format';
 
 /** 导出结果：文件名与 Markdown 由应用层给定，入口只负责传输。 */
 export interface ExportArticleResult {
@@ -151,7 +152,7 @@ export async function exportArticleMarkdown(ctx: AppContext, id: string): Promis
 
     return {
       filename: articleExportFilename(article.title, version.versionNo),
-      markdown: renderArticleMarkdown(article, version, now),
+      markdown: renderArticleMarkdown(article, version, formatDateTime(now)),
       status: article.status,
       versionNo: version.versionNo,
     };

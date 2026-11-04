@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ArticleCitation, ArticleStatus, ArticleVersionRecord } from '@sb/contracts';
-import { createHarness, FIXED_NOW, hashPort, type TestHarness } from '@sb/testing';
+import { createHarness, hashPort, type TestHarness } from '@sb/testing';
 import type { AppContext } from '../src/context';
 import { createArticle } from '../src/compose';
 import {
@@ -220,7 +220,7 @@ describe('Markdown 导出', () => {
       [
         `# ${DEFAULT_TITLE}`,
         '',
-        `> 主题：${DEFAULT_THEME} · 状态：待主编审 · 版本 v2 · 导出时间 ${FIXED_NOW}`,
+        `> 主题：${DEFAULT_THEME} · 状态：待主编审 · 版本 v2 · 导出时间 2026-10-30 23:00`,
         '',
         'v2 第一段：反脆弱。',
         '',
@@ -264,7 +264,7 @@ describe('Markdown 导出', () => {
       [
         `# ${DEFAULT_TITLE}`,
         '',
-        `> 主题：未设主题 · 状态：已定稿 · 版本 v2 · 导出时间 ${FIXED_NOW}`,
+        `> 主题：未设主题 · 状态：已定稿 · 版本 v2 · 导出时间 2026-10-30 23:00`,
         '',
         '正文内容',
         '',

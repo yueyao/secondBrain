@@ -1,6 +1,7 @@
 /** 服务端渲染的审核台（无前端框架，手机可用）。 */
 import type { DeAiStyle, QueueItemV1, ReviewViewV1, ScoredHit } from '@sb/contracts';
 import { AI_FLAVOR_RULES, type AiFlavorReport } from '@sb/domain';
+import { formatClock, formatDate, formatDateTime } from '@sb/app';
 import { webRepoUrl, type RepoStatus } from './repos';
 
 const esc = (value: unknown): string =>
@@ -529,7 +530,7 @@ export function articlesPage(data: ArticlesPageData): string {
     <td><span class="badge">${esc(stateLabel(item.state))}</span></td>
     <td>${item.triage ? `${esc(triageLabel(item.triage.status))} · ${item.triage.judgments} 句` : '—'}</td>
     <td>${item.charCount.toLocaleString()}</td>
-    <td class="muted">${esc(item.updatedAt.slice(0, 10))}</td></tr>`).join('')
+    <td class="muted">${esc(formatDate(item.updatedAt))}</td></tr>`).join('')
     || '<tr><td colspan="6" class="muted">没有匹配的文章</td></tr>';
 
   const prev = data.page > 1 ? `<a class="btn" href="/articles${qs({ page: data.page - 1 })}">← 上一页</a>` : '';
@@ -587,7 +588,7 @@ export function articlePage(data: ArticlePageData): string {
     <div class="stat"><b>${esc(stateLabel(data.state))}</b><span>状态</span></div>
     <div class="stat"><b>${esc(data.sourceKey)}</b><span>来源</span></div>
     <div class="stat"><b>${data.charCount.toLocaleString()}</b><span>字符</span></div>
-    <div class="stat"><b>${esc(data.updatedAt.slice(0, 10))}</b><span>更新时间</span></div>
+    <div class="stat"><b>${esc(formatDate(data.updatedAt))}</b><span>更新时间</span></div>
     ${data.commitSha ? `<div class="stat"><b>${esc(data.commitSha.slice(0, 7))}</b><span>commit</span></div>` : ''}
   </div>
 
@@ -598,7 +599,7 @@ export function articlePage(data: ArticlePageData): string {
     : '<span class="muted">无 triage 结果</span>'}</div>
 
   <h2>时间线</h2>
-  <div class="card">${data.timeline.length === 0 ? '<span class="muted">暂无事件</span>' : `<table>${data.timeline.map((event) => `<tr><td class="muted">${esc(event.at.slice(0, 19))}</td><td>${esc(event.type)}</td></tr>`).join('')}</table>`}</div>
+  <div class="card">${data.timeline.length === 0 ? '<span class="muted">暂无事件</span>' : `<table>${data.timeline.map((event) => `<tr><td class="muted">${esc(formatDateTime(event.at, { seconds: true }))}</td><td>${esc(event.type)}</td></tr>`).join('')}</table>`}</div>
 
   ${data.draft ? `
   <h2>草稿 ${draftLink}</h2>
@@ -689,7 +690,7 @@ export function adminPage(data: AdminPageData): string {
         : '<span class="badge b-ok">工作区干净</span>';
     const headLine = repo.head
       ? `<code>${esc(repo.head.sha)}</code> ${esc(cut(repo.head.subject, 44))}
-         <div class="muted">${esc(repo.head.date.slice(0, 16).replace('T', ' '))} · ${esc(repo.head.author)}</div>`
+         <div class="muted">${esc(formatDateTime(repo.head.date))} · ${esc(repo.head.author)}</div>`
       : '<span class="muted">—</span>';
     const fetchNote = repo.fetchError !== null
       ? `<div class="muted" style="color:#f0a6ac">fetch 失败：${esc(repo.fetchError)}</div>`
@@ -718,7 +719,7 @@ export function adminPage(data: AdminPageData): string {
     : '<span class="muted">远端状态以最近一次 fetch 为准；点「检查远端」可强制刷新</span>';
   const stateRows = Object.entries(data.counts).sort((a, b) => b[1] - a[1])
     .map(([state, count]) => `<tr><td>${esc(stateLabel(state))}</td><td>${count.toLocaleString()}</td></tr>`).join('');
-  const events = data.recentEvents.map((event) => `<tr><td class="muted">${esc(event.at.slice(0, 19))}</td><td>${esc(event.type)}</td><td class="muted">${esc(event.aggregateId)}</td></tr>`).join('')
+  const events = data.recentEvents.map((event) => `<tr><td class="muted">${esc(formatDateTime(event.at, { seconds: true }))}</td><td>${esc(event.type)}</td><td class="muted">${esc(event.aggregateId)}</td></tr>`).join('')
     || '<tr><td colspan="3" class="muted">暂无事件</td></tr>';
 
   const worker = data.worker;
@@ -728,7 +729,7 @@ export function adminPage(data: AdminPageData): string {
   const workerBlock = worker
     ? `<div class="row">
          <div class="stat"><b>${esc(phaseLabel(worker.phase))}</b><span>worker 状态</span></div>
-         <div class="stat"><b>${esc(worker.updatedAt.slice(11, 19))}</b><span>状态更新</span></div>
+         <div class="stat"><b>${esc(formatClock(worker.updatedAt))}</b><span>状态更新</span></div>
          ${worker.lastTick ? `<div class="stat"><b>${worker.lastTick.drafted} / ${worker.lastTick.failed}</b><span>上轮 起草 / 失败</span></div>` : ''}
          ${worker.lastTick ? `<div class="stat"><b>${worker.lastTick.queueLength.toLocaleString()}</b><span>上轮队列</span></div>` : ''}
        </div>
@@ -799,7 +800,7 @@ export function adminPage(data: AdminPageData): string {
     <form method="post" action="/actions/ops/backup"><button class="btn" type="submit">立即备份状态库</button></form>
   </div>
   <table style="margin-top:10px"><tr><th>时间</th><th>动作</th><th>结果</th><th>详情</th></tr>
-  ${data.ops.length === 0 ? '<tr><td colspan="4" class="muted">还没有执行记录</td></tr>' : data.ops.map((op) => `<tr><td class="muted">${esc(op.at.slice(0, 19))}</td><td>${esc(op.action)}</td><td>${op.ok ? '✅ 成功' : '❌ 失败'}</td><td class="muted">${esc(op.detail)}</td></tr>`).join('')}
+  ${data.ops.length === 0 ? '<tr><td colspan="4" class="muted">还没有执行记录</td></tr>' : data.ops.map((op) => `<tr><td class="muted">${esc(formatDateTime(op.at, { seconds: true }))}</td><td>${esc(op.action)}</td><td>${op.ok ? '✅ 成功' : '❌ 失败'}</td><td class="muted">${esc(op.detail)}</td></tr>`).join('')}
   </table></div>
 
   <h2>GitHub 仓库与维护</h2>
@@ -855,7 +856,7 @@ export function reviewListPage(data: ReviewListPageData): string {
     <td><a href="/review/${encodeURIComponent(item.draftId)}" class="review-link">${esc(item.title)}</a></td>
     <td>${esc(item.tier)}</td>
     <td>${item.hasBlock ? '<span class="badge b-block">阻断</span>' : '<span class="badge b-ok">可审</span>'}</td>
-    <td class="muted">${esc(item.createdAt.slice(5, 16))}</td></tr>`).join('')
+    <td class="muted">${esc(formatDateTime(item.createdAt).slice(5))}</td></tr>`).join('')
     || '<tr><td colspan="5" class="muted">没有待审草稿</td></tr>';
 
   const flash = data.accepted > 0 || data.failed > 0
@@ -1016,7 +1017,7 @@ export function nodePage(node: { name: string; file: string; nodeType: string; a
 
 
 export function composePage(data: { articles: readonly { id: string; title: string; theme: string; nodeIds: readonly string[]; status: string; outline: string | null; updatedAt: string }[]; nodes: readonly { name: string; claimCount: number }[] }): string {
-  const list = data.articles.map((article) => `<tr><td><a href="/compose/${encodeURIComponent(article.id)}">${esc(article.title)}</a></td><td>${esc(article.theme || '—')}</td><td>${article.nodeIds.length}</td><td>${esc(article.status)}</td><td class="muted">${article.outline ? '有大纲' : '未生成'}</td><td class="muted">${esc(article.updatedAt.slice(0, 10))}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">还没有文章，先创建一篇</td></tr>';
+  const list = data.articles.map((article) => `<tr><td><a href="/compose/${encodeURIComponent(article.id)}">${esc(article.title)}</a></td><td>${esc(article.theme || '—')}</td><td>${article.nodeIds.length}</td><td>${esc(article.status)}</td><td class="muted">${article.outline ? '有大纲' : '未生成'}</td><td class="muted">${esc(formatDate(article.updatedAt))}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">还没有文章，先创建一篇</td></tr>';
   const nodeOptions = data.nodes.map((node) => `<label class="muted" style="display:inline-flex;gap:6px;align-items:center;margin:2px 10px 2px 0"><input type="checkbox" name="node" value="${esc(node.name)}">${esc(node.name)} <span style="opacity:.6">${node.claimCount}</span></label>`).join('');
   return layout('主编台', `${nav('/compose')}
   <h1>主编台</h1>
@@ -1127,12 +1128,12 @@ export function composeArticlePage(data: {
       : version.note
         ? esc(version.note)
         : '—';
-    return `<tr><td>v${version.versionNo}${version.versionNo === currentVersion?.versionNo ? ' <span class="badge b-ok">当前</span>' : ''}</td><td>${esc(ARTICLE_SOURCE_LABEL[version.source] ?? version.source)}</td><td class="muted">${note}</td><td class="muted">${esc(version.model ?? '—')}</td><td>${version.chars}</td><td class="muted">${version.inputTokens ?? 0} / ${version.outputTokens ?? 0}</td><td class="muted">${version.cost === null ? '—' : `$${version.cost.toFixed(4)}`}</td><td class="muted">${esc(version.createdAt.slice(0, 16))}</td><td>${actions}${restore}</td></tr>`;
+    return `<tr><td>v${version.versionNo}${version.versionNo === currentVersion?.versionNo ? ' <span class="badge b-ok">当前</span>' : ''}</td><td>${esc(ARTICLE_SOURCE_LABEL[version.source] ?? version.source)}</td><td class="muted">${note}</td><td class="muted">${esc(version.model ?? '—')}</td><td>${version.chars}</td><td class="muted">${version.inputTokens ?? 0} / ${version.outputTokens ?? 0}</td><td class="muted">${version.cost === null ? '—' : `$${version.cost.toFixed(4)}`}</td><td class="muted">${esc(formatDateTime(version.createdAt))}</td><td>${actions}${restore}</td></tr>`;
   }).join('') || '<tr><td colspan="9" class="muted">还没有正文版本</td></tr>';
 
   const body = data.current
     ? `<div class="card prose">${renderArticleMarkdown(data.current.contentMd)}</div>
-    <div class="muted">当前正文 v${data.current.versionNo}，生成于 ${esc(data.current.createdAt.slice(0, 16))}；引用可点开原文核对。</div>`
+    <div class="muted">当前正文 v${data.current.versionNo}，生成于 ${esc(formatDateTime(data.current.createdAt))}；引用可点开原文核对。</div>`
     : '<div class="card muted">还没有正文。先确认大纲，再生成 v1。</div>';
 
   const actions = [
@@ -1152,7 +1153,7 @@ export function composeArticlePage(data: {
 
   return layout('主编台 · 文章', `${nav('/compose')}
   <div class="row" style="justify-content:space-between;align-items:center"><h1>${esc(data.title)}</h1><div class="row" style="gap:8px;align-items:center"><a class="btn" href="/compose">← 主编台</a>${actions}</div></div>
-  <div class="muted">${esc(data.theme || '未设主题')} · <span class="badge${data.status === 'final' ? ' b-ok' : ''}">${esc(statusLabel)}</span> · 更新 ${esc(data.updatedAt.slice(0, 16))}</div>
+  <div class="muted">${esc(data.theme || '未设主题')} · <span class="badge${data.status === 'final' ? ' b-ok' : ''}">${esc(statusLabel)}</span> · 更新 ${esc(formatDateTime(data.updatedAt))}</div>
 
   <h2>大纲</h2>
   <div class="card"><form method="post" action="/actions/compose/outline/generate" onsubmit="return confirm('调用模型生成大纲，可能产生费用。继续？')"><input type="hidden" name="id" value="${esc(data.id)}">
@@ -1327,7 +1328,7 @@ export function aboutPage(data: AboutPageData): string {
     <tr><th>vault HEAD</th><td class="muted"><code>${esc(data.head.slice(0, 12))}</code></td></tr>
     <tr><th>数据目录</th><td class="muted">${esc(data.dataDir)}</td></tr>
     <tr><th>vault 根目录</th><td class="muted">${esc(data.vaultRoot)}</td></tr>
-    <tr><th>页面生成时间</th><td class="muted">${esc(data.generatedAt.replace('T', ' ').slice(0, 19))}</td></tr>
+    <tr><th>页面生成时间</th><td class="muted">${esc(formatDateTime(data.generatedAt, { seconds: true }))}</td></tr>
   </table></div>
 
   <div class="muted" style="margin-top:18px">快捷入口：<a href="/">工作台</a> · <a href="/articles">素材库</a> · <a href="/review">审核</a> · <a href="/compose">主编台</a> · <a href="/operations">运维</a> · <a href="/guide">使用说明</a></div>`);

@@ -423,3 +423,15 @@ describe('导航信息架构（一级分组 + 二级菜单）', () => {
     expect(operations).toMatch(/nav-item active">运维/);
   });
 });
+
+describe('展示时间（去掉 ISO 的 T、转本地时区）', () => {
+  it('运维页与主编台不再出现带 T 的 ISO 时间', async () => {
+    const ops = await (await fetch(`${base}/operations`)).text();
+    expect(ops).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
+    expect(ops).toMatch(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}/);
+
+    const compose = await (await fetch(`${base}/compose`)).text();
+    expect(compose).not.toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/);
+    expect(compose).toMatch(/\d{4}-\d{2}-\d{2}/);
+  });
+});
