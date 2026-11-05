@@ -5,6 +5,7 @@ import {
   evaluateAll,
   fitTierForClaims,
   firstHeading,
+  makeNodeId,
   normalizeText,
   parseFrontmatter,
   parseRawPath,
@@ -17,7 +18,7 @@ import {
   type RawState,
   type Result,
 } from '@sb/domain';
-import type { DraftRecord, RawItemRecord, ScoredHit } from '@sb/contracts';
+import type { DraftRecord, NodeDoc, RawItemRecord, ScoredHit } from '@sb/contracts';
 import { AppError, type AppContext } from './context';
 import { nodeFile, renderNewNode, renderPatchedNode } from './render';
 import { effectiveBlockingFindings, effectiveFindings } from './review-policy';
@@ -434,6 +435,26 @@ export async function commitApproved(
       const head = await ctx.vault.head();
       if (!head) throw error;
       commitSha = head;
+    }
+
+    // 增量更新检索索引：批量 job 不再"看不到刚写的新节点"，避免后续草稿重复新建。
+    for (const write of writes) {
+      try {
+        const { data, body: nodeBody } = parseFrontmatter(write.content);
+        const nodeType = (typeof data.node_type === 'string' ? data.node_type : 'concept') as NodeDoc['nodeType'];
+        const name = typeof data.name === 'string' ? data.name : write.file.split('/').pop()?.replace(/\.md$/, '') ?? write.file;
+        await ctx.search.upsert({
+          nodeId: makeNodeId(nodeType, name),
+          name,
+          aliases: Array.isArray(data.aliases) ? data.aliases.map(String) : [],
+          nodeType,
+          file: write.file,
+          body: nodeBody,
+          updatedAt: typeof data.updated_at === 'string' ? data.updated_at : today,
+        });
+      } catch {
+        // 索引更新失败不影响已提交的 wiki；下次 refresh/重启会补齐
+      }
     }
   } catch (error) {
     // 只有真的写过文件才回滚；TARGET_MOVED 发生在写入前，不能误删外部改动

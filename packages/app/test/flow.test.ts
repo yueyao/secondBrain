@@ -174,6 +174,8 @@ describe('应用层：完整流程', () => {
     const content = await harness.vault.readNode('wiki/concepts/幂律分布.md');
     expect(content).toContain('name: "幂律分布"');
     expect(content).toContain('confirmed: true');
+    // 入库后必须立即可被后续草稿/规则看到（批量 job 不能等重启才刷新）
+    expect(ctx.search.allDocs().some((doc) => doc.name === '幂律分布')).toBe(true);
   });
 
   it('队列与待审读模型可用于 UI', async () => {
